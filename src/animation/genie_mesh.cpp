@@ -22,6 +22,8 @@ float QuadraticEaseInOut(float value) {
   return (-2.0f * clamped * clamped) + (4.0f * clamped) - 1.0f;
 }
 
+float Lerp(float from, float to, float progress) { return from + ((to - from) * progress); }
+
 RectF ToBottomLeftRect(const RectF& rect, float viewport_height) {
   return RectF{
       .left = rect.left,
@@ -59,6 +61,19 @@ float SafeDivisor(float value) {
     return value < 0.0f ? -0.0001f : 0.0001f;
   }
   return value;
+}
+
+float BezierAxisPosition(float value, float bezier_min, float bezier_max, float start_value,
+                         float end_value) {
+  if (value < bezier_min) {
+    return start_value;
+  }
+  if (value < bezier_max) {
+    const float progress =
+        QuadraticEaseInOut((value - bezier_min) / SafeDivisor(bezier_max - bezier_min));
+    return Lerp(start_value, end_value, progress);
+  }
+  return end_value;
 }
 
 }  // namespace
@@ -111,84 +126,151 @@ std::vector<PointF> GenieMeshGenerator::GenerateBottomLeftPositions(const RectF&
   positions.reserve(static_cast<std::size_t>((row_count + 1) * (column_count + 1)));
 
   if (horizontal) {
+    const float slide_progress = Clamp01(progress / kSlideAnimationEndFraction);
+    const float translate_progress =
+        Clamp01((progress - kTranslateAnimationStartFraction) /
+                (1.0f - kTranslateAnimationStartFraction));
+
+    if (edge == GenieEdge::kBottom) {
+      const float left_bezier_top_x = source_rect.left;
+      const float right_bezier_top_x = source_rect.right;
+      const float left_bezier_bottom_x =
+          Lerp(left_bezier_top_x, target_rect.left, slide_progress);
+      const float right_bezier_bottom_x =
+          Lerp(right_bezier_top_x, target_rect.right, slide_progress);
+
+      const float translation = translate_progress * (target_rect.bottom - source_rect.bottom);
+      const float top_edge_y = source_rect.bottom + translation;
+      const float bottom_edge_y = std::max(source_rect.top + translation, target_rect.top);
+      const float bezier_min_y = target_rect.bottom;
+      const float bezier_max_y = source_rect.bottom;
+
+      for (int row = 0; row <= row_count; ++row) {
+        const float row_fraction = static_cast<float>(row) / row_count;
+        const float y = Lerp(bottom_edge_y, top_edge_y, row_fraction);
+        const float left_x = BezierAxisPosition(y, bezier_min_y, bezier_max_y,
+                                                left_bezier_bottom_x, left_bezier_top_x);
+        const float right_x = BezierAxisPosition(y, bezier_min_y, bezier_max_y,
+                                                 right_bezier_bottom_x, right_bezier_top_x);
+        positions.push_back(PointF{.x = left_x, .y = y});
+        positions.push_back(PointF{.x = right_x, .y = y});
+      }
+      return positions;
+    }
+
+    if (edge == GenieEdge::kTop) {
+      const float left_bezier_bottom_x = source_rect.left;
+      const float right_bezier_bottom_x = source_rect.right;
+      const float left_bezier_top_x =
+          Lerp(left_bezier_bottom_x, target_rect.left, slide_progress);
+      const float right_bezier_top_x =
+          Lerp(right_bezier_bottom_x, target_rect.right, slide_progress);
+
+      const float translation = translate_progress * (target_rect.top - source_rect.top);
+      const float top_edge_y = std::min(source_rect.bottom + translation, target_rect.bottom);
+      const float bottom_edge_y = source_rect.top + translation;
+      const float bezier_min_y = source_rect.top;
+      const float bezier_max_y = target_rect.top;
+
+      for (int row = 0; row <= row_count; ++row) {
+        const float row_fraction = static_cast<float>(row) / row_count;
+        const float y = Lerp(bottom_edge_y, top_edge_y, row_fraction);
+        const float left_x = BezierAxisPosition(y, bezier_min_y, bezier_max_y,
+                                                left_bezier_bottom_x, left_bezier_top_x);
+        const float right_x = BezierAxisPosition(y, bezier_min_y, bezier_max_y,
+                                                 right_bezier_bottom_x, right_bezier_top_x);
+        positions.push_back(PointF{.x = left_x, .y = y});
+        positions.push_back(PointF{.x = right_x, .y = y});
+      }
+      return positions;
+    }
+
     for (int row = 0; row <= row_count; ++row) {
       const float row_fraction = static_cast<float>(row) / row_count;
-      const float v = (edge == GenieEdge::kBottom) ? row_fraction : (1.0f - row_fraction);
-
-      // Local progress calculation for each row to create the funnel/sucking effect
-      const float start_time = 0.4f * v;
-      const float end_time = 0.5f + 0.5f * v;
-      const float p = Clamp01((progress - start_time) / (end_time - start_time));
-      const float eased_p = QuadraticEaseInOut(p);
-
-      // Interpolate Y coordinate between source and target positions
-      const float source_y =
-          source_rect.top + (source_rect.bottom - source_rect.top) * row_fraction;
-      const float target_y =
-          target_rect.top + (target_rect.bottom - target_rect.top) * row_fraction;
-      const float y = source_y + (target_y - source_y) * eased_p;
-
-      // Interpolate X coordinates (left and right edges) to squeeze the width
-      const float source_left = source_rect.left;
-      const float target_left = target_rect.left;
-      const float left_x = source_left + (target_left - source_left) * eased_p;
-
-      const float source_right = source_rect.right;
-      const float target_right = target_rect.right;
-      const float right_x = source_right + (target_right - source_right) * eased_p;
+      const float y = Lerp(source_rect.top, target_rect.top, row_fraction);
+      const float left_x = Lerp(source_rect.left, target_rect.left, progress);
+      const float right_x = Lerp(source_rect.right, target_rect.right, progress);
 
       positions.push_back(PointF{.x = left_x, .y = y});
       positions.push_back(PointF{.x = right_x, .y = y});
     }
   } else {
-    // Vertical taskbar (kLeft or kRight)
-    // Row 0: Bottom edge of the grid
-    for (int column = 0; column <= column_count; ++column) {
-      const float column_fraction = static_cast<float>(column) / column_count;
-      const float v = (edge == GenieEdge::kLeft) ? column_fraction : (1.0f - column_fraction);
+    const float slide_progress = Clamp01(progress / kSlideAnimationEndFraction);
+    const float translate_progress =
+        Clamp01((progress - kTranslateAnimationStartFraction) /
+                (1.0f - kTranslateAnimationStartFraction));
 
-      const float start_time = 0.4f * v;
-      const float end_time = 0.5f + 0.5f * v;
-      const float p = Clamp01((progress - start_time) / (end_time - start_time));
-      const float eased_p = QuadraticEaseInOut(p);
+    if (edge == GenieEdge::kLeft) {
+      const float top_bezier_right_y = source_rect.bottom;
+      const float bottom_bezier_right_y = source_rect.top;
+      const float top_bezier_left_y =
+          Lerp(top_bezier_right_y, target_rect.bottom, slide_progress);
+      const float bottom_bezier_left_y =
+          Lerp(bottom_bezier_right_y, target_rect.top, slide_progress);
 
-      // Interpolate X coordinate between source and target positions
-      const float source_x =
-          source_rect.left + (source_rect.right - source_rect.left) * column_fraction;
-      const float target_x =
-          target_rect.left + (target_rect.right - target_rect.left) * column_fraction;
-      const float x = source_x + (target_x - source_x) * eased_p;
+      const float translation = translate_progress * (target_rect.right - source_rect.right);
+      const float left_edge_x = std::max(source_rect.left + translation, target_rect.left);
+      const float right_edge_x = source_rect.right + translation;
+      const float bezier_min_x = target_rect.right;
+      const float bezier_max_x = source_rect.right;
 
-      // Interpolate Y coordinate for the bottom boundary
-      const float source_bottom = source_rect.top;
-      const float target_bottom = target_rect.top;
-      const float bottom_y = source_bottom + (target_bottom - source_bottom) * eased_p;
-
-      positions.push_back(PointF{.x = x, .y = bottom_y});
+      for (int row = 0; row <= row_count; ++row) {
+        const bool top_row = row == 1;
+        for (int column = 0; column <= column_count; ++column) {
+          const float column_fraction = static_cast<float>(column) / column_count;
+          const float x = Lerp(left_edge_x, right_edge_x, column_fraction);
+          const float y = BezierAxisPosition(
+              x, bezier_min_x, bezier_max_x,
+              top_row ? top_bezier_left_y : bottom_bezier_left_y,
+              top_row ? top_bezier_right_y : bottom_bezier_right_y);
+          positions.push_back(PointF{.x = x, .y = y});
+        }
+      }
+      return positions;
     }
-    // Row 1: Top edge of the grid
+
+    if (edge == GenieEdge::kRight) {
+      const float top_bezier_left_y = source_rect.bottom;
+      const float bottom_bezier_left_y = source_rect.top;
+      const float top_bezier_right_y =
+          Lerp(top_bezier_left_y, target_rect.bottom, slide_progress);
+      const float bottom_bezier_right_y =
+          Lerp(bottom_bezier_left_y, target_rect.top, slide_progress);
+
+      const float translation = translate_progress * (target_rect.left - source_rect.left);
+      const float left_edge_x = source_rect.left + translation;
+      const float right_edge_x = std::min(source_rect.right + translation, target_rect.right);
+      const float bezier_min_x = source_rect.left;
+      const float bezier_max_x = target_rect.left;
+
+      for (int row = 0; row <= row_count; ++row) {
+        const bool top_row = row == 1;
+        for (int column = 0; column <= column_count; ++column) {
+          const float column_fraction = static_cast<float>(column) / column_count;
+          const float x = Lerp(left_edge_x, right_edge_x, column_fraction);
+          const float y = BezierAxisPosition(
+              x, bezier_min_x, bezier_max_x,
+              top_row ? top_bezier_left_y : bottom_bezier_left_y,
+              top_row ? top_bezier_right_y : bottom_bezier_right_y);
+          positions.push_back(PointF{.x = x, .y = y});
+        }
+      }
+      return positions;
+    }
+
     for (int column = 0; column <= column_count; ++column) {
       const float column_fraction = static_cast<float>(column) / column_count;
-      const float v = (edge == GenieEdge::kLeft) ? column_fraction : (1.0f - column_fraction);
-
-      const float start_time = 0.4f * v;
-      const float end_time = 0.5f + 0.5f * v;
-      const float p = Clamp01((progress - start_time) / (end_time - start_time));
-      const float eased_p = QuadraticEaseInOut(p);
-
-      // Interpolate X coordinate between source and target positions
-      const float source_x =
-          source_rect.left + (source_rect.right - source_rect.left) * column_fraction;
-      const float target_x =
-          target_rect.left + (target_rect.right - target_rect.left) * column_fraction;
-      const float x = source_x + (target_x - source_x) * eased_p;
-
-      // Interpolate Y coordinate for the top boundary
-      const float source_top = source_rect.bottom;
-      const float target_top = target_rect.bottom;
-      const float top_y = source_top + (target_top - source_top) * eased_p;
-
-      positions.push_back(PointF{.x = x, .y = top_y});
+      positions.push_back(PointF{
+          .x = Lerp(source_rect.left, target_rect.left, column_fraction),
+          .y = Lerp(source_rect.top, target_rect.top, progress),
+      });
+    }
+    for (int column = 0; column <= column_count; ++column) {
+      const float column_fraction = static_cast<float>(column) / column_count;
+      positions.push_back(PointF{
+          .x = Lerp(source_rect.left, target_rect.left, column_fraction),
+          .y = Lerp(source_rect.bottom, target_rect.bottom, progress),
+      });
     }
   }
 

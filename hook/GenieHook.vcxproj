@@ -42,8 +42,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Platform)'=='x64'">
-    <OutDir>$(ProjectDir)..\build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)..\obj\Hook\$(Platform)\$(Configuration)\</IntDir>
+    <OutDir>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\build\obj\Hook\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>GenieHookPost</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>
@@ -69,8 +69,10 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <PreBuildEvent>
-      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"</Command>
-      <Message>Stopping running Genie processes...</Message>
+      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
+del "$(OutDir)*.old" &gt;nul 2&gt;nul
+if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+      <Message>Stopping running Genie processes and renaming locked hook DLL...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -92,8 +94,10 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PreBuildEvent>
-      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"</Command>
-      <Message>Stopping running Genie processes...</Message>
+      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
+del "$(OutDir)*.old" &gt;nul 2&gt;nul
+if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+      <Message>Stopping running Genie processes and renaming locked hook DLL...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
