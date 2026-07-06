@@ -258,20 +258,12 @@ void BringWindowForwardForCapture(HWND window) {
                        std::to_wstring(top_ok != FALSE) + L" window " + WindowTraceString(window));
 }
 
-bool ForegroundBelongsToWindowProcess(HWND window, HWND ignored_window) {
+bool ForegroundIsExactWindow(HWND window, HWND ignored_window) {
   HWND foreground = GetForegroundWindow();
   if (foreground == nullptr || foreground == ignored_window) {
     return false;
   }
-  if (foreground == window || GetAncestor(foreground, GA_ROOT) == window) {
-    return true;
-  }
-
-  DWORD foreground_pid = 0;
-  DWORD window_pid = 0;
-  GetWindowThreadProcessId(foreground, &foreground_pid);
-  GetWindowThreadProcessId(window, &window_pid);
-  return foreground_pid != 0 && foreground_pid == window_pid;
+  return foreground == window || GetAncestor(foreground, GA_ROOT) == window;
 }
 
 void KeepGenieMinimizedWindowHidden(HWND window) {
@@ -1026,8 +1018,7 @@ bool Application::IsGenieWindowRestored(HWND window) const {
   if (GetWindowPlacement(window, &placement) && !IsMinimizedShowCommand(placement.showCmd)) {
     return true;
   }
-
-  return ForegroundBelongsToWindowProcess(window, overlay_window_.window());
+  return ForegroundIsExactWindow(window, overlay_window_.window());
 }
 
 bool Application::OnRestoreAttempt(HWND window) {
