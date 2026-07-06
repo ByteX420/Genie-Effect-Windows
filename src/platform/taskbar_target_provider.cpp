@@ -395,8 +395,6 @@ TaskbarTarget TaskbarTargetProvider::GetTargetForWindow(HWND window,
     }
   }
 
-  const genie::animation::RectF source = ToRectF(window_rect);
-
   genie::animation::GenieEdge edge = genie::animation::GenieEdge::kBottom;
   genie::animation::RectF target{};
 

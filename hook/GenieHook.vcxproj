@@ -70,9 +70,13 @@
     </ClCompile>
     <PreBuildEvent>
       <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
-del "$(OutDir)*.old" &gt;nul 2&gt;nul
-if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
-      <Message>Stopping running Genie processes and renaming locked hook DLL...</Message>
+if exist "$(OutDir)" del "$(OutDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)GenieHookPost.pdb" move /y "$(IntDir)GenieHookPost.pdb" "$(IntDir)GenieHookPost.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+      <Message>Stopping running Genie processes and renaming locked hook DLL/PDB files...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -95,9 +99,13 @@ if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(Ou
     </Link>
     <PreBuildEvent>
       <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
-del "$(OutDir)*.old" &gt;nul 2&gt;nul
-if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
-      <Message>Stopping running Genie processes and renaming locked hook DLL...</Message>
+if exist "$(OutDir)" del "$(OutDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)GenieHookPost.pdb" move /y "$(IntDir)GenieHookPost.pdb" "$(IntDir)GenieHookPost.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+      <Message>Stopping running Genie processes and renaming locked hook DLL/PDB files...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -247,14 +247,14 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
                                      taskbar_window_rect.right, taskbar_window_rect.bottom);
     HRGN result_rgn = CreateRectRgn(0, 0, 0, 0);
     if (CombineRgn(result_rgn, full_rgn, taskbar_rgn, RGN_DIFF) != ERROR) {
-      SetWindowRgn(window_, result_rgn, TRUE);
+      genie::platform::SetOwnedWindowRegion(window_, result_rgn, true);
     } else {
       DeleteObject(result_rgn);
     }
     DeleteObject(full_rgn);
     DeleteObject(taskbar_rgn);
   } else {
-    SetWindowRgn(window_, nullptr, TRUE);
+    genie::platform::SetOwnedWindowRegion(window_, nullptr, true);
   }
 
   DwmFlush();
@@ -780,7 +780,7 @@ void OverlayWindow::ClearFrame() {
 void OverlayWindow::HideOverlay() {
   if (window_ != nullptr) {
     ClearFrame();
-    SetWindowRgn(window_, nullptr, TRUE);
+    genie::platform::SetOwnedWindowRegion(window_, nullptr, true);
     SetWindowPos(window_, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
   }

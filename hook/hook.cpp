@@ -34,9 +34,7 @@ bool IsRestoreCommand(LPARAM l_param) {
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
   (void)hModule;
   (void)lpReserved;
-  if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
-    LogDebug(L"HookDLL", L"DLL_PROCESS_ATTACH loaded successfully");
-  }
+  (void)ul_reason_for_call;
   return TRUE;
 }
 
@@ -97,10 +95,17 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK CBTProc(int code, WPARAM w_par
                                  std::to_wstring(reinterpret_cast<std::uintptr_t>(overlay_window)) +
                                  L" message=" + std::to_wstring(message));
         if (overlay_window != nullptr && message != 0) {
-          const LRESULT handled = SendMessageW(overlay_window, message,
-                                               reinterpret_cast<WPARAM>(target_window), l_param);
+          DWORD_PTR handled = 0;
+          constexpr UINT kRestoreMessageTimeoutMs = 75;
+          const LRESULT send_result =
+              SendMessageTimeoutW(overlay_window, message, reinterpret_cast<WPARAM>(target_window),
+                                  l_param, SMTO_ABORTIFHUNG, kRestoreMessageTimeoutMs, &handled);
+          if (send_result == 0) {
+            LogDebug(L"HookDLL", L"SendMessageTimeout(GenieRestoreAttempt) failed error=" +
+                                     std::to_wstring(GetLastError()));
+          }
           LogDebug(L"HookDLL",
-                   L"SendMessage(GenieRestoreAttempt) returned " + std::to_wstring(handled));
+                   L"SendMessageTimeout(GenieRestoreAttempt) returned " + std::to_wstring(handled));
           if (handled != 0) {
             return 1;
           }

@@ -21,6 +21,16 @@ constexpr char kDecoratedCbtProcName[] = "_CBTProc@12";
 constexpr wchar_t kAllowMinimizeProperty[] = L"GenieAllowMinimize";
 constexpr wchar_t kAllowRestoreProperty[] = L"GenieAllowRestore";
 constexpr wchar_t kIsMinimizingProperty[] = L"GenieIsMinimizing";
+constexpr wchar_t kOriginalPlacementLeftProperty[] = L"GenieOriginalPlacementLeft";
+constexpr wchar_t kOriginalPlacementTopProperty[] = L"GenieOriginalPlacementTop";
+constexpr wchar_t kOriginalPlacementRightProperty[] = L"GenieOriginalPlacementRight";
+constexpr wchar_t kOriginalPlacementBottomProperty[] = L"GenieOriginalPlacementBottom";
+constexpr wchar_t kMovedOffscreenProperty[] = L"GenieMovedOffscreen";
+constexpr wchar_t kWasMaximizedProperty[] = L"GenieWasMaximized";
+constexpr wchar_t kOriginalExStyleProperty[] = L"GenieOriginalExStyle";
+constexpr wchar_t kWasLayeredProperty[] = L"GenieWasLayered";
+constexpr wchar_t kOriginalAlphaProperty[] = L"GenieOriginalAlpha";
+constexpr wchar_t kOriginalFlagsProperty[] = L"GenieOriginalFlags";
 constexpr ULONGLONG kDesktopRefreshIntervalMs = 16;
 constexpr ULONGLONG kAnimationFrameIntervalMs = 8;
 
@@ -144,6 +154,11 @@ bool IsUsableRect(const RECT& rect) {
          rect.top > -30000;
 }
 
+bool IsMinimizedShowCommand(UINT show_command) {
+  return show_command == SW_SHOWMINIMIZED || show_command == SW_MINIMIZE ||
+         show_command == SW_SHOWMINNOACTIVE;
+}
+
 RECT RectWithSizeAt(const RECT& rect, LONG left, LONG top) {
   return RECT{
       .left = left,
@@ -153,16 +168,58 @@ RECT RectWithSizeAt(const RECT& rect, LONG left, LONG top) {
   };
 }
 
+void StoreOriginalPlacementProperties(HWND window, const RECT& rect) {
+  SetPropW(window, kOriginalPlacementLeftProperty,
+           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(rect.left)));
+  SetPropW(window, kOriginalPlacementTopProperty,
+           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(rect.top)));
+  SetPropW(window, kOriginalPlacementRightProperty,
+           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(rect.right)));
+  SetPropW(window, kOriginalPlacementBottomProperty,
+           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(rect.bottom)));
+}
+
+std::optional<RECT> ReadOriginalPlacementProperties(HWND window) {
+  RECT rect{
+      .left = static_cast<LONG>(
+          reinterpret_cast<INT_PTR>(GetPropW(window, kOriginalPlacementLeftProperty))),
+      .top = static_cast<LONG>(
+          reinterpret_cast<INT_PTR>(GetPropW(window, kOriginalPlacementTopProperty))),
+      .right = static_cast<LONG>(
+          reinterpret_cast<INT_PTR>(GetPropW(window, kOriginalPlacementRightProperty))),
+      .bottom = static_cast<LONG>(
+          reinterpret_cast<INT_PTR>(GetPropW(window, kOriginalPlacementBottomProperty))),
+  };
+  if (!IsUsableRect(rect)) {
+    return std::nullopt;
+  }
+  return rect;
+}
+
+void StoreWasMaximizedProperty(HWND window, bool was_maximized) {
+  if (was_maximized) {
+    SetPropW(window, kWasMaximizedProperty, reinterpret_cast<HANDLE>(1));
+  } else {
+    RemovePropW(window, kWasMaximizedProperty);
+  }
+}
+
+bool HasGenieWindowState(HWND window) {
+  return GetPropW(window, kMovedOffscreenProperty) != nullptr ||
+         GetPropW(window, kOriginalExStyleProperty) != nullptr ||
+         GetPropW(window, kOriginalPlacementLeftProperty) != nullptr;
+}
+
 void ClearGenieWindowProperties(HWND window) {
   if (!IsWindow(window)) {
     return;
   }
-  RemovePropW(window, L"GenieOriginalPlacementLeft");
-  RemovePropW(window, L"GenieOriginalPlacementTop");
-  RemovePropW(window, L"GenieOriginalPlacementRight");
-  RemovePropW(window, L"GenieOriginalPlacementBottom");
-  RemovePropW(window, L"GenieMovedOffscreen");
-  RemovePropW(window, L"GenieWasMaximized");
+  RemovePropW(window, kOriginalPlacementLeftProperty);
+  RemovePropW(window, kOriginalPlacementTopProperty);
+  RemovePropW(window, kOriginalPlacementRightProperty);
+  RemovePropW(window, kOriginalPlacementBottomProperty);
+  RemovePropW(window, kMovedOffscreenProperty);
+  RemovePropW(window, kWasMaximizedProperty);
   RemovePropW(window, kIsMinimizingProperty);
   RemovePropW(window, kAllowMinimizeProperty);
   RemovePropW(window, kAllowRestoreProperty);
@@ -277,14 +334,14 @@ std::optional<RECT> ResolveAnimationBounds(HWND window) {
 }
 
 void MakeWindowTransparent(HWND window) {
-  if (GetPropW(window, L"GenieOriginalExStyle") != nullptr) {
+  if (GetPropW(window, kOriginalExStyleProperty) != nullptr) {
     TraceWindowEvent(L"MakeWindowTransparent skipped: already transparent", window);
     return;
   }
 
   TraceWindowEvent(L"MakeWindowTransparent begin", window);
   LONG_PTR ex_style = GetWindowLongPtrW(window, GWL_EXSTYLE);
-  SetPropW(window, L"GenieOriginalExStyle", reinterpret_cast<HANDLE>(ex_style));
+  SetPropW(window, kOriginalExStyleProperty, reinterpret_cast<HANDLE>(ex_style));
 
   BYTE alpha = 255;
   DWORD flags = 0;
@@ -292,10 +349,10 @@ void MakeWindowTransparent(HWND window) {
   if (was_layered) {
     GetLayeredWindowAttributes(window, nullptr, &alpha, &flags);
   }
-  SetPropW(window, L"GenieWasLayered",
+  SetPropW(window, kWasLayeredProperty,
            reinterpret_cast<HANDLE>(static_cast<INT_PTR>(was_layered ? 1 : 0)));
-  SetPropW(window, L"GenieOriginalAlpha", reinterpret_cast<HANDLE>(static_cast<INT_PTR>(alpha)));
-  SetPropW(window, L"GenieOriginalFlags", reinterpret_cast<HANDLE>(static_cast<INT_PTR>(flags)));
+  SetPropW(window, kOriginalAlphaProperty, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(alpha)));
+  SetPropW(window, kOriginalFlagsProperty, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(flags)));
 
   SetWindowLongPtrW(window, GWL_EXSTYLE, ex_style | WS_EX_LAYERED);
   SetLayeredWindowAttributes(window, 0, 0, LWA_ALPHA);
@@ -303,7 +360,7 @@ void MakeWindowTransparent(HWND window) {
 }
 
 void RestoreWindowTransparency(HWND window) {
-  HANDLE ex_style_prop = GetPropW(window, L"GenieOriginalExStyle");
+  HANDLE ex_style_prop = GetPropW(window, kOriginalExStyleProperty);
   if (ex_style_prop == nullptr) {
     TraceWindowEvent(L"RestoreWindowTransparency skipped: no original style", window);
     return;
@@ -311,12 +368,12 @@ void RestoreWindowTransparency(HWND window) {
 
   TraceWindowEvent(L"RestoreWindowTransparency begin", window);
   LONG_PTR original_ex_style = reinterpret_cast<LONG_PTR>(ex_style_prop);
-  BOOL was_layered = GetPropW(window, L"GenieWasLayered") != nullptr &&
-                     reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieWasLayered")) != 0;
+  BOOL was_layered = GetPropW(window, kWasLayeredProperty) != nullptr &&
+                     reinterpret_cast<INT_PTR>(GetPropW(window, kWasLayeredProperty)) != 0;
   BYTE alpha =
-      static_cast<BYTE>(reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieOriginalAlpha")));
+      static_cast<BYTE>(reinterpret_cast<INT_PTR>(GetPropW(window, kOriginalAlphaProperty)));
   DWORD flags =
-      static_cast<DWORD>(reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieOriginalFlags")));
+      static_cast<DWORD>(reinterpret_cast<INT_PTR>(GetPropW(window, kOriginalFlagsProperty)));
 
   if (was_layered) {
     SetLayeredWindowAttributes(window, 0, alpha, flags);
@@ -325,10 +382,10 @@ void RestoreWindowTransparency(HWND window) {
     SetWindowLongPtrW(window, GWL_EXSTYLE, original_ex_style & ~WS_EX_LAYERED);
   }
 
-  RemovePropW(window, L"GenieOriginalExStyle");
-  RemovePropW(window, L"GenieWasLayered");
-  RemovePropW(window, L"GenieOriginalAlpha");
-  RemovePropW(window, L"GenieOriginalFlags");
+  RemovePropW(window, kOriginalExStyleProperty);
+  RemovePropW(window, kWasLayeredProperty);
+  RemovePropW(window, kOriginalAlphaProperty);
+  RemovePropW(window, kOriginalFlagsProperty);
   TraceWindowEvent(L"RestoreWindowTransparency end", window);
 }
 
@@ -449,7 +506,7 @@ int Application::Run() {
       }
       if (!overlay_window_.clock_started()) {
         const bool is_iconic = IsIconic(animating_window_) != FALSE;
-        const bool is_moved = GetPropW(animating_window_, L"GenieMovedOffscreen") != nullptr;
+        const bool is_moved = GetPropW(animating_window_, kMovedOffscreenProperty) != nullptr;
         if (is_iconic || is_moved) {
           if (IsTraceLoggingEnabled()) {
             LogTrace(L"App", L"Run starting animation clock is_iconic=" +
@@ -547,8 +604,8 @@ int Application::Run() {
         TraceWindowEvent(L"Run minimize animation completed before SetWindowRgn",
                          animating_window_);
         RemovePropW(animating_window_, kAllowMinimizeProperty);
-        HRGN hRgn = CreateRectRgn(0, 0, 0, 0);
-        SetWindowRgn(animating_window_, hRgn, TRUE);
+        HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
+        platform::SetOwnedWindowRegion(animating_window_, hidden_region, true);
         std::wcout << L"Minimize animation completed.\n";
       }
       animating_window_ = nullptr;
@@ -570,46 +627,8 @@ int Application::Run() {
       // longer iconic and trigger the restore animation.
       if (animating_window_ == nullptr && !overlay_window_.active()) {
         for (auto& [hwnd, snapshot] : restore_snapshots_) {
-          const bool is_win = IsWindow(hwnd) != FALSE;
-          const bool is_iconic = IsIconic(hwnd) != FALSE;
-          bool is_visible = IsWindowVisible(hwnd) != FALSE;
-
-          bool is_restored = false;
-          if (is_win) {
-            if (!is_iconic) {
-              is_restored = true;
-            } else {
-              // Fallback 1: Window placement showCmd might not be minimized
-              WINDOWPLACEMENT wp{};
-              wp.length = sizeof(wp);
-              if (GetWindowPlacement(hwnd, &wp)) {
-                if (wp.showCmd != SW_SHOWMINIMIZED && wp.showCmd != SW_MINIMIZE &&
-                    wp.showCmd != SW_SHOWMINNOACTIVE) {
-                  is_restored = true;
-                }
-              }
-              // Fallback 2: The app gained foreground focus
-              if (!is_restored) {
-                HWND fg = GetForegroundWindow();
-                if (fg != nullptr && fg != overlay_window_.window()) {
-                  DWORD fg_pid = 0;
-                  GetWindowThreadProcessId(fg, &fg_pid);
-                  DWORD hwnd_pid = 0;
-                  GetWindowThreadProcessId(hwnd, &hwnd_pid);
-                  if (fg_pid != 0 && fg_pid == hwnd_pid) {
-                    is_restored = true;
-                    is_visible = true;
-                  }
-                }
-              }
-            }
-          }
-
-          if (is_restored && !is_visible) {
-            is_restored = false;
-          }
-
-          if (is_restored) {
+          (void)snapshot;
+          if (IsWindow(hwnd) && IsWindowVisible(hwnd) && IsGenieWindowRestored(hwnd)) {
             std::wcout << L"Poll: detected restore for hwnd=0x" << std::hex
                        << reinterpret_cast<std::uintptr_t>(hwnd) << std::dec << std::endl;
             OnRestoreAttempt(hwnd);
@@ -857,17 +876,8 @@ bool Application::OnMinimizeStart(HWND window) {
   TraceWindowEvent(L"OnMinimizeStart after cloak transparent", window);
 
   native_animation_blocker_.SetTransitionsDisabledForWindow(window, true);
-  SetPropW(window, L"GenieOriginalPlacementLeft",
-           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(original_normal_rect.left)));
-  SetPropW(window, L"GenieOriginalPlacementTop",
-           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(original_normal_rect.top)));
-  SetPropW(window, L"GenieOriginalPlacementRight",
-           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(original_normal_rect.right)));
-  SetPropW(window, L"GenieOriginalPlacementBottom",
-           reinterpret_cast<HANDLE>(static_cast<INT_PTR>(original_normal_rect.bottom)));
-  if (restore_to_maximized) {
-    SetPropW(window, L"GenieWasMaximized", reinterpret_cast<HANDLE>(1));
-  }
+  StoreOriginalPlacementProperties(window, original_normal_rect);
+  StoreWasMaximizedProperty(window, restore_to_maximized);
   SetPropW(window, kIsMinimizingProperty, reinterpret_cast<HANDLE>(1));
   minimize_start_time_ms_ = GetTickCount64();
   pending_native_minimize_window_ = window;
@@ -947,13 +957,13 @@ void Application::CompletePendingNativeMinimize() {
   const bool was_restore_maximized =
       snap_it->second.was_maximized || (wp.flags & WPF_RESTORETOMAXIMIZED) != 0;
   if (was_restore_maximized) {
-    SetPropW(window, L"GenieWasMaximized", reinterpret_cast<HANDLE>(1));
+    SetPropW(window, kWasMaximizedProperty, reinterpret_cast<HANDLE>(1));
   }
 
   TraceWindowEvent(L"CompletePendingNativeMinimize before final cloak transparent", window);
   platform::SetWindowCloaked(window, true);
   MakeWindowTransparent(window);
-  SetPropW(window, L"GenieMovedOffscreen", reinterpret_cast<HANDLE>(1));
+  SetPropW(window, kMovedOffscreenProperty, reinterpret_cast<HANDLE>(1));
   TraceWindowEvent(L"CompletePendingNativeMinimize after final cloak transparent moved_offscreen",
                    window);
   snap_it->second.was_maximized = was_restore_maximized;
@@ -962,6 +972,62 @@ void Application::CompletePendingNativeMinimize() {
   TraceWindowEvent(L"CompletePendingNativeMinimize before StartAnimationClock", window);
   overlay_window_.StartAnimationClock();
   std::wcout << L"Native minimize completed; starting animation clock.\n";
+}
+
+bool Application::PreserveRestorePlacementAndMarkOffscreen(HWND window, CachedSnapshot* snapshot) {
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(placement);
+  if (!GetWindowPlacement(window, &placement)) {
+    return false;
+  }
+
+  RECT original_rect = placement.rcNormalPosition;
+  if (!IsUsableRect(original_rect) && snapshot != nullptr) {
+    original_rect = IsUsableRect(snapshot->original_placement) ? snapshot->original_placement
+                                                               : snapshot->bounds;
+  }
+  if (!IsUsableRect(original_rect)) {
+    const std::optional<RECT> bounds = platform::GetExtendedFrameBounds(window);
+    if (bounds.has_value() && IsUsableRect(*bounds)) {
+      original_rect = *bounds;
+    }
+  }
+  if (!IsUsableRect(original_rect)) {
+    return false;
+  }
+
+  const bool was_maximized =
+      IsZoomed(window) != FALSE || (snapshot != nullptr && snapshot->was_maximized);
+  if (snapshot != nullptr) {
+    if (!IsUsableRect(snapshot->original_placement)) {
+      snapshot->original_placement = original_rect;
+    }
+    snapshot->was_maximized = was_maximized;
+    snapshot->moved_offscreen = true;
+  }
+
+  StoreOriginalPlacementProperties(window, original_rect);
+  SetPropW(window, kMovedOffscreenProperty, reinterpret_cast<HANDLE>(1));
+  StoreWasMaximizedProperty(window, was_maximized);
+  return true;
+}
+
+bool Application::IsGenieWindowRestored(HWND window) const {
+  if (restore_snapshots_.count(window) == 0 && GetPropW(window, kIsMinimizingProperty) == nullptr) {
+    return false;
+  }
+
+  if (IsIconic(window) == FALSE) {
+    return true;
+  }
+
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(placement);
+  if (GetWindowPlacement(window, &placement) && !IsMinimizedShowCommand(placement.showCmd)) {
+    return true;
+  }
+
+  return ForegroundBelongsToWindowProcess(window, overlay_window_.window());
 }
 
 bool Application::OnRestoreAttempt(HWND window) {
@@ -977,7 +1043,7 @@ bool Application::OnRestoreAttempt(HWND window) {
   auto snapshot_it = restore_snapshots_.find(window);
   const bool has_snapshot = snapshot_it != restore_snapshots_.end();
   const bool snapshot_moved_offscreen = has_snapshot && snapshot_it->second.moved_offscreen;
-  const bool prop_moved_offscreen = GetPropW(window, L"GenieMovedOffscreen") != nullptr;
+  const bool prop_moved_offscreen = GetPropW(window, kMovedOffscreenProperty) != nullptr;
   const bool is_moved_offscreen = snapshot_moved_offscreen || prop_moved_offscreen;
   const bool window_was_genie_minimized =
       has_snapshot || GetPropW(window, kIsMinimizingProperty) != nullptr;
@@ -1030,48 +1096,9 @@ bool Application::OnRestoreAttempt(HWND window) {
         MakeWindowTransparent(window);
         TraceWindowEvent(L"OnRestoreAttempt active animation after cloak transparent", window);
         if (!is_moved_offscreen) {
-          WINDOWPLACEMENT wp{};
-          wp.length = sizeof(wp);
-          if (GetWindowPlacement(window, &wp)) {
-            RECT orig_rect = wp.rcNormalPosition;
-            if (!IsUsableRect(orig_rect) && has_snapshot) {
-              orig_rect = IsUsableRect(snapshot_it->second.original_placement)
-                              ? snapshot_it->second.original_placement
-                              : snapshot_it->second.bounds;
-            }
-            if (!IsUsableRect(orig_rect)) {
-              const std::optional<RECT> bounds = platform::GetExtendedFrameBounds(window);
-              if (bounds.has_value() && IsUsableRect(*bounds)) {
-                orig_rect = *bounds;
-              }
-            }
-            if (!IsUsableRect(orig_rect)) {
-              return true;
-            }
-            bool was_maximized =
-                IsZoomed(window) != FALSE || (has_snapshot && snapshot_it->second.was_maximized);
-
-            if (has_snapshot) {
-              if (!IsUsableRect(snapshot_it->second.original_placement)) {
-                snapshot_it->second.original_placement = orig_rect;
-              }
-              snapshot_it->second.was_maximized = was_maximized;
-              snapshot_it->second.moved_offscreen = true;
-            }
-
-            SetPropW(window, L"GenieOriginalPlacementLeft",
-                     reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.left)));
-            SetPropW(window, L"GenieOriginalPlacementTop",
-                     reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.top)));
-            SetPropW(window, L"GenieOriginalPlacementRight",
-                     reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.right)));
-            SetPropW(window, L"GenieOriginalPlacementBottom",
-                     reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.bottom)));
-            SetPropW(window, L"GenieMovedOffscreen", reinterpret_cast<HANDLE>(1));
-
-            if (was_maximized) {
-              SetPropW(window, L"GenieWasMaximized", reinterpret_cast<HANDLE>(1));
-            }
+          CachedSnapshot* snapshot = has_snapshot ? &snapshot_it->second : nullptr;
+          if (!PreserveRestorePlacementAndMarkOffscreen(window, snapshot)) {
+            return true;
           }
         }
       }
@@ -1100,48 +1127,9 @@ bool Application::OnRestoreAttempt(HWND window) {
     platform::SetWindowCloaked(window, true);
     MakeWindowTransparent(window);
     TraceWindowEvent(L"OnRestoreAttempt after pre-animation cloak transparent", window);
-    WINDOWPLACEMENT wp{};
-    wp.length = sizeof(wp);
-    if (GetWindowPlacement(window, &wp)) {
-      RECT orig_rect = wp.rcNormalPosition;
-      if (!IsUsableRect(orig_rect) && has_snapshot) {
-        orig_rect = IsUsableRect(snapshot_it->second.original_placement)
-                        ? snapshot_it->second.original_placement
-                        : snapshot_it->second.bounds;
-      }
-      if (!IsUsableRect(orig_rect)) {
-        const std::optional<RECT> bounds = platform::GetExtendedFrameBounds(window);
-        if (bounds.has_value() && IsUsableRect(*bounds)) {
-          orig_rect = *bounds;
-        }
-      }
-      if (!IsUsableRect(orig_rect)) {
-        return false;
-      }
-      bool was_maximized =
-          IsZoomed(window) != FALSE || (has_snapshot && snapshot_it->second.was_maximized);
-
-      if (has_snapshot) {
-        if (!IsUsableRect(snapshot_it->second.original_placement)) {
-          snapshot_it->second.original_placement = orig_rect;
-        }
-        snapshot_it->second.was_maximized = was_maximized;
-        snapshot_it->second.moved_offscreen = true;
-      }
-
-      SetPropW(window, L"GenieOriginalPlacementLeft",
-               reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.left)));
-      SetPropW(window, L"GenieOriginalPlacementTop",
-               reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.top)));
-      SetPropW(window, L"GenieOriginalPlacementRight",
-               reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.right)));
-      SetPropW(window, L"GenieOriginalPlacementBottom",
-               reinterpret_cast<HANDLE>(static_cast<INT_PTR>(orig_rect.bottom)));
-      SetPropW(window, L"GenieMovedOffscreen", reinterpret_cast<HANDLE>(1));
-
-      if (was_maximized) {
-        SetPropW(window, L"GenieWasMaximized", reinterpret_cast<HANDLE>(1));
-      }
+    CachedSnapshot* snapshot = has_snapshot ? &snapshot_it->second : nullptr;
+    if (!PreserveRestorePlacementAndMarkOffscreen(window, snapshot)) {
+      return false;
     }
   } else if (!window_is_iconic && is_moved_offscreen) {
     TraceWindowEvent(L"OnRestoreAttempt before recloak moved-offscreen window", window);
@@ -1200,35 +1188,7 @@ void Application::OnWindowSeen(HWND window) {
 
   native_animation_blocker_.SetTransitionsDisabledForWindow(window, true);
 
-  bool is_restored = false;
-  if (restore_snapshots_.count(window) > 0 || GetPropW(window, kIsMinimizingProperty) != nullptr) {
-    if (!IsIconic(window)) {
-      is_restored = true;
-    } else {
-      WINDOWPLACEMENT wp{};
-      wp.length = sizeof(wp);
-      if (GetWindowPlacement(window, &wp)) {
-        if (wp.showCmd != SW_SHOWMINIMIZED && wp.showCmd != SW_MINIMIZE &&
-            wp.showCmd != SW_SHOWMINNOACTIVE) {
-          is_restored = true;
-        }
-      }
-      if (!is_restored) {
-        HWND fg = GetForegroundWindow();
-        if (fg != nullptr && fg != overlay_window_.window()) {
-          DWORD fg_pid = 0;
-          GetWindowThreadProcessId(fg, &fg_pid);
-          DWORD hwnd_pid = 0;
-          GetWindowThreadProcessId(window, &hwnd_pid);
-          if (fg_pid != 0 && fg_pid == hwnd_pid) {
-            is_restored = true;
-          }
-        }
-      }
-    }
-  }
-
-  if (is_restored && IsWindowVisible(window)) {
+  if (IsWindowVisible(window) && IsGenieWindowRestored(window)) {
     std::wcout << L"OnWindowSeen: surprise restore detected for hwnd=0x" << std::hex
                << reinterpret_cast<std::uintptr_t>(window) << std::dec << L"\n";
     LogDebug(L"App", L"OnWindowSeen: surprise restore detected for hwnd=0x" +
@@ -1310,7 +1270,7 @@ void Application::RestoreWindowFromGenieState(HWND window, bool force_show_if_ic
   in_restore_window_state_ = true;
 
   // Restore region
-  SetWindowRgn(window, nullptr, TRUE);
+  platform::SetOwnedWindowRegion(window, nullptr, true);
 
   bool was_maximized = false;
   bool has_restore_rect = false;
@@ -1332,23 +1292,14 @@ void Application::RestoreWindowFromGenieState(HWND window, bool force_show_if_ic
         has_restore_rect = true;
       }
     } else {
-      was_maximized = GetPropW(window, L"GenieWasMaximized") != nullptr;
+      was_maximized = GetPropW(window, kWasMaximizedProperty) != nullptr;
     }
   }
 
   if (!has_restore_rect) {
-    RECT prop_rect{
-        .left = static_cast<LONG>(
-            reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieOriginalPlacementLeft"))),
-        .top = static_cast<LONG>(
-            reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieOriginalPlacementTop"))),
-        .right = static_cast<LONG>(
-            reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieOriginalPlacementRight"))),
-        .bottom = static_cast<LONG>(
-            reinterpret_cast<INT_PTR>(GetPropW(window, L"GenieOriginalPlacementBottom"))),
-    };
-    if (IsUsableRect(prop_rect)) {
-      restore_rect = prop_rect;
+    const std::optional<RECT> prop_rect = ReadOriginalPlacementProperties(window);
+    if (prop_rect.has_value()) {
+      restore_rect = *prop_rect;
       has_restore_rect = true;
     }
   }
@@ -1433,14 +1384,12 @@ void Application::CleanupAndRestoreAll() {
   // Enumerate and heal all windows in the system
   EnumWindows(
       [](HWND hwnd, LPARAM) -> BOOL {
-        if (GetPropW(hwnd, L"GenieMovedOffscreen") != nullptr ||
-            GetPropW(hwnd, L"GenieOriginalExStyle") != nullptr ||
-            GetPropW(hwnd, L"GenieOriginalPlacementLeft") != nullptr) {
+        if (HasGenieWindowState(hwnd)) {
           // Inline restore: don't use RestoreWindowFromGenieState to avoid
           // setting in_restore_window_state_ which can race with the main thread.
           platform::SetWindowCloaked(hwnd, false);
           RestoreWindowTransparency(hwnd);
-          SetWindowRgn(hwnd, nullptr, TRUE);
+          platform::SetOwnedWindowRegion(hwnd, nullptr, true);
           ClearGenieWindowProperties(hwnd);
         }
         return TRUE;
@@ -1466,9 +1415,7 @@ void Application::HealLeftoverWindows() {
   LogDebug(L"App", L"HealLeftoverWindows checking for leftover Genie windows");
   EnumWindows(
       [](HWND hwnd, LPARAM lParam) -> BOOL {
-        if (GetPropW(hwnd, L"GenieMovedOffscreen") != nullptr ||
-            GetPropW(hwnd, L"GenieOriginalExStyle") != nullptr ||
-            GetPropW(hwnd, L"GenieOriginalPlacementLeft") != nullptr) {
+        if (HasGenieWindowState(hwnd)) {
           auto* app = reinterpret_cast<Application*>(lParam);
           LogDebug(L"App", L"HealLeftoverWindows: restoring leftover window hwnd=0x" +
                                std::to_wstring(reinterpret_cast<std::uintptr_t>(hwnd)));

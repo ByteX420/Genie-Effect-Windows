@@ -159,6 +159,24 @@ void SetWindowCloaked(HWND window, bool cloaked) {
   DwmSetWindowAttribute(window, DWMWA_CLOAKED, &value, sizeof(value));
 }
 
+bool SetOwnedWindowRegion(HWND window, HRGN region, bool redraw) {
+  if (!IsWindow(window)) {
+    if (region != nullptr) {
+      DeleteObject(region);
+    }
+    return false;
+  }
+
+  if (SetWindowRgn(window, region, redraw ? TRUE : FALSE) != 0) {
+    return true;
+  }
+
+  if (region != nullptr) {
+    DeleteObject(region);
+  }
+  return false;
+}
+
 RECT GetVirtualScreenRect() {
   const int left = GetSystemMetrics(SM_XVIRTUALSCREEN);
   const int top = GetSystemMetrics(SM_YVIRTUALSCREEN);

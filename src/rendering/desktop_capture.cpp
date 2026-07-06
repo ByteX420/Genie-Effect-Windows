@@ -197,8 +197,11 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
     return false;
   }
 
-  (void)requested_screen_rect;
-  RECT capture_rect = window_rect;
+  RECT capture_rect{};
+  if (!IntersectRect(&capture_rect, &window_rect, &requested_screen_rect) ||
+      RectWidth(capture_rect) <= 0 || RectHeight(capture_rect) <= 0) {
+    capture_rect = window_rect;
+  }
 
   const int window_width = RectWidth(window_rect);
   const int window_height = RectHeight(window_rect);
@@ -236,6 +239,11 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
   }
 
   HGDIOBJ old_bitmap = SelectObject(memory_dc, bitmap);
+  if (old_bitmap == nullptr || old_bitmap == HGDI_ERROR) {
+    DeleteObject(bitmap);
+    DeleteDC(memory_dc);
+    return false;
+  }
   RECT paint_rect{0, 0, window_width, window_height};
   HBRUSH black_brush = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
   FillRect(memory_dc, &paint_rect, black_brush);

@@ -11,6 +11,7 @@ namespace genie::platform {
 [[nodiscard]] std::vector<HWND> EnumerateTopLevelWindows(HWND ignored_window = nullptr);
 void SetDwmTransitionsDisabled(HWND window, bool disabled);
 void SetWindowCloaked(HWND window, bool cloaked);
+bool SetOwnedWindowRegion(HWND window, HRGN region, bool redraw);
 [[nodiscard]] RECT GetVirtualScreenRect();
 [[nodiscard]] HWND FindTaskbarWindowForRect(const RECT& rect);
 bool GrantAppContainerPermissions(const std::wstring& path);

@@ -76,8 +76,14 @@
     </Link>
     <PreBuildEvent>
       <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
-"$(MSBuildBinPath)\MSBuild.exe" "$(ProjectDir)hook\GenieHook.vcxproj" /p:Configuration=$(Configuration) /p:Platform=x64</Command>
-      <Message>Building CBT hook components...</Message>
+"$(MSBuildBinPath)\MSBuild.exe" "$(ProjectDir)hook\GenieHook.vcxproj" /p:Configuration=$(Configuration) /p:Platform=x64
+if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(OutDir)" del "$(OutDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(IntDir)GenieEffect.pch" move /y "$(IntDir)GenieEffect.pch" "$(IntDir)GenieEffect.pch.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(OutDir)GenieEffect.pdb" move /y "$(OutDir)GenieEffect.pdb" "$(OutDir)GenieEffect.pdb.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+      <Message>Building CBT hook components and renaming locked build files...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
@@ -102,8 +108,14 @@
     </Link>
     <PreBuildEvent>
       <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
-"$(MSBuildBinPath)\MSBuild.exe" "$(ProjectDir)hook\GenieHook.vcxproj" /p:Configuration=$(Configuration) /p:Platform=x64</Command>
-      <Message>Building CBT hook components...</Message>
+"$(MSBuildBinPath)\MSBuild.exe" "$(ProjectDir)hook\GenieHook.vcxproj" /p:Configuration=$(Configuration) /p:Platform=x64
+if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(OutDir)" del "$(OutDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
+if exist "$(IntDir)GenieEffect.pch" move /y "$(IntDir)GenieEffect.pch" "$(IntDir)GenieEffect.pch.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(OutDir)GenieEffect.pdb" move /y "$(OutDir)GenieEffect.pdb" "$(OutDir)GenieEffect.pdb.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+      <Message>Building CBT hook components and renaming locked build files...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

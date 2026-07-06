@@ -45,6 +45,8 @@ private:
   void UpdatePreMinimizeSnapshot(HWND window);
   void CompletePendingNativeMinimize();
   void PruneSnapshots();
+  bool PreserveRestorePlacementAndMarkOffscreen(HWND window, CachedSnapshot* snapshot);
+  bool IsGenieWindowRestored(HWND window) const;
   void RestoreWindowFromGenieState(HWND window, bool force_show_if_iconic = true);
   bool InstallCbtHook();
   void UninstallCbtHook();
