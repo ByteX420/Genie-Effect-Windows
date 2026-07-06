@@ -1,10 +1,13 @@
 #include "pch.hpp"
 
+#include <timeapi.h>
 #include "app/application.hpp"
 
 #ifndef _DEBUG
 #pragma comment(linker, "/subsystem:windows /ENTRY:wmainCRTStartup")
 #endif
+
+#pragma comment(lib, "winmm.lib")
 
 static genie::app::Application* g_application = nullptr;
 
@@ -22,9 +25,13 @@ BOOL WINAPI ConsoleHandler(DWORD signal) {
 int wmain() {
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+  // Request high-precision 1ms timer resolution for smooth animations
+  timeBeginPeriod(1);
+
   const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   if (FAILED(hr)) {
     std::wcerr << L"CoInitializeEx failed: 0x" << std::hex << hr << L"\n";
+    timeEndPeriod(1);
     return 1;
   }
 
@@ -36,6 +43,7 @@ int wmain() {
     g_application = nullptr;
     SetConsoleCtrlHandler(ConsoleHandler, FALSE);
     CoUninitialize();
+    timeEndPeriod(1);
     return 1;
   }
 
@@ -43,5 +51,10 @@ int wmain() {
   g_application = nullptr;
   SetConsoleCtrlHandler(ConsoleHandler, FALSE);
   CoUninitialize();
+
+  // Restore timer resolution
+  timeEndPeriod(1);
+
   return result;
 }
+

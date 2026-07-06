@@ -75,7 +75,8 @@ if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
 if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul
 if exist "$(IntDir)GenieHookPost.pdb" move /y "$(IntDir)GenieHookPost.pdb" "$(IntDir)GenieHookPost.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
 if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)GenieHookPost.ilk" move /y "$(IntDir)GenieHookPost.ilk" "$(IntDir)GenieHookPost.ilk.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
       <Message>Stopping running Genie processes and renaming locked hook DLL/PDB files...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -104,7 +105,8 @@ if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
 if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul
 if exist "$(IntDir)GenieHookPost.pdb" move /y "$(IntDir)GenieHookPost.pdb" "$(IntDir)GenieHookPost.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
 if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
+if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul
+if exist "$(IntDir)GenieHookPost.ilk" move /y "$(IntDir)GenieHookPost.ilk" "$(IntDir)GenieHookPost.ilk.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
       <Message>Stopping running Genie processes and renaming locked hook DLL/PDB files...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>

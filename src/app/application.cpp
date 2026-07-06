@@ -605,7 +605,14 @@ int Application::Run() {
     }
 
     if (animation_active) {
-      MsgWaitForMultipleObjects(0, nullptr, FALSE, 1, QS_ALLINPUT);
+      // Calculate remaining time until the next frame tick is due (8ms intervals)
+      const ULONGLONG now_ms = GetTickCount64();
+      const ULONGLONG elapsed_since_last = now_ms - last_animation_tick_ms_;
+      DWORD timeout_ms = 1;
+      if (elapsed_since_last < kAnimationFrameIntervalMs) {
+        timeout_ms = static_cast<DWORD>(kAnimationFrameIntervalMs - elapsed_since_last);
+      }
+      MsgWaitForMultipleObjects(0, nullptr, FALSE, timeout_ms, QS_ALLINPUT);
     } else {
       const ULONGLONG now_ms = GetTickCount64();
       if (now_ms - last_snapshot_refresh_ms_ >= 120) {
@@ -798,19 +805,19 @@ bool Application::OnMinimizeStart(HWND window) {
     LogTrace(L"App", L"OnMinimizeStart capture=cached_already_minimized bounds=" +
                          RectTraceString(source_bounds));
   } else if (!window_is_already_minimized &&
+             desktop_capture_->CaptureRegion(*animation_bounds, &captured_texture)) {
+    std::wcout << L"Using live desktop-region capture.\n";
+    LogTrace(L"App", L"OnMinimizeStart capture=desktop bounds=" +
+                         RectTraceString(*animation_bounds) + L" texture_size=" +
+                         std::to_wstring(captured_texture.size.width) + L"x" +
+                         std::to_wstring(captured_texture.size.height));
+  } else if (!window_is_already_minimized &&
              desktop_capture_->CaptureWindow(window, *animation_bounds, &captured_texture,
                                              &captured_window_bounds)) {
     source_bounds = captured_window_bounds;
-    std::wcout << L"Using live target-window capture.\n";
+    std::wcout << L"Using live target-window capture fallback.\n";
     LogTrace(L"App", L"OnMinimizeStart capture=window bounds=" + RectTraceString(source_bounds) +
                          L" texture_size=" + std::to_wstring(captured_texture.size.width) + L"x" +
-                         std::to_wstring(captured_texture.size.height));
-  } else if (!window_is_already_minimized &&
-             desktop_capture_->CaptureRegion(*animation_bounds, &captured_texture)) {
-    std::wcout << L"Using live desktop-region capture fallback.\n";
-    LogTrace(L"App", L"OnMinimizeStart capture=desktop_fallback bounds=" +
-                         RectTraceString(*animation_bounds) + L" texture_size=" +
-                         std::to_wstring(captured_texture.size.width) + L"x" +
                          std::to_wstring(captured_texture.size.height));
   } else if (has_pre_minimize_snapshot) {
     source_bounds = pre_min_it->second.bounds;
@@ -921,7 +928,7 @@ void Application::CompletePendingNativeMinimize() {
 
   if (IsIconic(window) == FALSE) {
     TraceWindowEvent(L"CompletePendingNativeMinimize before ShowWindow SW_MINIMIZE", window);
-    ShowWindow(window, SW_MINIMIZE);
+    ShowWindowAsync(window, SW_MINIMIZE);
     TraceWindowEvent(L"CompletePendingNativeMinimize after ShowWindow SW_MINIMIZE", window);
   }
   DwmFlush();
@@ -1204,16 +1211,21 @@ void Application::UpdatePreMinimizeSnapshot(HWND window) {
   }
 
   rendering::CapturedTexture captured_texture;
-  RECT captured_window_bounds{};
   RECT snapshot_bounds = *animation_bounds;
-  if (desktop_capture_->CaptureWindow(window, *animation_bounds, &captured_texture,
-                                      &captured_window_bounds)) {
-    snapshot_bounds = captured_window_bounds;
-  } else if (!desktop_capture_->CaptureRegion(*animation_bounds, &captured_texture)) {
-    LogTrace(L"App", L"UpdatePreMinimizeSnapshot capture failed bounds=" +
-                         RectTraceString(*animation_bounds) + L" window " +
-                         WindowTraceString(window));
-    return;
+  // Prioritize non-blocking CaptureRegion to prevent target window blocking
+  if (desktop_capture_->CaptureRegion(*animation_bounds, &captured_texture)) {
+    // CaptureRegion succeeded
+  } else {
+    RECT captured_window_bounds{};
+    if (desktop_capture_->CaptureWindow(window, *animation_bounds, &captured_texture,
+                                        &captured_window_bounds)) {
+      snapshot_bounds = captured_window_bounds;
+    } else {
+      LogTrace(L"App", L"UpdatePreMinimizeSnapshot capture failed bounds=" +
+                           RectTraceString(*animation_bounds) + L" window " +
+                           WindowTraceString(window));
+      return;
+    }
   }
 
   CachedSnapshot snapshot;
