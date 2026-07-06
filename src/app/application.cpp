@@ -1310,26 +1310,6 @@ void Application::RestoreWindowFromGenieState(HWND window, bool force_show_if_ic
   platform::SetWindowCloaked(window, false);
   RestoreWindowTransparency(window);
 
-  const bool iconic_before_placement = IsIconic(window) != FALSE;
-  if (has_restore_rect) {
-    WINDOWPLACEMENT placement{};
-    placement.length = sizeof(placement);
-    if (GetWindowPlacement(window, &placement)) {
-      placement.rcNormalPosition = restore_rect;
-      if (!was_maximized) {
-        placement.flags &= ~WPF_RESTORETOMAXIMIZED;
-        if (!iconic_before_placement || force_show_if_iconic) {
-          placement.showCmd = SW_SHOWNORMAL;
-        }
-      }
-      SetWindowPlacement(window, &placement);
-      LogTrace(L"App", L"RestoreWindowFromGenieState applied restore_rect=" +
-                           RectTraceString(restore_rect) + L" was_maximized=" +
-                           std::to_wstring(was_maximized) + L" window " +
-                           WindowTraceString(window));
-    }
-  }
-
   ClearGenieWindowProperties(window);
 
   const bool still_iconic = IsIconic(window) != FALSE;

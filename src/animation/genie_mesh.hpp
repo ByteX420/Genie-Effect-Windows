@@ -38,10 +38,10 @@ public:
                                    float viewport_height) const;
 
 private:
-  [[nodiscard]] std::vector<PointF> GenerateBottomLeftPositions(const RectF& source_rect,
-                                                                const RectF& target_rect,
-                                                                GenieEdge edge,
-                                                                float progress) const;
+  [[nodiscard]] std::vector<PointF> GenerateScreenPositions(const RectF& source_rect,
+                                                           const RectF& target_rect,
+                                                           GenieEdge edge,
+                                                           float progress) const;
 };
 
 }  // namespace genie::animation
