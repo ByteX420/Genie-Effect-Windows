@@ -44,6 +44,7 @@ private:
   void OnWindowSeen(HWND window);
   void UpdatePreMinimizeSnapshot(HWND window);
   void CompletePendingNativeMinimize();
+  void FinishActiveAnimation();
   void PruneSnapshots();
   bool PreserveRestorePlacementAndMarkOffscreen(HWND window, CachedSnapshot* snapshot);
   bool IsGenieWindowRestored(HWND window) const;

@@ -748,12 +748,7 @@ bool Application::OnMinimizeStart(HWND window) {
       return true;
     }
 
-    std::wcout << L"Ignoring minimize for background window during active "
-                  L"Genie animation: hwnd=0x"
-               << std::hex << reinterpret_cast<std::uintptr_t>(window) << std::dec << L"\n";
-    LogDebug(L"App",
-             L"OnMinimizeStart: Ignored minimize for background window during active animation");
-    return false;
+    FinishActiveAnimation();
   }
 
   if (restore_snapshots_.count(window) > 0 || GetPropW(window, kIsMinimizingProperty) != nullptr) {
@@ -883,6 +878,44 @@ bool Application::OnMinimizeStart(HWND window) {
   TraceWindowEvent(L"OnMinimizeStart completed pending native minimize", window);
   std::wcout << L"Genie overlay visible; native minimize scheduled.\n";
   return true;
+}
+
+void Application::FinishActiveAnimation() {
+  if (animating_window_ == nullptr) {
+    return;
+  }
+
+  const bool was_restoring = animating_restore_;
+  HWND finished_window = animating_window_;
+
+  // Set animating_window_ to nullptr first to prevent re-entrancy
+  animating_window_ = nullptr;
+  animating_restore_ = false;
+  live_animation_capture_enabled_ = false;
+
+  if (was_restoring) {
+    TraceWindowEvent(L"FinishActiveAnimation restore completed", finished_window);
+    RestoreWindowFromGenieState(finished_window);
+    overlay_window_.FinishRestoreAnimation();
+    restore_snapshots_.erase(finished_window);
+    std::wcout << L"Restore animation forced completion.\n";
+  } else {
+    TraceWindowEvent(L"FinishActiveAnimation minimize completed", finished_window);
+    if (pending_native_minimize_window_ == finished_window) {
+      SetPropW(finished_window, kAllowMinimizeProperty, reinterpret_cast<HANDLE>(1));
+      ShowWindow(finished_window, SW_MINIMIZE);
+      RemovePropW(finished_window, kAllowMinimizeProperty);
+      pending_native_minimize_window_ = nullptr;
+    }
+    RemovePropW(finished_window, kAllowMinimizeProperty);
+    HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
+    platform::SetOwnedWindowRegion(finished_window, hidden_region, true);
+    std::wcout << L"Minimize animation forced completion.\n";
+  }
+
+  overlay_window_.CancelAnimation();
+  last_animation_tick_ms_ = 0;
+  DwmFlush();
 }
 
 void Application::CompletePendingNativeMinimize() {
@@ -1016,16 +1049,7 @@ bool Application::IsGenieWindowRestored(HWND window) const {
     return false;
   }
 
-  if (IsIconic(window) == FALSE) {
-    return true;
-  }
-
-  WINDOWPLACEMENT placement{};
-  placement.length = sizeof(placement);
-  if (GetWindowPlacement(window, &placement) && !IsMinimizedShowCommand(placement.showCmd)) {
-    return true;
-  }
-  return ForegroundIsExactWindow(window, overlay_window_.window());
+  return IsIconic(window) == FALSE;
 }
 
 bool Application::OnRestoreAttempt(HWND window) {
@@ -1103,12 +1127,7 @@ bool Application::OnRestoreAttempt(HWND window) {
       return true;
     }
 
-    std::wcout << L"Restoring background window immediately during active "
-                  L"Genie animation: hwnd=0x"
-               << std::hex << reinterpret_cast<std::uintptr_t>(window) << std::dec << L"\n";
-    RestoreWindowFromGenieState(window, false);
-    restore_snapshots_.erase(window);
-    return false;
+    FinishActiveAnimation();
   }
 
   const bool window_is_iconic = IsIconic(window) != FALSE;
