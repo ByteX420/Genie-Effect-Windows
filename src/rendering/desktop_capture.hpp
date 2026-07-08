@@ -30,6 +30,11 @@ public:
   [[nodiscard]] bool RefreshCapturedTexture(const RECT& screen_rect,
                                             CapturedTexture* captured_texture);
   void RefreshFrames(UINT timeout_ms = 0);
+  void ClearHistory() {
+    for (auto& output : outputs_) {
+      output.frame_history.clear();
+    }
+  }
   [[nodiscard]] bool device_lost() const { return device_lost_; }
   void ClearDeviceLost() { device_lost_ = false; }
 

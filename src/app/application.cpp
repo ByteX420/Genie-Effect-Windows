@@ -242,20 +242,25 @@ bool IsCurrentlyMaximized(HWND window) {
   return IsZoomed(window) != FALSE;
 }
 
-void BringWindowForwardForCapture(HWND window) {
+bool BringWindowForwardForCapture(HWND window) {
   if (!IsWindow(window) || IsIconic(window) != FALSE) {
-    return;
+    return false;
   }
 
   TraceWindowEvent(L"BringWindowForwardForCapture begin", window);
-  const BOOL foreground_ok = SetForegroundWindow(window);
+  const bool was_topmost = (GetWindowLongW(window, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
   const BOOL top_ok =
-      SetWindowPos(window, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+      SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+  const BOOL foreground_ok = SetForegroundWindow(window);
   BringWindowToTop(window);
+  DwmFlush();
+  Sleep(16);
   DwmFlush();
   LogTrace(L"App", L"BringWindowForwardForCapture foreground_ok=" +
                        std::to_wstring(foreground_ok != FALSE) + L" top_ok=" +
-                       std::to_wstring(top_ok != FALSE) + L" window " + WindowTraceString(window));
+                       std::to_wstring(top_ok != FALSE) + L" was_topmost=" +
+                       std::to_wstring(was_topmost) + L" window " + WindowTraceString(window));
+  return was_topmost;
 }
 
 bool ForegroundIsExactWindow(HWND window, HWND ignored_window) {
@@ -758,7 +763,17 @@ bool Application::OnMinimizeStart(HWND window) {
   std::wcout << L"Minimize detected: hwnd=0x" << std::hex
              << reinterpret_cast<std::uintptr_t>(window) << std::dec << L"\n";
 
-  BringWindowForwardForCapture(window);
+  struct TopmostRestorer {
+    HWND wnd;
+    bool active;
+    ~TopmostRestorer() {
+      if (wnd != nullptr && IsWindow(wnd) && !active) {
+        SetWindowPos(wnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      }
+    }
+  } restorer{window, BringWindowForwardForCapture(window)};
+
+  desktop_capture_->ClearHistory();
 
   const std::optional<RECT> animation_bounds = ResolveAnimationBounds(window);
   if (!animation_bounds.has_value()) {
