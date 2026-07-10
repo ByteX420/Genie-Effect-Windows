@@ -76,7 +76,6 @@ private:
   std::unordered_map<HWND, CachedSnapshot> pre_minimize_snapshots_;
   std::unordered_map<HWND, CachedSnapshot> restore_snapshots_;
   RECT live_animation_bounds_{};
-  ULONGLONG last_desktop_refresh_ms_ = 0;
   ULONGLONG last_snapshot_refresh_ms_ = 0;
   ULONGLONG last_animation_texture_refresh_ms_ = 0;
   HANDLE animation_frame_timer_ = nullptr;

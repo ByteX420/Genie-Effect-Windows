@@ -172,9 +172,10 @@ bool DesktopCapture::CaptureRegion(const RECT& screen_rect, CapturedTexture* cap
     return false;
   }
 
-  if (output->frame_history.empty()) {
-    TryAcquireLatestFrame(output, 120);
-  }
+  // Only acquire the output containing the requested window. Existing cached
+  // data makes this non-blocking; the first request may wait for one desktop
+  // frame so minimize still has a reliable fallback image.
+  TryAcquireLatestFrame(output, output->frame_history.empty() ? 120 : 0);
 
   if (output->frame_history.empty()) {
     std::wcerr << L"No cached desktop frame is available for the minimize "
@@ -376,16 +377,6 @@ bool DesktopCapture::RefreshCapturedTexture(const RECT& screen_rect,
   }
 
   return CopyRegionIntoTexture(output, screen_rect, captured_texture);
-}
-
-void DesktopCapture::RefreshFrames(UINT timeout_ms) {
-  if (outputs_.empty() && !InitializeOutputs()) {
-    return;
-  }
-
-  for (auto& output : outputs_) {
-    TryAcquireLatestFrame(&output, timeout_ms);
-  }
 }
 
 bool DesktopCapture::TryAcquireLatestFrame(OutputCapture* output, UINT timeout_ms) {
@@ -858,7 +849,8 @@ bool DesktopCapture::CopyRegionIntoTexture(OutputCapture* output, const RECT& sc
   d3d_device_->context()->Unmap(staging_texture.Get(), 0);
 
   d3d_device_->context()->UpdateSubresource(captured_texture->texture.Get(), 0, nullptr,
-                                            dst_pixels.data(), static_cast<UINT>(W_dst * bytes_per_pixel), 0);
+                                            dst_pixels.data(),
+                                            static_cast<UINT>(W_dst * bytes_per_pixel), 0);
   return true;
 }
 

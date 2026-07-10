@@ -29,7 +29,6 @@ public:
                                    CapturedTexture* captured_texture, RECT* captured_screen_rect);
   [[nodiscard]] bool RefreshCapturedTexture(const RECT& screen_rect,
                                             CapturedTexture* captured_texture);
-  void RefreshFrames(UINT timeout_ms = 0);
   void ClearHistory() {
     for (auto& output : outputs_) {
       output.frame_history.clear();

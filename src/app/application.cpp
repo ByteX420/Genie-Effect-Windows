@@ -31,7 +31,6 @@ constexpr wchar_t kOriginalExStyleProperty[] = L"GenieOriginalExStyle";
 constexpr wchar_t kWasLayeredProperty[] = L"GenieWasLayered";
 constexpr wchar_t kOriginalAlphaProperty[] = L"GenieOriginalAlpha";
 constexpr wchar_t kOriginalFlagsProperty[] = L"GenieOriginalFlags";
-constexpr ULONGLONG kDesktopRefreshIntervalMs = 16;
 
 using CbtProc = LRESULT(CALLBACK*)(int, WPARAM, LPARAM);
 
@@ -457,7 +456,6 @@ bool Application::Initialize(HINSTANCE instance) {
   settings_window_.Show(true);
 
   desktop_capture_ = std::make_unique<rendering::DesktopCapture>(d3d_device_.get());
-  desktop_capture_->RefreshFrames(120);
   native_animation_blocker_.Enable(overlay_window_.window());
   const bool cbt_hook_installed = InstallCbtHook();
   if (cbt_hook_installed) {
@@ -517,13 +515,6 @@ int Application::Run() {
       CompletePendingNativeMinimize();
       TraceWindowEvent(L"Run pending_native_minimize after CompletePendingNativeMinimize",
                        pending_native_minimize_window_);
-    }
-
-    const ULONGLONG loop_now_ms = GetTickCount64();
-    if (!overlay_window_.active() &&
-        loop_now_ms - last_desktop_refresh_ms_ >= kDesktopRefreshIntervalMs) {
-      last_desktop_refresh_ms_ = loop_now_ms;
-      desktop_capture_->RefreshFrames();
     }
 
     if (overlay_window_.active() && !overlay_window_.restoring() && animating_window_ != nullptr) {
@@ -643,7 +634,7 @@ int Application::Run() {
       WaitForAnimationFrameOrMessage();
     } else {
       const ULONGLONG now_ms = GetTickCount64();
-      if (now_ms - last_snapshot_refresh_ms_ >= 120) {
+      if (is_enabled_ && now_ms - last_snapshot_refresh_ms_ >= 120) {
         last_snapshot_refresh_ms_ = now_ms;
         UpdatePreMinimizeSnapshot(GetForegroundWindow());
       }
@@ -808,6 +799,7 @@ void Application::SetEnabled(bool enabled) {
     }
     restore_snapshots_.clear();
     pre_minimize_snapshots_.clear();
+    desktop_capture_->ClearHistory();
   } else {
     native_animation_blocker_.Enable(overlay_window_.window());
     InstallCbtHook();
