@@ -53,7 +53,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -126,6 +126,31 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     </ClCompile>
     <ClCompile Include="src\animation\genie_mesh.cpp" />
     <ClCompile Include="src\app\application.cpp" />
+    <ClCompile Include="src\app\settings_window.cpp" />
+    <ClCompile Include="third_party\imgui\imgui.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_dx11.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_win32.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
+    </ClCompile>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\platform\native_animation_blocker.cpp" />
     <ClCompile Include="src\platform\taskbar_target_provider.cpp" />
@@ -141,6 +166,7 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClInclude Include="src\animation\geometry.hpp" />
     <ClInclude Include="src\animation\genie_mesh.hpp" />
     <ClInclude Include="src\app\application.hpp" />
+    <ClInclude Include="src\app\settings_window.hpp" />
     <ClInclude Include="src\platform\native_animation_blocker.hpp" />
     <ClInclude Include="src\platform\taskbar_target_provider.hpp" />
     <ClInclude Include="src\platform\window_event_monitor.hpp" />

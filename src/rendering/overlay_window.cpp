@@ -18,7 +18,6 @@ namespace {
 
 constexpr wchar_t kOverlayWindowClassName[] = L"GenieEffectOverlayWindow";
 constexpr wchar_t kAllowMinimizeProperty[] = L"GenieAllowMinimize";
-constexpr float kAnimationDurationSeconds = 0.70f;
 constexpr UINT kMaxMeshVertices = 102;
 constexpr UINT kMaxMeshIndices = 300;
 
@@ -335,7 +334,7 @@ bool OverlayWindow::Tick() {
       std::chrono::duration<float>(now - animation_state_.last_tick_time).count();
   animation_state_.last_tick_time = now;
 
-  const float step = elapsed_seconds / kAnimationDurationSeconds;
+  const float step = elapsed_seconds / animation_duration_seconds_;
   const float previous_progress = animation_state_.progress;
   if (animation_state_.target_progress >= animation_state_.progress) {
     animation_state_.progress =

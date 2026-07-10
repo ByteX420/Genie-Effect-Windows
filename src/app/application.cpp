@@ -430,6 +430,20 @@ bool Application::Initialize(HINSTANCE instance) {
           [this](HWND window) { return OnRestoreAttempt(window); })) {
     return false;
   }
+  overlay_window_.SetAnimationDuration(animation_duration_seconds_);
+
+  if (!settings_window_.Initialize(
+          instance, [this](bool enabled) { SetEnabled(enabled); },
+          [this](float duration) { SetAnimationDuration(duration); },
+          [this]() { HealLeftoverWindows(); },
+          [this]() {
+            shutting_down_.store(true, std::memory_order_release);
+            PostQuitMessage(0);
+          })) {
+    return false;
+  }
+  settings_window_.UpdateState(is_enabled_, animation_duration_seconds_);
+  settings_window_.Show(true);
 
   desktop_capture_ = std::make_unique<rendering::DesktopCapture>(d3d_device_.get());
   desktop_capture_->RefreshFrames(120);
@@ -477,6 +491,8 @@ int Application::Run() {
     if (!running || shutting_down_.load(std::memory_order_acquire)) {
       break;
     }
+
+    settings_window_.Render();
 
     if (pending_native_minimize_window_ != nullptr) {
       TraceWindowEvent(L"Run pending_native_minimize before CompletePendingNativeMinimize",
@@ -648,6 +664,43 @@ int Application::Run() {
   return static_cast<int>(message.wParam);
 }
 
+void Application::SetEnabled(bool enabled) {
+  if (is_enabled_ == enabled) {
+    settings_window_.UpdateState(enabled, animation_duration_seconds_);
+    return;
+  }
+
+  if (!enabled) {
+    FinishActiveAnimation();
+    UninstallCbtHook();
+    native_animation_blocker_.Disable();
+
+    std::vector<HWND> tracked_windows;
+    tracked_windows.reserve(restore_snapshots_.size());
+    for (const auto& [window, snapshot] : restore_snapshots_) {
+      (void)snapshot;
+      tracked_windows.push_back(window);
+    }
+    for (HWND window : tracked_windows) {
+      RestoreWindowFromGenieState(window, false);
+    }
+    restore_snapshots_.clear();
+    pre_minimize_snapshots_.clear();
+  } else {
+    native_animation_blocker_.Enable(overlay_window_.window());
+    InstallCbtHook();
+  }
+
+  is_enabled_ = enabled;
+  settings_window_.UpdateState(enabled, animation_duration_seconds_);
+}
+
+void Application::SetAnimationDuration(float duration_seconds) {
+  animation_duration_seconds_ = std::clamp(duration_seconds, 0.10f, 2.00f);
+  overlay_window_.SetAnimationDuration(animation_duration_seconds_);
+  settings_window_.UpdateState(is_enabled_, animation_duration_seconds_);
+}
+
 bool Application::InstallCbtHook() {
   if (cbt_hook_ != nullptr) {
     return true;
@@ -710,7 +763,7 @@ void Application::UninstallCbtHook() {
 }
 
 bool Application::OnMinimizeStart(HWND window) {
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_) {
     return false;
   }
   TraceWindowEvent(L"OnMinimizeStart begin", window);
@@ -1068,6 +1121,9 @@ bool Application::IsGenieWindowRestored(HWND window) const {
 }
 
 bool Application::OnRestoreAttempt(HWND window) {
+  if (!is_enabled_) {
+    return false;
+  }
   if (shutting_down_.load(std::memory_order_acquire)) {
     return false;
   }
@@ -1205,7 +1261,7 @@ bool Application::OnRestoreAttempt(HWND window) {
 }
 
 void Application::OnWindowSeen(HWND window) {
-  if (shutting_down_.load(std::memory_order_acquire)) {
+  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_) {
     return;
   }
   if (window == overlay_window_.window() || window == animating_window_) {
@@ -1425,6 +1481,7 @@ void Application::CleanupAndRestoreAll() {
   }
 
   overlay_window_.Shutdown();
+  settings_window_.Shutdown();
   LogDebug(L"App", L"CleanupAndRestoreAll completed");
 }
 

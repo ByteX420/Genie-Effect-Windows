@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <windows.h>
 
+#include "app/settings_window.hpp"
 #include "platform/native_animation_blocker.hpp"
 #include "platform/taskbar_target_provider.hpp"
 #include "platform/window_event_monitor.hpp"
@@ -49,6 +50,8 @@ private:
   bool PreserveRestorePlacementAndMarkOffscreen(HWND window, CachedSnapshot* snapshot);
   bool IsGenieWindowRestored(HWND window) const;
   void RestoreWindowFromGenieState(HWND window, bool force_show_if_iconic = true);
+  void SetEnabled(bool enabled);
+  void SetAnimationDuration(float duration_seconds);
   bool InstallCbtHook();
   void UninstallCbtHook();
 
@@ -73,7 +76,10 @@ private:
   ULONGLONG last_animation_texture_refresh_ms_ = 0;
   bool live_animation_capture_enabled_ = false;
   bool in_restore_window_state_ = false;
+  bool is_enabled_ = true;
+  float animation_duration_seconds_ = 0.70f;
   std::atomic<bool> shutting_down_{false};
+  SettingsWindow settings_window_;
 };
 
 }  // namespace genie::app

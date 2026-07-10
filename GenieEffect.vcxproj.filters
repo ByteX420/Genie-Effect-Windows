@@ -19,6 +19,12 @@
     <Filter Include="src\rendering">
       <UniqueIdentifier>{d61d48ac-5a89-480d-9078-f897c753a3d0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="third_party\imgui">
+      <UniqueIdentifier>{44b5e00e-d8af-4da7-9e4f-748b0af1e19e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\imgui\backends">
+      <UniqueIdentifier>{b563dffc-348a-4d03-a7c5-8b1898b09e28}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\pch.cpp">
@@ -29,6 +35,27 @@
     </ClCompile>
     <ClCompile Include="src\app\application.cpp">
       <Filter>src\app</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\settings_window.cpp">
+      <Filter>src\app</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_dx11.cpp">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>third_party\imgui\backends</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
@@ -69,6 +96,9 @@
       <Filter>src\animation</Filter>
     </ClInclude>
     <ClInclude Include="src\app\application.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\settings_window.hpp">
       <Filter>src\app</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\native_animation_blocker.hpp">

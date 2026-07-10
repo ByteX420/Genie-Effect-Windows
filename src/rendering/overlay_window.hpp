@@ -28,6 +28,9 @@ public:
   bool Initialize(HINSTANCE instance, D3dDevice* d3d_device, MinimizeCallback minimize_callback,
                   RestoreCallback restore_callback);
   void Shutdown();
+  void SetAnimationDuration(float duration_seconds) {
+    animation_duration_seconds_ = duration_seconds;
+  }
 
   [[nodiscard]] HWND window() const { return window_; }
   [[nodiscard]] bool active() const { return animation_state_.active; }
@@ -106,6 +109,7 @@ private:
   genie::animation::GenieMeshGenerator mesh_generator_;
   MinimizeCallback minimize_callback_;
   RestoreCallback restore_callback_;
+  float animation_duration_seconds_ = 0.70f;
   UINT minimize_attempt_message_ = 0;
   UINT restore_attempt_message_ = 0;
 };
