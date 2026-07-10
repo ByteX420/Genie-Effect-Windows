@@ -162,22 +162,13 @@ bool DesktopCapture::CaptureRegion(const RECT& screen_rect, CapturedTexture* cap
   if (captured_texture == nullptr || RectWidth(screen_rect) <= 0 || RectHeight(screen_rect) <= 0) {
     return false;
   }
-  if (outputs_.empty() && !InitializeOutputs()) {
-    return false;
-  }
-
-  OutputCapture* output = FindOutputForRect(screen_rect);
+  OutputCapture* output = AcquireFrameForRect(screen_rect, 120);
   if (output == nullptr) {
     std::wcerr << L"No DXGI output contains the target window.\n";
     return false;
   }
 
-  // Only acquire the output containing the requested window. Existing cached
-  // data makes this non-blocking; the first request may wait for one desktop
-  // frame so minimize still has a reliable fallback image.
-  TryAcquireLatestFrame(output, output->frame_history.empty() ? 120 : 0);
-
-  if (output->frame_history.empty()) {
+  if (output->latest_frame == nullptr) {
     std::wcerr << L"No cached desktop frame is available for the minimize "
                   L"animation yet.\n";
     return false;
@@ -362,45 +353,68 @@ bool DesktopCapture::RefreshCapturedTexture(const RECT& screen_rect,
       RectWidth(screen_rect) <= 0 || RectHeight(screen_rect) <= 0) {
     return false;
   }
-  if (outputs_.empty() && !InitializeOutputs()) {
-    return false;
-  }
-
-  OutputCapture* output = FindOutputForRect(screen_rect);
+  OutputCapture* output = AcquireFrameForRect(screen_rect, 0);
   if (output == nullptr) {
     return false;
   }
 
-  TryAcquireLatestFrame(output, 0);
-  if (output->frame_history.empty()) {
+  if (output->latest_frame == nullptr) {
     return false;
   }
 
   return CopyRegionIntoTexture(output, screen_rect, captured_texture);
 }
 
-bool DesktopCapture::TryAcquireLatestFrame(OutputCapture* output, UINT timeout_ms) {
+DesktopCapture::OutputCapture* DesktopCapture::AcquireFrameForRect(const RECT& screen_rect,
+                                                                   UINT first_frame_timeout_ms) {
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    if (outputs_.empty() && !InitializeOutputs()) {
+      return nullptr;
+    }
+
+    OutputCapture* output = FindOutputForRect(screen_rect);
+    if (output == nullptr) {
+      return nullptr;
+    }
+
+    const UINT timeout_ms = output->latest_frame == nullptr ? first_frame_timeout_ms : 0;
+    const AcquireResult result = TryAcquireLatestFrame(output, timeout_ms);
+    if (result == AcquireResult::kAccessLost) {
+      // Reset only after TryAcquireLatestFrame has returned. Clearing outputs
+      // inside that function would invalidate its OutputCapture pointer.
+      ResetOutputs();
+      continue;
+    }
+    if (result == AcquireResult::kDeviceLost) {
+      return nullptr;
+    }
+    return output->latest_frame != nullptr ? output : nullptr;
+  }
+  return nullptr;
+}
+
+DesktopCapture::AcquireResult DesktopCapture::TryAcquireLatestFrame(OutputCapture* output,
+                                                                    UINT timeout_ms) {
   if (output == nullptr || output->duplication == nullptr) {
-    return false;
+    return AcquireResult::kFailed;
   }
 
   DXGI_OUTDUPL_FRAME_INFO frame_info{};
   Microsoft::WRL::ComPtr<IDXGIResource> desktop_resource;
   HRESULT hr = output->duplication->AcquireNextFrame(timeout_ms, &frame_info, &desktop_resource);
   if (hr == DXGI_ERROR_WAIT_TIMEOUT) {
-    return !output->frame_history.empty();
+    return AcquireResult::kNoNewFrame;
   }
   if (hr == DXGI_ERROR_ACCESS_LOST) {
-    ResetOutputs();
-    return false;
+    return AcquireResult::kAccessLost;
   }
   if (IsDeviceLostError(hr)) {
     MarkDeviceLost(L"AcquireNextFrame", hr);
-    return false;
+    return AcquireResult::kDeviceLost;
   }
   if (FAILED(hr)) {
     std::wcerr << L"IDXGIOutputDuplication::AcquireNextFrame failed: 0x" << std::hex << hr << L"\n";
-    return !output->frame_history.empty();
+    return AcquireResult::kFailed;
   }
 
   Microsoft::WRL::ComPtr<ID3D11Texture2D> desktop_texture;
@@ -408,47 +422,50 @@ bool DesktopCapture::TryAcquireLatestFrame(OutputCapture* output, UINT timeout_m
   if (FAILED(hr)) {
     output->duplication->ReleaseFrame();
     std::wcerr << L"Desktop frame is not a D3D11 texture: 0x" << std::hex << hr << L"\n";
-    return false;
+    return AcquireResult::kFailed;
   }
 
   D3D11_TEXTURE2D_DESC desktop_desc{};
   desktop_texture->GetDesc(&desktop_desc);
   output->latest_frame_format = desktop_desc.Format;
 
-  Microsoft::WRL::ComPtr<ID3D11Texture2D> target_texture;
-  if (output->frame_history.size() < kHistorySize) {
+  if (output->latest_frame != nullptr) {
+    D3D11_TEXTURE2D_DESC cached_desc{};
+    output->latest_frame->GetDesc(&cached_desc);
+    if (cached_desc.Width != desktop_desc.Width || cached_desc.Height != desktop_desc.Height ||
+        cached_desc.Format != desktop_desc.Format) {
+      output->latest_frame.Reset();
+    }
+  }
+
+  if (output->latest_frame == nullptr) {
     D3D11_TEXTURE2D_DESC cached_desc = desktop_desc;
     cached_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     cached_desc.CPUAccessFlags = 0;
     cached_desc.MiscFlags = 0;
     cached_desc.Usage = D3D11_USAGE_DEFAULT;
 
-    hr = d3d_device_->device()->CreateTexture2D(&cached_desc, nullptr, &target_texture);
+    hr = d3d_device_->device()->CreateTexture2D(&cached_desc, nullptr, &output->latest_frame);
     if (FAILED(hr)) {
       output->duplication->ReleaseFrame();
       if (IsDeviceLostError(hr)) {
         MarkDeviceLost(L"CreateTexture2D cached desktop frame", hr);
-        return false;
+        return AcquireResult::kDeviceLost;
       }
       std::wcerr << L"CreateTexture2D for cached desktop frame failed: 0x" << std::hex << hr
                  << L"\n";
-      return false;
+      return AcquireResult::kFailed;
     }
-    output->frame_history.push_back(target_texture);
-    output->current_frame_index = output->frame_history.size() - 1;
-  } else {
-    output->current_frame_index = (output->current_frame_index + 1) % kHistorySize;
-    target_texture = output->frame_history[output->current_frame_index];
   }
 
-  d3d_device_->context()->CopyResource(target_texture.Get(), desktop_texture.Get());
+  d3d_device_->context()->CopyResource(output->latest_frame.Get(), desktop_texture.Get());
   output->duplication->ReleaseFrame();
-  return true;
+  return AcquireResult::kAcquired;
 }
 
 bool DesktopCapture::CopyRegionFromFrame(OutputCapture* output, const RECT& screen_rect,
                                          CapturedTexture* captured_texture) {
-  if (output == nullptr || output->frame_history.empty() || captured_texture == nullptr) {
+  if (output == nullptr || output->latest_frame == nullptr || captured_texture == nullptr) {
     return false;
   }
 
@@ -459,11 +476,7 @@ bool DesktopCapture::CopyRegionFromFrame(OutputCapture* output, const RECT& scre
     return false;
   }
 
-  size_t oldest_index = 0;
-  if (output->frame_history.size() == kHistorySize) {
-    oldest_index = (output->current_frame_index + 1) % kHistorySize;
-  }
-  ID3D11Texture2D* source_frame = output->frame_history[oldest_index].Get();
+  ID3D11Texture2D* source_frame = output->latest_frame.Get();
 
   DXGI_OUTDUPL_DESC dupl_desc{};
   output->duplication->GetDesc(&dupl_desc);
@@ -691,7 +704,7 @@ bool DesktopCapture::CopyRegionFromFrame(OutputCapture* output, const RECT& scre
 
 bool DesktopCapture::CopyRegionIntoTexture(OutputCapture* output, const RECT& screen_rect,
                                            CapturedTexture* captured_texture) {
-  if (output == nullptr || output->frame_history.empty() || captured_texture == nullptr ||
+  if (output == nullptr || output->latest_frame == nullptr || captured_texture == nullptr ||
       captured_texture->texture == nullptr) {
     return false;
   }
@@ -710,7 +723,7 @@ bool DesktopCapture::CopyRegionIntoTexture(OutputCapture* output, const RECT& sc
     return false;
   }
 
-  ID3D11Texture2D* source_frame = output->frame_history[output->current_frame_index].Get();
+  ID3D11Texture2D* source_frame = output->latest_frame.Get();
 
   DXGI_OUTDUPL_DESC dupl_desc{};
   output->duplication->GetDesc(&dupl_desc);
@@ -921,7 +934,6 @@ void DesktopCapture::ResetOutputs() { outputs_.clear(); }
 
 void DesktopCapture::MarkDeviceLost(const wchar_t* context, HRESULT hr) {
   device_lost_ = true;
-  ResetOutputs();
   HRESULT reason = S_OK;
   if (d3d_device_ != nullptr && d3d_device_->device() != nullptr) {
     reason = d3d_device_->device()->GetDeviceRemovedReason();

@@ -31,10 +31,19 @@ constexpr wchar_t kOriginalExStyleProperty[] = L"GenieOriginalExStyle";
 constexpr wchar_t kWasLayeredProperty[] = L"GenieWasLayered";
 constexpr wchar_t kOriginalAlphaProperty[] = L"GenieOriginalAlpha";
 constexpr wchar_t kOriginalFlagsProperty[] = L"GenieOriginalFlags";
+constexpr std::size_t kMaxPreMinimizeSnapshots = 4;
 
 using CbtProc = LRESULT(CALLBACK*)(int, WPARAM, LPARAM);
 
 void MakeWindowTransparent(HWND window);
+
+DWORD WindowProcessId(HWND window) {
+  DWORD process_id = 0;
+  if (window != nullptr) {
+    GetWindowThreadProcessId(window, &process_id);
+  }
+  return process_id;
+}
 
 bool IsProcessElevated() {
   bool elevated = false;
@@ -972,6 +981,7 @@ bool Application::OnMinimizeStart(HWND window) {
   const bool window_is_already_minimized = IsIconic(window) != FALSE;
   RECT captured_window_bounds{};
 
+  PruneSnapshots();
   auto pre_min_it = pre_minimize_snapshots_.find(window);
   const bool has_pre_minimize_snapshot = pre_min_it != pre_minimize_snapshots_.end() &&
                                          pre_min_it->second.texture.shader_resource_view != nullptr;
@@ -1024,8 +1034,9 @@ bool Application::OnMinimizeStart(HWND window) {
   snapshot.target = target;
   snapshot.original_placement = original_normal_rect;
   snapshot.was_maximized = restore_to_maximized;
+  snapshot.process_id = WindowProcessId(window);
+  snapshot.captured_at_ms = GetTickCount64();
 
-  PruneSnapshots();
   restore_snapshots_[window] = std::move(snapshot);
 
   animating_window_ = window;
@@ -1427,6 +1438,7 @@ void Application::UpdatePreMinimizeSnapshot(HWND window) {
   rendering::CapturedTexture captured_texture;
   RECT snapshot_bounds = *animation_bounds;
   bool captured = false;
+  PruneSnapshots();
   auto existing = pre_minimize_snapshots_.find(window);
   if (existing != pre_minimize_snapshots_.end() &&
       EqualRect(&existing->second.bounds, &snapshot_bounds) &&
@@ -1465,8 +1477,11 @@ void Application::UpdatePreMinimizeSnapshot(HWND window) {
     snapshot.original_placement = snapshot_bounds;
   }
   snapshot.was_maximized = IsCurrentlyMaximized(window);
+  snapshot.process_id = WindowProcessId(window);
+  snapshot.captured_at_ms = GetTickCount64();
 
   pre_minimize_snapshots_[window] = std::move(snapshot);
+  PruneSnapshots();
   LogTrace(L"App", L"UpdatePreMinimizeSnapshot stored bounds=" + RectTraceString(snapshot_bounds) +
                        L" texture_size=" + std::to_wstring(captured_texture.size.width) + L"x" +
                        std::to_wstring(captured_texture.size.height) + L" window " +
@@ -1474,19 +1489,36 @@ void Application::UpdatePreMinimizeSnapshot(HWND window) {
 }
 
 void Application::PruneSnapshots() {
+  const auto still_matches_window = [](HWND window, const CachedSnapshot& snapshot) {
+    return IsWindow(window) && snapshot.process_id != 0 &&
+           WindowProcessId(window) == snapshot.process_id;
+  };
+
   for (auto it = restore_snapshots_.begin(); it != restore_snapshots_.end();) {
-    if (!IsWindow(it->first)) {
+    if (!still_matches_window(it->first, it->second)) {
       it = restore_snapshots_.erase(it);
     } else {
       ++it;
     }
   }
   for (auto it = pre_minimize_snapshots_.begin(); it != pre_minimize_snapshots_.end();) {
-    if (!IsWindow(it->first)) {
+    if (!still_matches_window(it->first, it->second)) {
       it = pre_minimize_snapshots_.erase(it);
     } else {
       ++it;
     }
+  }
+
+  while (pre_minimize_snapshots_.size() > kMaxPreMinimizeSnapshots) {
+    auto oldest =
+        std::min_element(pre_minimize_snapshots_.begin(), pre_minimize_snapshots_.end(),
+                         [](const auto& left, const auto& right) {
+                           return left.second.captured_at_ms < right.second.captured_at_ms;
+                         });
+    if (oldest == pre_minimize_snapshots_.end()) {
+      break;
+    }
+    pre_minimize_snapshots_.erase(oldest);
   }
 }
 

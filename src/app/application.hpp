@@ -39,6 +39,8 @@ private:
     bool was_maximized = false;
     bool moved_offscreen = false;
     RECT original_placement{};
+    DWORD process_id = 0;
+    ULONGLONG captured_at_ms = 0;
   };
 
   bool OnMinimizeStart(HWND window);

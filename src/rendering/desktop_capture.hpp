@@ -31,26 +31,33 @@ public:
                                             CapturedTexture* captured_texture);
   void ClearHistory() {
     for (auto& output : outputs_) {
-      output.frame_history.clear();
+      output.latest_frame.Reset();
     }
   }
   [[nodiscard]] bool device_lost() const { return device_lost_; }
   void ClearDeviceLost() { device_lost_ = false; }
 
 private:
-  static constexpr size_t kHistorySize = 4;
-
   struct OutputCapture {
     RECT desktop_coordinates{};
     Microsoft::WRL::ComPtr<IDXGIOutputDuplication> duplication;
-    std::vector<Microsoft::WRL::ComPtr<ID3D11Texture2D>> frame_history;
-    size_t current_frame_index = 0;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> latest_frame;
     DXGI_FORMAT latest_frame_format = DXGI_FORMAT_UNKNOWN;
+  };
+
+  enum class AcquireResult {
+    kAcquired,
+    kNoNewFrame,
+    kAccessLost,
+    kDeviceLost,
+    kFailed,
   };
 
   [[nodiscard]] bool InitializeOutputs();
   [[nodiscard]] OutputCapture* FindOutputForRect(const RECT& screen_rect);
-  bool TryAcquireLatestFrame(OutputCapture* output, UINT timeout_ms);
+  [[nodiscard]] OutputCapture* AcquireFrameForRect(const RECT& screen_rect,
+                                                   UINT first_frame_timeout_ms);
+  AcquireResult TryAcquireLatestFrame(OutputCapture* output, UINT timeout_ms);
   [[nodiscard]] bool CopyRegionFromFrame(OutputCapture* output, const RECT& screen_rect,
                                          CapturedTexture* captured_texture);
   [[nodiscard]] bool CopyRegionIntoTexture(OutputCapture* output, const RECT& screen_rect,
