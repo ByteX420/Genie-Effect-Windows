@@ -453,11 +453,11 @@ bool Application::Initialize(HINSTANCE instance) {
 
   if (!settings_window_.Initialize(
           instance, [this](bool enabled) { SetEnabled(enabled); },
-          [this](float duration) { SetAnimationDuration(duration); },
+          [this](float min_dur, float rest_dur) { SetAnimationDurations(min_dur, rest_dur); },
           [this]() { HealLeftoverWindows(); }, [this]() { RequestShutdown(); })) {
     return false;
   }
-  settings_window_.UpdateState(is_enabled_, animation_duration_seconds_);
+  settings_window_.UpdateState(is_enabled_, minimize_duration_seconds_, restore_duration_seconds_);
   settings_window_.Show(true);
 
   native_animation_blocker_.Enable(slots_[0].overlay.window());
@@ -523,7 +523,7 @@ bool Application::CreateAnimationRenderer() {
       d3d_device_.reset();
       return false;
     }
-    slots_[i].overlay.SetAnimationDuration(animation_duration_seconds_);
+    slots_[i].overlay.SetAnimationDuration(minimize_duration_seconds_);
   }
   desktop_capture_ = std::make_unique<rendering::DesktopCapture>(d3d_device_.get());
   return true;
@@ -961,7 +961,7 @@ void Application::EndFallbackTimerResolution() {
 
 void Application::SetEnabled(bool enabled) {
   if (is_enabled_ == enabled) {
-    settings_window_.UpdateState(enabled, animation_duration_seconds_);
+    settings_window_.UpdateState(enabled, minimize_duration_seconds_, restore_duration_seconds_);
     return;
   }
 
@@ -993,15 +993,22 @@ void Application::SetEnabled(bool enabled) {
   }
 
   is_enabled_ = enabled;
-  settings_window_.UpdateState(enabled, animation_duration_seconds_);
+  settings_window_.UpdateState(enabled, minimize_duration_seconds_, restore_duration_seconds_);
 }
 
-void Application::SetAnimationDuration(float duration_seconds) {
-  animation_duration_seconds_ = std::clamp(duration_seconds, 0.10f, 2.00f);
+void Application::SetAnimationDurations(float minimize_duration, float restore_duration) {
+  minimize_duration_seconds_ = std::clamp(minimize_duration, 0.10f, 2.00f);
+  restore_duration_seconds_ = std::clamp(restore_duration, 0.10f, 2.00f);
   for (int i = 0; i < 2; ++i) {
-    slots_[i].overlay.SetAnimationDuration(animation_duration_seconds_);
+    if (slots_[i].overlay.active()) {
+      if (slots_[i].animating_restore) {
+        slots_[i].overlay.SetAnimationDuration(restore_duration_seconds_);
+      } else {
+        slots_[i].overlay.SetAnimationDuration(minimize_duration_seconds_);
+      }
+    }
   }
-  settings_window_.UpdateState(is_enabled_, animation_duration_seconds_);
+  settings_window_.UpdateState(is_enabled_, minimize_duration_seconds_, restore_duration_seconds_);
 }
 
 bool Application::InstallCbtHook() {
@@ -1234,6 +1241,7 @@ bool Application::OnMinimizeStart(HWND window) {
   slot.last_animation_texture_refresh_ms = 0;
   slot.live_animation_capture_enabled = false;
 
+  slot.overlay.SetAnimationDuration(minimize_duration_seconds_);
   if (!slot.overlay.StartAnimation(captured_texture, ToRectF(source_bounds), target.rect,
                                       target.edge)) {
     TraceWindowEvent(L"OnMinimizeStart failed: overlay StartAnimation", window);
@@ -1605,6 +1613,7 @@ bool Application::OnRestoreAttempt(HWND window) {
 
   native_animation_blocker_.SetTransitionsDisabledForWindow(window, true);
 
+  slot.overlay.SetAnimationDuration(restore_duration_seconds_);
   if (!slot.overlay.StartAnimation(current_snapshot.texture, ToRectF(current_snapshot.bounds),
                                       current_snapshot.target.rect, current_snapshot.target.edge,
                                       1.0f, 0.0f)) {

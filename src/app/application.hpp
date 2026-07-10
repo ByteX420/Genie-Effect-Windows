@@ -72,7 +72,7 @@ private:
   bool IsGenieWindowRestored(HWND window) const;
   void RestoreWindowFromGenieState(HWND window, bool force_show_if_iconic = true);
   void SetEnabled(bool enabled);
-  void SetAnimationDuration(float duration_seconds);
+  void SetAnimationDurations(float minimize_duration, float restore_duration);
   bool InstallCbtHook();
   void UninstallCbtHook();
   void ResetAnimationFramePacing(int slot_index, HWND window, const RECT& animation_bounds);
@@ -109,7 +109,8 @@ private:
   DWORD animation_renderer_recovery_delay_ms_ = 0;
   bool in_restore_window_state_ = false;
   bool is_enabled_ = true;
-  float animation_duration_seconds_ = 0.70f;
+  float minimize_duration_seconds_ = 0.70f;
+  float restore_duration_seconds_ = 0.70f;
   std::atomic<bool> shutting_down_{false};
   SettingsWindow settings_window_;
 };

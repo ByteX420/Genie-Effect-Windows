@@ -13,7 +13,7 @@ namespace genie::app {
 class SettingsWindow {
 public:
   using ToggleCallback = std::function<void(bool)>;
-  using SpeedCallback = std::function<void(float)>;
+  using SpeedCallback = std::function<void(float minimize_duration, float restore_duration)>;
   using HealCallback = std::function<void()>;
   using ExitCallback = std::function<void()>;
 
@@ -26,7 +26,7 @@ public:
                   HealCallback heal_callback, ExitCallback exit_callback);
   void Shutdown();
   void Show(bool show);
-  void UpdateState(bool enabled, float duration_seconds);
+  void UpdateState(bool enabled, float minimize_duration, float restore_duration);
   void Render();
   void ForceRender();
   [[nodiscard]] HWND hwnd() const { return hwnd_; }
@@ -58,7 +58,8 @@ private:
   HealCallback heal_callback_;
   ExitCallback exit_callback_;
   bool is_enabled_ = true;
-  float duration_seconds_ = 0.70f;
+  float minimize_duration_seconds_ = 0.70f;
+  float restore_duration_seconds_ = 0.70f;
   bool imgui_ready_ = false;
   bool imgui_context_ready_ = false;
   bool imgui_win32_ready_ = false;

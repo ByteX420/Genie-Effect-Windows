@@ -20,7 +20,7 @@ namespace {
 
 constexpr wchar_t kSettingsWindowClass[] = L"GenieEffectImGuiSettings";
 constexpr int kWindowWidth = 400;
-constexpr int kWindowHeight = 140;
+constexpr int kWindowHeight = 180;
 constexpr float kMinimumAnimationDurationSeconds = 0.10f;
 constexpr float kMaximumAnimationDurationSeconds = 2.00f;
 constexpr UINT kTrayMessage = WM_APP + 100;
@@ -362,11 +362,14 @@ void SettingsWindow::Show(bool show) {
   Render();
 }
 
-void SettingsWindow::UpdateState(bool enabled, float duration_seconds) {
+void SettingsWindow::UpdateState(bool enabled, float minimize_duration, float restore_duration) {
   const bool changed =
-      is_enabled_ != enabled || std::abs(duration_seconds_ - duration_seconds) > 0.0001f;
+      is_enabled_ != enabled ||
+      std::abs(minimize_duration_seconds_ - minimize_duration) > 0.0001f ||
+      std::abs(restore_duration_seconds_ - restore_duration) > 0.0001f;
   is_enabled_ = enabled;
-  duration_seconds_ = duration_seconds;
+  minimize_duration_seconds_ = minimize_duration;
+  restore_duration_seconds_ = restore_duration;
   if (changed) ForceRender();
 }
 
@@ -641,28 +644,51 @@ void SettingsWindow::RenderContents() {
     toggle_callback_(is_enabled_);
   }
 
-  // Row 2: Duration (y = 92)
+  // Row 2: Minimize Duration (y = 92)
   draw->AddText(font_body_, px(13.5f), point(px(18.0f), px(92.0f) + y_offset),
-                WithAlpha(kSecondaryTextColor, content_alpha), "Duration");
+                WithAlpha(kSecondaryTextColor, content_alpha), "Minimize Duration");
 
   // Value text on the right
-  const std::string duration_text = std::format("{:.2f}s", duration_seconds_);
-  const ImVec2 duration_size =
-      font_medium_->CalcTextSizeA(px(13.0f), FLT_MAX, 0.0f, duration_text.c_str());
+  const std::string min_duration_text = std::format("{:.2f}s", minimize_duration_seconds_);
+  const ImVec2 min_duration_size =
+      font_medium_->CalcTextSizeA(px(13.0f), FLT_MAX, 0.0f, min_duration_text.c_str());
   draw->AddText(font_medium_, px(13.0f),
-                point(size.x - px(18.0f) - duration_size.x, px(92.0f) + y_offset),
-                WithAlpha(kSecondaryTextColor, content_alpha), duration_text.c_str());
+                point(size.x - px(18.0f) - min_duration_size.x, px(92.0f) + y_offset),
+                WithAlpha(kSecondaryTextColor, content_alpha), min_duration_text.c_str());
 
   // Slider (Right-aligned next to value text)
   const float slider_w = px(120.0f);
   ImGui::SetCursorPos(
-      ImVec2(size.x - px(18.0f) - duration_size.x - slider_w - px(8.0f), px(92.0f) + y_offset));
-  float updated_duration = duration_seconds_;
-  if (Slider("##duration", &updated_duration, kMinimumAnimationDurationSeconds,
+      ImVec2(size.x - px(18.0f) - min_duration_size.x - slider_w - px(8.0f), px(92.0f) + y_offset));
+  float updated_min_duration = minimize_duration_seconds_;
+  if (Slider("##min_duration", &updated_min_duration, kMinimumAnimationDurationSeconds,
              kMaximumAnimationDurationSeconds, slider_w, scale, content_alpha) &&
-      std::abs(updated_duration - duration_seconds_) > 0.0001f) {
-    duration_seconds_ = updated_duration;
-    if (speed_callback_) speed_callback_(duration_seconds_);
+      std::abs(updated_min_duration - minimize_duration_seconds_) > 0.0001f) {
+    minimize_duration_seconds_ = updated_min_duration;
+    if (speed_callback_) speed_callback_(minimize_duration_seconds_, restore_duration_seconds_);
+  }
+
+  // Row 3: Restore Duration (y = 132)
+  draw->AddText(font_body_, px(13.5f), point(px(18.0f), px(132.0f) + y_offset),
+                WithAlpha(kSecondaryTextColor, content_alpha), "Restore Duration");
+
+  // Value text on the right
+  const std::string restore_duration_text = std::format("{:.2f}s", restore_duration_seconds_);
+  const ImVec2 restore_duration_size =
+      font_medium_->CalcTextSizeA(px(13.0f), FLT_MAX, 0.0f, restore_duration_text.c_str());
+  draw->AddText(font_medium_, px(13.0f),
+                point(size.x - px(18.0f) - restore_duration_size.x, px(132.0f) + y_offset),
+                WithAlpha(kSecondaryTextColor, content_alpha), restore_duration_text.c_str());
+
+  // Slider (Right-aligned next to value text)
+  ImGui::SetCursorPos(
+      ImVec2(size.x - px(18.0f) - restore_duration_size.x - slider_w - px(8.0f), px(132.0f) + y_offset));
+  float updated_restore_duration = restore_duration_seconds_;
+  if (Slider("##restore_duration", &updated_restore_duration, kMinimumAnimationDurationSeconds,
+             kMaximumAnimationDurationSeconds, slider_w, scale, content_alpha) &&
+      std::abs(updated_restore_duration - restore_duration_seconds_) > 0.0001f) {
+    restore_duration_seconds_ = updated_restore_duration;
+    if (speed_callback_) speed_callback_(minimize_duration_seconds_, restore_duration_seconds_);
   }
 
   ImGui::End();
