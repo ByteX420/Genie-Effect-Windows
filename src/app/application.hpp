@@ -43,7 +43,7 @@ private:
 
   bool OnMinimizeStart(HWND window);
   bool OnRestoreAttempt(HWND window);
-  void OnWindowSeen(HWND window);
+  void OnWindowSeen(HWND window, DWORD event);
   void UpdatePreMinimizeSnapshot(HWND window);
   void CompletePendingNativeMinimize();
   void FinishActiveAnimation();

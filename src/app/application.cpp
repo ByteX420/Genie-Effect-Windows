@@ -464,9 +464,10 @@ bool Application::Initialize(HINSTANCE instance) {
     std::wcerr << L"Global CBT hook unavailable; using WinEvent fallback.\n";
   }
 
-  if (!window_event_monitor_.Start([this](HWND window) { OnMinimizeStart(window); },
-                                   [this](HWND window) { OnRestoreAttempt(window); },
-                                   [this](HWND window) { OnWindowSeen(window); })) {
+  if (!window_event_monitor_.Start(
+          [this](HWND window) { OnMinimizeStart(window); },
+          [this](HWND window) { OnRestoreAttempt(window); },
+          [this](HWND window, DWORD event) { OnWindowSeen(window, event); })) {
     return false;
   }
 
@@ -1381,7 +1382,7 @@ bool Application::OnRestoreAttempt(HWND window) {
   return true;
 }
 
-void Application::OnWindowSeen(HWND window) {
+void Application::OnWindowSeen(HWND window, DWORD event) {
   if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_) {
     return;
   }
@@ -1406,7 +1407,9 @@ void Application::OnWindowSeen(HWND window) {
     return;
   }
 
-  UpdatePreMinimizeSnapshot(window);
+  if (event == EVENT_SYSTEM_FOREGROUND) {
+    UpdatePreMinimizeSnapshot(window);
+  }
 }
 
 void Application::UpdatePreMinimizeSnapshot(HWND window) {
@@ -1423,10 +1426,22 @@ void Application::UpdatePreMinimizeSnapshot(HWND window) {
 
   rendering::CapturedTexture captured_texture;
   RECT snapshot_bounds = *animation_bounds;
-  // Prioritize non-blocking CaptureRegion to prevent target window blocking
-  if (desktop_capture_->CaptureRegion(*animation_bounds, &captured_texture)) {
-    // CaptureRegion succeeded
-  } else {
+  bool captured = false;
+  auto existing = pre_minimize_snapshots_.find(window);
+  if (existing != pre_minimize_snapshots_.end() &&
+      EqualRect(&existing->second.bounds, &snapshot_bounds) &&
+      existing->second.texture.texture != nullptr) {
+    captured_texture = existing->second.texture;
+    captured = desktop_capture_->RefreshCapturedTexture(*animation_bounds, &captured_texture);
+  }
+
+  // Prioritize a non-blocking desktop-region capture. When the window bounds
+  // are unchanged, RefreshCapturedTexture above reuses the cropped texture and
+  // SRV instead of allocating both again on every snapshot refresh.
+  if (!captured) {
+    captured = desktop_capture_->CaptureRegion(*animation_bounds, &captured_texture);
+  }
+  if (!captured) {
     RECT captured_window_bounds{};
     if (desktop_capture_->CaptureWindow(window, *animation_bounds, &captured_texture,
                                         &captured_window_bounds)) {
@@ -1443,7 +1458,6 @@ void Application::UpdatePreMinimizeSnapshot(HWND window) {
   snapshot.window = window;
   snapshot.bounds = snapshot_bounds;
   snapshot.texture = captured_texture;
-  snapshot.target = taskbar_target_provider_.GetTargetForWindow(window, snapshot_bounds);
   const std::optional<WINDOWPLACEMENT> placement = GetPlacement(window);
   snapshot.original_placement =
       placement.has_value() ? placement->rcNormalPosition : *animation_bounds;

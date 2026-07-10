@@ -58,7 +58,7 @@ WindowEventMonitor::~WindowEventMonitor() { Stop(); }
 
 bool WindowEventMonitor::Start(WindowCallback minimize_start_callback,
                                WindowCallback restore_start_callback,
-                               WindowCallback window_seen_callback) {
+                               WindowSeenCallback window_seen_callback) {
   Stop();
   minimize_start_callback_ = std::move(minimize_start_callback);
   restore_start_callback_ = std::move(restore_start_callback);
@@ -224,7 +224,7 @@ void WindowEventMonitor::OnWinEvent(DWORD event, HWND window, LONG object_id, LO
   if (window_seen_callback_) {
     LogTrace(L"WinEvent", L"OnWinEvent dispatch window_seen event=" + EventName(event) + L" " +
                               WindowBrief(window));
-    window_seen_callback_(window);
+    window_seen_callback_(window, event);
   }
 }
 

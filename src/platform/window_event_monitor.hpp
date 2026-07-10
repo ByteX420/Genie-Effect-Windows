@@ -8,6 +8,7 @@ namespace genie::platform {
 class WindowEventMonitor {
 public:
   using WindowCallback = std::function<void(HWND window)>;
+  using WindowSeenCallback = std::function<void(HWND window, DWORD event)>;
 
   WindowEventMonitor() = default;
   ~WindowEventMonitor();
@@ -16,7 +17,7 @@ public:
   WindowEventMonitor& operator=(const WindowEventMonitor&) = delete;
 
   bool Start(WindowCallback minimize_start_callback, WindowCallback restore_start_callback,
-             WindowCallback window_seen_callback);
+             WindowSeenCallback window_seen_callback);
   void Stop();
 
 private:
@@ -39,7 +40,7 @@ private:
   UINT shell_hook_message_ = 0;
   WindowCallback minimize_start_callback_;
   WindowCallback restore_start_callback_;
-  WindowCallback window_seen_callback_;
+  WindowSeenCallback window_seen_callback_;
 
   static WindowEventMonitor* active_monitor_;
 };
