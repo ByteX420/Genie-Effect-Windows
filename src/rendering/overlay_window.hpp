@@ -74,6 +74,8 @@ private:
   bool CreateOverlayWindow(HINSTANCE instance);
   bool InitializeComposition();
   bool CreateRenderTarget();
+  bool ResizeOverlaySurface(const RECT& screen_rect);
+  void ApplyVisibleOverlayRegion(HWND taskbar_window);
   bool CreateRenderResources();
   bool CompileShaders();
   bool UploadMesh(const genie::animation::GenieMesh& mesh);
@@ -86,6 +88,7 @@ private:
   D3dDevice* d3d_device_ = nullptr;
   HWND window_ = nullptr;
   RECT virtual_screen_rect_{};
+  RECT overlay_screen_rect_{};
   UINT width_ = 0;
   UINT height_ = 0;
 

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <d3dcompiler.h>
 #include <dwmapi.h>
@@ -20,6 +21,7 @@ constexpr wchar_t kOverlayWindowClassName[] = L"GenieEffectOverlayWindow";
 constexpr wchar_t kAllowMinimizeProperty[] = L"GenieAllowMinimize";
 constexpr UINT kMaxMeshVertices = 102;
 constexpr UINT kMaxMeshIndices = 300;
+constexpr LONG kOverlayPadding = 2;
 
 struct FrameConstants {
   float viewport_size[2]{};
@@ -87,6 +89,23 @@ genie::animation::RectF RectToRectF(const RECT& rect) {
   };
 }
 
+RECT AnimationSurfaceRect(const genie::animation::RectF& source,
+                          const genie::animation::RectF& target, const RECT& virtual_screen) {
+  RECT requested{
+      .left = static_cast<LONG>(std::floor(std::min(source.left, target.left))) - kOverlayPadding,
+      .top = static_cast<LONG>(std::floor(std::min(source.top, target.top))) - kOverlayPadding,
+      .right = static_cast<LONG>(std::ceil(std::max(source.right, target.right))) + kOverlayPadding,
+      .bottom =
+          static_cast<LONG>(std::ceil(std::max(source.bottom, target.bottom))) + kOverlayPadding,
+  };
+  RECT clipped{};
+  if (!IntersectRect(&clipped, &requested, &virtual_screen) || RectWidth(clipped) <= 0 ||
+      RectHeight(clipped) <= 0) {
+    return RECT{};
+  }
+  return clipped;
+}
+
 std::wstring RectFTraceString(const genie::animation::RectF& rect) {
   std::wstringstream ss;
   ss << L"(" << rect.left << L"," << rect.top << L"," << rect.right << L"," << rect.bottom << L")";
@@ -139,8 +158,10 @@ bool OverlayWindow::Initialize(HINSTANCE instance, D3dDevice* d3d_device,
   minimize_attempt_message_ = RegisterWindowMessageW(L"GenieMinimizeAttempt");
   restore_attempt_message_ = RegisterWindowMessageW(L"GenieRestoreAttempt");
   virtual_screen_rect_ = platform::GetVirtualScreenRect();
-  width_ = static_cast<UINT>(RectWidth(virtual_screen_rect_));
-  height_ = static_cast<UINT>(RectHeight(virtual_screen_rect_));
+  overlay_screen_rect_ = RECT{virtual_screen_rect_.left, virtual_screen_rect_.top,
+                              virtual_screen_rect_.left + 1, virtual_screen_rect_.top + 1};
+  width_ = 1;
+  height_ = 1;
 
   if (!RegisterWindowClass(instance) || !CreateOverlayWindow(instance) ||
       !InitializeComposition() || !CreateRenderTarget() || !CreateRenderResources()) {
@@ -197,6 +218,21 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
     return false;
   }
 
+  const RECT animation_surface =
+      AnimationSurfaceRect(source_screen_rect, target_screen_rect, virtual_screen_rect_);
+  if (RectWidth(animation_surface) <= 0 || RectHeight(animation_surface) <= 0) {
+    LogTrace(L"Overlay", L"StartAnimation failed: animation surface is outside virtual screen");
+    return false;
+  }
+
+  HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
+  genie::platform::SetOwnedWindowRegion(window_, hidden_region, false);
+  if (!ResizeOverlaySurface(animation_surface)) {
+    LogTrace(L"Overlay", L"StartAnimation failed: ResizeOverlaySurface returned false");
+    HideOverlay();
+    return false;
+  }
+
   animation_state_.active = true;
   animation_state_.captured_texture = std::move(captured_texture);
   animation_state_.source_rect = ToOverlayRect(source_screen_rect);
@@ -229,32 +265,10 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
   }
 
-  SetWindowPos(window_, HWND_TOPMOST, virtual_screen_rect_.left, virtual_screen_rect_.top,
+  ApplyVisibleOverlayRegion(taskbar_hwnd);
+  SetWindowPos(window_, HWND_TOPMOST, overlay_screen_rect_.left, overlay_screen_rect_.top,
                static_cast<int>(width_), static_cast<int>(height_),
                SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
-
-  RECT taskbar_rect{};
-  if (taskbar_hwnd != nullptr && GetWindowRect(taskbar_hwnd, &taskbar_rect)) {
-    RECT taskbar_window_rect = taskbar_rect;
-    taskbar_window_rect.left -= virtual_screen_rect_.left;
-    taskbar_window_rect.right -= virtual_screen_rect_.left;
-    taskbar_window_rect.top -= virtual_screen_rect_.top;
-    taskbar_window_rect.bottom -= virtual_screen_rect_.top;
-
-    HRGN full_rgn = CreateRectRgn(0, 0, static_cast<int>(width_), static_cast<int>(height_));
-    HRGN taskbar_rgn = CreateRectRgn(taskbar_window_rect.left, taskbar_window_rect.top,
-                                     taskbar_window_rect.right, taskbar_window_rect.bottom);
-    HRGN result_rgn = CreateRectRgn(0, 0, 0, 0);
-    if (CombineRgn(result_rgn, full_rgn, taskbar_rgn, RGN_DIFF) != ERROR) {
-      genie::platform::SetOwnedWindowRegion(window_, result_rgn, true);
-    } else {
-      DeleteObject(result_rgn);
-    }
-    DeleteObject(full_rgn);
-    DeleteObject(taskbar_rgn);
-  } else {
-    genie::platform::SetOwnedWindowRegion(window_, nullptr, true);
-  }
 
   DwmFlush();
   HRESULT hr = composition_device_->WaitForCommitCompletion();
@@ -469,7 +483,7 @@ bool OverlayWindow::CreateOverlayWindow(HINSTANCE instance) {
       WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED;
   window_ =
       CreateWindowExW(kExStyle, kOverlayWindowClassName, L"Genie Effect Overlay", WS_POPUP,
-                      virtual_screen_rect_.left, virtual_screen_rect_.top, static_cast<int>(width_),
+                      overlay_screen_rect_.left, overlay_screen_rect_.top, static_cast<int>(width_),
                       static_cast<int>(height_), nullptr, nullptr, instance, this);
   return window_ != nullptr;
 }
@@ -536,6 +550,61 @@ bool OverlayWindow::CreateRenderTarget() {
     return false;
   }
   return true;
+}
+
+bool OverlayWindow::ResizeOverlaySurface(const RECT& screen_rect) {
+  const UINT new_width = static_cast<UINT>(RectWidth(screen_rect));
+  const UINT new_height = static_cast<UINT>(RectHeight(screen_rect));
+  if (new_width == 0 || new_height == 0 || swap_chain_ == nullptr || window_ == nullptr) {
+    return false;
+  }
+
+  if (new_width != width_ || new_height != height_) {
+    ID3D11DeviceContext* context = d3d_device_->context();
+    context->OMSetRenderTargets(0, nullptr, nullptr);
+    render_target_view_.Reset();
+    const HRESULT hr = swap_chain_->ResizeBuffers(0, new_width, new_height, DXGI_FORMAT_UNKNOWN, 0);
+    if (FAILED(hr)) {
+      std::wcerr << L"ResizeBuffers for animation surface failed: 0x" << std::hex << hr << std::dec
+                 << L"\n";
+      return false;
+    }
+    width_ = new_width;
+    height_ = new_height;
+    if (!CreateRenderTarget()) {
+      return false;
+    }
+  }
+
+  overlay_screen_rect_ = screen_rect;
+  return SetWindowPos(window_, HWND_TOPMOST, screen_rect.left, screen_rect.top,
+                      static_cast<int>(new_width), static_cast<int>(new_height),
+                      SWP_NOACTIVATE | SWP_NOOWNERZORDER) != FALSE;
+}
+
+void OverlayWindow::ApplyVisibleOverlayRegion(HWND taskbar_window) {
+  HRGN visible_region = CreateRectRgn(0, 0, static_cast<int>(width_), static_cast<int>(height_));
+  if (visible_region == nullptr) {
+    return;
+  }
+
+  RECT taskbar_rect{};
+  RECT overlap{};
+  if (taskbar_window != nullptr && GetWindowRect(taskbar_window, &taskbar_rect) &&
+      IntersectRect(&overlap, &overlay_screen_rect_, &taskbar_rect)) {
+    OffsetRect(&overlap, -overlay_screen_rect_.left, -overlay_screen_rect_.top);
+    HRGN taskbar_region = CreateRectRgn(overlap.left, overlap.top, overlap.right, overlap.bottom);
+    if (taskbar_region != nullptr) {
+      if (CombineRgn(visible_region, visible_region, taskbar_region, RGN_DIFF) == ERROR) {
+        DeleteObject(taskbar_region);
+        DeleteObject(visible_region);
+        return;
+      }
+      DeleteObject(taskbar_region);
+    }
+  }
+
+  genie::platform::SetOwnedWindowRegion(window_, visible_region, true);
 }
 
 bool OverlayWindow::CreateRenderResources() {
@@ -779,7 +848,8 @@ void OverlayWindow::ClearFrame() {
 void OverlayWindow::HideOverlay() {
   if (window_ != nullptr) {
     ClearFrame();
-    genie::platform::SetOwnedWindowRegion(window_, nullptr, true);
+    HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
+    genie::platform::SetOwnedWindowRegion(window_, hidden_region, true);
     SetWindowPos(window_, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
   }
@@ -787,12 +857,12 @@ void OverlayWindow::HideOverlay() {
 
 genie::animation::RectF OverlayWindow::ToOverlayRect(
     const genie::animation::RectF& screen_rect) const {
-  const genie::animation::RectF virtual_screen = RectToRectF(virtual_screen_rect_);
+  const genie::animation::RectF overlay_screen = RectToRectF(overlay_screen_rect_);
   return genie::animation::RectF{
-      .left = screen_rect.left - virtual_screen.left,
-      .top = screen_rect.top - virtual_screen.top,
-      .right = screen_rect.right - virtual_screen.left,
-      .bottom = screen_rect.bottom - virtual_screen.top,
+      .left = screen_rect.left - overlay_screen.left,
+      .top = screen_rect.top - overlay_screen.top,
+      .right = screen_rect.right - overlay_screen.left,
+      .bottom = screen_rect.bottom - overlay_screen.top,
   };
 }
 
