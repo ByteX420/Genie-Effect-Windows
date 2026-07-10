@@ -36,6 +36,12 @@
     <ClCompile Include="src\app\application.cpp">
       <Filter>src\app</Filter>
     </ClCompile>
+    <ClCompile Include="src\app\settings_store.cpp">
+      <Filter>Source Files\App</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\startup_manager.cpp">
+      <Filter>Source Files\App</Filter>
+    </ClCompile>
     <ClCompile Include="src\app\settings_window.cpp">
       <Filter>src\app</Filter>
     </ClCompile>
@@ -97,6 +103,12 @@
     </ClInclude>
     <ClInclude Include="src\app\application.hpp">
       <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\settings_store.hpp">
+      <Filter>Header Files\App</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\startup_manager.hpp">
+      <Filter>Header Files\App</Filter>
     </ClInclude>
     <ClInclude Include="src\app\settings_window.hpp">
       <Filter>src\app</Filter>

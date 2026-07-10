@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -61,6 +62,56 @@ inline const std::wstring& GenieDebugLogPath() {
     return path;
   }();
   return log_path;
+}
+
+inline std::uintmax_t GenieLogFolderSize() {
+  std::error_code error;
+  const std::filesystem::path folder = std::filesystem::path(GenieDebugLogPath()).parent_path();
+  std::uintmax_t total = 0;
+  for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+    if (error) break;
+    if (entry.is_regular_file(error) && entry.path().filename().wstring().starts_with(L"genie_debug")) {
+      total += entry.file_size(error);
+      error.clear();
+    }
+  }
+  return total;
+}
+
+inline void CleanupGenieLogs(std::size_t maximum_files = 5,
+                             std::uintmax_t maximum_total_bytes = 10u * 1024u * 1024u) {
+  std::error_code error;
+  const std::filesystem::path active = GenieDebugLogPath();
+  const std::filesystem::path folder = active.parent_path();
+  if (std::filesystem::exists(active, error) && std::filesystem::file_size(active, error) >
+                                                   2u * 1024u * 1024u) {
+    SYSTEMTIME time{};
+    GetLocalTime(&time);
+    wchar_t suffix[40]{};
+    swprintf_s(suffix, L"genie_debug_%04u%02u%02u_%02u%02u%02u.log", time.wYear, time.wMonth,
+               time.wDay, time.wHour, time.wMinute, time.wSecond);
+    std::filesystem::rename(active, folder / suffix, error);
+    error.clear();
+  }
+  std::vector<std::filesystem::directory_entry> logs;
+  for (const auto& entry : std::filesystem::directory_iterator(folder, error)) {
+    if (error) break;
+    if (entry.is_regular_file(error) && entry.path() != active &&
+        entry.path().filename().wstring().starts_with(L"genie_debug")) logs.push_back(entry);
+    error.clear();
+  }
+  std::sort(logs.begin(), logs.end(), [&error](const auto& left, const auto& right) {
+    const auto left_time = left.last_write_time(error); error.clear();
+    const auto right_time = right.last_write_time(error); error.clear();
+    return left_time < right_time;
+  });
+  std::uintmax_t total = GenieLogFolderSize();
+  while (!logs.empty() && (logs.size() + 1 > maximum_files || total > maximum_total_bytes)) {
+    const std::uintmax_t size = logs.front().file_size(error); error.clear();
+    std::filesystem::remove(logs.front().path(), error); error.clear();
+    total = total > size ? total - size : 0;
+    logs.erase(logs.begin());
+  }
 }
 
 inline std::string GenieLogToUtf8(const std::wstring& text) {

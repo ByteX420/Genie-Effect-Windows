@@ -126,6 +126,8 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     </ClCompile>
     <ClCompile Include="src\animation\genie_mesh.cpp" />
     <ClCompile Include="src\app\application.cpp" />
+    <ClCompile Include="src\app\settings_store.cpp" />
+    <ClCompile Include="src\app\startup_manager.cpp" />
     <ClCompile Include="src\app\settings_window.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -166,6 +168,8 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClInclude Include="src\animation\geometry.hpp" />
     <ClInclude Include="src\animation\genie_mesh.hpp" />
     <ClInclude Include="src\app\application.hpp" />
+    <ClInclude Include="src\app\settings_store.hpp" />
+    <ClInclude Include="src\app\startup_manager.hpp" />
     <ClInclude Include="src\app\settings_window.hpp" />
     <ClInclude Include="src\platform\native_animation_blocker.hpp" />
     <ClInclude Include="src\platform\taskbar_target_provider.hpp" />

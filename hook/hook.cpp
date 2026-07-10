@@ -7,6 +7,7 @@ namespace {
 
 constexpr wchar_t kAllowMinimizeProperty[] = L"GenieAllowMinimize";
 constexpr wchar_t kAllowRestoreProperty[] = L"GenieAllowRestore";
+constexpr wchar_t kExcludedApplicationProperty[] = L"GenieExcludedApplication";
 constexpr wchar_t kOverlayMessageName[] = L"GenieMinimizeAttempt";
 constexpr wchar_t kRestoreMessageName[] = L"GenieRestoreAttempt";
 constexpr wchar_t kOverlayClassName[] = L"GenieEffectOverlayWindow";
@@ -63,7 +64,9 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK CBTProc(int code, WPARAM w_par
     }
 
     if (IsMinimizeCommand(show_cmd)) {
-      if (GetPropW(target_window, kAllowMinimizeProperty) == nullptr) {
+      if (GetPropW(target_window, kExcludedApplicationProperty) != nullptr) {
+        LogTrace(L"HookDLL", L"Minimize allowed natively for excluded application");
+      } else if (GetPropW(target_window, kAllowMinimizeProperty) == nullptr) {
         HWND overlay_window = FindWindowW(kOverlayClassName, nullptr);
         const UINT message = RegisterWindowMessageW(kOverlayMessageName);
         LogTrace(L"HookDLL", L"Attempting to intercept minimize for hwnd=0x" +
@@ -88,7 +91,9 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK CBTProc(int code, WPARAM w_par
     }
 
     if (IsRestoreCommand(show_cmd)) {
-      if (GetPropW(target_window, kAllowRestoreProperty) == nullptr) {
+      if (GetPropW(target_window, kExcludedApplicationProperty) != nullptr) {
+        LogTrace(L"HookDLL", L"Restore allowed natively for excluded application");
+      } else if (GetPropW(target_window, kAllowRestoreProperty) == nullptr) {
         HWND overlay_window = FindWindowW(kOverlayClassName, nullptr);
         const UINT message = RegisterWindowMessageW(kRestoreMessageName);
         LogTrace(L"HookDLL", L"Attempting to intercept restore for hwnd=0x" +

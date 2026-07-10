@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include <unordered_set>
 
 namespace genie::platform {
 
@@ -19,6 +20,7 @@ public:
 private:
   HWND ignored_window_ = nullptr;
   bool enabled_ = false;
+  std::unordered_set<HWND> blocked_windows_;
 };
 
 }  // namespace genie::platform

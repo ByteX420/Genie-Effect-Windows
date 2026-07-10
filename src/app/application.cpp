@@ -3,13 +3,19 @@
 #include "app/application.hpp"
 
 #include <atomic>
+#include <cstring>
 #include <dwmapi.h>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <shellapi.h>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <timeapi.h>
 
 #include "animation/geometry.hpp"
+#include "app/startup_manager.hpp"
 #include "common/debug_log.hpp"
 #include "platform/window_util.hpp"
 
@@ -23,6 +29,7 @@ constexpr char kCbtProcName[] = "CBTProc";
 constexpr char kDecoratedCbtProcName[] = "_CBTProc@12";
 constexpr wchar_t kAllowMinimizeProperty[] = L"GenieAllowMinimize";
 constexpr wchar_t kAllowRestoreProperty[] = L"GenieAllowRestore";
+constexpr wchar_t kExcludedApplicationProperty[] = L"GenieExcludedApplication";
 constexpr wchar_t kIsMinimizingProperty[] = L"GenieIsMinimizing";
 constexpr wchar_t kOriginalPlacementLeftProperty[] = L"GenieOriginalPlacementLeft";
 constexpr wchar_t kOriginalPlacementTopProperty[] = L"GenieOriginalPlacementTop";
@@ -30,6 +37,7 @@ constexpr wchar_t kOriginalPlacementRightProperty[] = L"GenieOriginalPlacementRi
 constexpr wchar_t kOriginalPlacementBottomProperty[] = L"GenieOriginalPlacementBottom";
 constexpr wchar_t kMovedOffscreenProperty[] = L"GenieMovedOffscreen";
 constexpr wchar_t kWasMaximizedProperty[] = L"GenieWasMaximized";
+constexpr wchar_t kTransparencySavedProperty[] = L"GenieTransparencySaved";
 constexpr wchar_t kOriginalExStyleProperty[] = L"GenieOriginalExStyle";
 constexpr wchar_t kWasLayeredProperty[] = L"GenieWasLayered";
 constexpr wchar_t kOriginalAlphaProperty[] = L"GenieOriginalAlpha";
@@ -37,6 +45,8 @@ constexpr wchar_t kOriginalFlagsProperty[] = L"GenieOriginalFlags";
 constexpr std::size_t kMaxPreMinimizeSnapshots = 4;
 constexpr DWORD kInitialRendererRecoveryDelayMs = 250;
 constexpr DWORD kMaximumRendererRecoveryDelayMs = 4000;
+constexpr int kHotkeyBaseId = 4100;
+constexpr std::uint32_t kSupportedHotkeyModifiers = MOD_ALT | MOD_CONTROL | MOD_SHIFT | MOD_WIN;
 
 using CbtProc = LRESULT(CALLBACK*)(int, WPARAM, LPARAM);
 
@@ -220,8 +230,34 @@ void StoreWasMaximizedProperty(HWND window, bool was_maximized) {
 
 bool HasGenieWindowState(HWND window) {
   return GetPropW(window, kMovedOffscreenProperty) != nullptr ||
+         GetPropW(window, kTransparencySavedProperty) != nullptr ||
          GetPropW(window, kOriginalExStyleProperty) != nullptr ||
          GetPropW(window, kOriginalPlacementLeftProperty) != nullptr;
+}
+
+std::string WideToUtf8(std::wstring_view value) {
+  if (value.empty()) return {};
+  const int required = WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
+                                           nullptr, 0, nullptr, nullptr);
+  if (required <= 0) return {};
+  std::string result(static_cast<size_t>(required), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), result.data(),
+                      required, nullptr, nullptr);
+  return result;
+}
+
+float AnimationStyleDurationScale(std::string_view style) {
+  if (style == "Snappy") return 0.72f;
+  if (style == "Linear") return 0.85f;
+  if (style == "Soft") return 0.95f;
+  return 1.0f;
+}
+
+float AnimationStyleStrength(std::string_view style) {
+  if (style == "Linear") return 0.0f;
+  if (style == "Soft") return 0.65f;
+  if (style == "Snappy") return 0.82f;
+  return 1.0f;
 }
 
 void ClearGenieWindowProperties(HWND window) {
@@ -345,14 +381,21 @@ std::optional<RECT> ResolveAnimationBounds(HWND window) {
 }
 
 void MakeWindowTransparent(HWND window) {
-  if (GetPropW(window, kOriginalExStyleProperty) != nullptr) {
+  if (GetPropW(window, kTransparencySavedProperty) != nullptr) {
     TraceWindowEvent(L"MakeWindowTransparent skipped: already transparent", window);
     return;
   }
 
   TraceWindowEvent(L"MakeWindowTransparent begin", window);
   LONG_PTR ex_style = GetWindowLongPtrW(window, GWL_EXSTYLE);
-  SetPropW(window, kOriginalExStyleProperty, reinterpret_cast<HANDLE>(ex_style));
+  if (!SetPropW(window, kTransparencySavedProperty, reinterpret_cast<HANDLE>(1))) {
+    return;
+  }
+  if (ex_style != 0 &&
+      !SetPropW(window, kOriginalExStyleProperty, reinterpret_cast<HANDLE>(ex_style))) {
+    RemovePropW(window, kTransparencySavedProperty);
+    return;
+  }
 
   BYTE alpha = 255;
   DWORD flags = 0;
@@ -371,14 +414,15 @@ void MakeWindowTransparent(HWND window) {
 }
 
 void RestoreWindowTransparency(HWND window) {
-  HANDLE ex_style_prop = GetPropW(window, kOriginalExStyleProperty);
-  if (ex_style_prop == nullptr) {
+  if (GetPropW(window, kTransparencySavedProperty) == nullptr &&
+      GetPropW(window, kOriginalExStyleProperty) == nullptr) {
     TraceWindowEvent(L"RestoreWindowTransparency skipped: no original style", window);
     return;
   }
 
   TraceWindowEvent(L"RestoreWindowTransparency begin", window);
-  LONG_PTR original_ex_style = reinterpret_cast<LONG_PTR>(ex_style_prop);
+  LONG_PTR original_ex_style =
+      reinterpret_cast<LONG_PTR>(GetPropW(window, kOriginalExStyleProperty));
   BOOL was_layered = GetPropW(window, kWasLayeredProperty) != nullptr &&
                      reinterpret_cast<INT_PTR>(GetPropW(window, kWasLayeredProperty)) != 0;
   BYTE alpha =
@@ -393,6 +437,7 @@ void RestoreWindowTransparency(HWND window) {
     SetWindowLongPtrW(window, GWL_EXSTYLE, original_ex_style & ~WS_EX_LAYERED);
   }
 
+  RemovePropW(window, kTransparencySavedProperty);
   RemovePropW(window, kOriginalExStyleProperty);
   RemovePropW(window, kWasLayeredProperty);
   RemovePropW(window, kOriginalAlphaProperty);
@@ -410,9 +455,60 @@ Application::~Application() {
   }
 }
 
+std::string Application::ReadSessionState() const {
+  const std::wstring settings_path = SettingsFilePath();
+  if (settings_path.empty()) return {};
+  std::filesystem::path path(settings_path);
+  path.replace_filename(L"session.state");
+  std::ifstream input(path, std::ios::binary);
+  std::string state;
+  if (input) std::getline(input, state);
+  return state;
+}
+
+bool Application::WriteSessionState(std::string_view state) const {
+  const std::wstring settings_path = SettingsFilePath();
+  if (settings_path.empty()) return false;
+  std::filesystem::path path(settings_path);
+  path.replace_filename(L"session.state");
+  std::error_code error;
+  std::filesystem::create_directories(path.parent_path(), error);
+  if (error) return false;
+  const std::filesystem::path temporary = path.wstring() + L".tmp";
+  std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+  if (!output) return false;
+  output << state << '\n';
+  output.flush();
+  if (!output) {
+    output.close();
+    std::filesystem::remove(temporary, error);
+    return false;
+  }
+  output.close();
+  if (!MoveFileExW(temporary.c_str(), path.c_str(),
+                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    std::filesystem::remove(temporary, error);
+    return false;
+  }
+  return true;
+}
+
 bool Application::Initialize(HINSTANCE instance) {
+  CleanupGenieLogs();
   instance_ = instance;
   main_thread_id_ = GetCurrentThreadId();
+  settings_ = LoadSettings();
+  safe_mode_ = false;
+  is_enabled_ = settings_.enabled;
+  minimize_duration_seconds_ = settings_.minimize_duration;
+  restore_duration_seconds_ = settings_.restore_duration;
+  if (settings_.run_at_startup && !ConfigureRunAtStartup(true)) {
+    LogDebug(L"Startup", L"Could not repair the per-user startup entry; disabling the option");
+    settings_.run_at_startup = false;
+    if (!SaveSettings(settings_)) {
+      LogDebug(L"Startup", L"Could not persist the repaired startup state");
+    }
+  }
 #ifdef _DEBUG
   // Touch log file and grant permissions so AppContainers can write to it
   {
@@ -439,6 +535,7 @@ bool Application::Initialize(HINSTANCE instance) {
 
   HealLeftoverWindows();
 
+
   if (!IsProcessElevated()) {
     std::wcerr << L"WARNING: Not running as Administrator. Elevated windows (like Task Manager, "
                   L"cmd as Admin, etc.)\n"
@@ -449,30 +546,59 @@ bool Application::Initialize(HINSTANCE instance) {
     LogDebug(L"App", L"Running as Administrator");
   }
 
-  if (!CreateAnimationRenderer()) return false;
+  if (!safe_mode_ && !CreateAnimationRenderer()) return false;
 
   if (!settings_window_.Initialize(
-          instance, [this](bool enabled) { SetEnabled(enabled); },
-          [this](float min_dur, float rest_dur) { SetAnimationDurations(min_dur, rest_dur); },
+          instance, [this](bool enabled) { return SetEnabled(enabled); },
+          [this](float min_dur, float rest_dur, bool save) {
+            return SetAnimationDurations(min_dur, rest_dur, save);
+          },
+          [this](bool linked) { return SetLinkSpeeds(linked); },
+          [this](bool enabled) { return SetAdaptiveDuration(enabled); },
+          [this](bool enabled) { return SetDisableAnimationsFullscreen(enabled); },
+          [this](bool reduce, bool disable) { return SetPowerBehavior(reduce, disable); },
+          [this](const std::string& minimize, const std::string& restore) {
+            return SetEasing(minimize, restore);
+          },
+          [this](const std::string& style) { return SetAnimationStyle(style); },
+          [this](float strength, bool save) { return SetGenieStrength(strength, save); },
+          [this](const std::string& strength) { return SetFadeStrength(strength); },
+          [this](bool enabled) { return SetTargetIndicator(enabled); },
+          [this](bool enabled) { return SetFollowWindowsAnimationPreference(enabled); },
+          [this](const std::string& behavior) { return SetCloseBehavior(behavior); },
+          [this](bool run_at_startup, bool start_minimized) {
+            return SetStartupOptions(run_at_startup, start_minimized);
+          },
+          [this](const std::string& name, bool excluded) {
+            return SetApplicationExcluded(name, excluded);
+          },
+          [this](TemporaryPauseAction action) { SetTemporaryPause(action); },
+          [this](HotkeyAction action, HotkeyBinding binding) {
+            return SetHotkey(action, binding);
+          },
+          [this](HotkeyAction action) { ExecuteHotkeyAction(action); },
+          [this]() { return BuildDiagnosticsSnapshot(); },
+          [this](DiagnosticsAction action) { return ExecuteDiagnosticsAction(action); },
           [this]() { HealLeftoverWindows(); }, [this]() { RequestShutdown(); })) {
     return false;
   }
-  settings_window_.UpdateState(is_enabled_, minimize_duration_seconds_, restore_duration_seconds_);
-  settings_window_.Show(true);
+  settings_window_.UpdateState(settings_);
+  if (!safe_mode_) RegisterConfiguredHotkeys();
+  settings_window_.UpdatePauseState(false, false);
+  if (safe_mode_) settings_window_.ShowDiagnosticsPage();
+  settings_window_.Show(safe_mode_ || !settings_.start_minimized ||
+                        !settings_window_.tray_icon_available());
+  UpdateFullscreenSuppression(true);
+  UpdatePowerState(true);
+  RefreshEffectRuntimeState();
 
-  native_animation_blocker_.Enable(slots_[0].overlay.window());
-  const bool cbt_hook_installed = InstallCbtHook();
-  if (cbt_hook_installed) {
-    std::wcout << L"Global CBT hook installed.\n";
-  } else {
-    std::wcerr << L"Global CBT hook unavailable; using WinEvent fallback.\n";
-  }
-
-  if (!window_event_monitor_.Start(
-          [this](HWND window) { OnMinimizeStart(window); },
-          [this](HWND window) { OnRestoreAttempt(window); },
-          [this](HWND window, DWORD event) { OnWindowSeen(window, event); })) {
-    return false;
+  if (!safe_mode_) {
+    if (!window_event_monitor_.Start(
+            [this](HWND window) { OnMinimizeStart(window); },
+            [this](HWND window) { OnRestoreAttempt(window); },
+            [this](HWND window, DWORD event) { OnWindowSeen(window, event); })) {
+      return false;
+    }
   }
 
   std::wcout << L"Genie minimize monitor is running.\n";
@@ -481,31 +607,58 @@ bool Application::Initialize(HINSTANCE instance) {
                 L"custom taskbar rectangle.\n";
   std::wcout << L"Close this console window to restore the previous Windows "
                 L"animation setting.\n";
+  session_started_ = true;
+  if (!WriteSessionState(safe_mode_ ? "safe" : "running")) {
+    LogDebug(L"SafeMode", L"Failed to write the active session marker");
+  }
   return true;
 }
 
-int Application::FindSlotForWindow(HWND window) const {
-  for (int i = 0; i < 2; ++i) {
-    if (slots_[i].animating_window == window) {
+int Application::FindRunForWindow(HWND window) const {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (runs_[i].animating_window == window) {
       return i;
     }
   }
   return -1;
 }
 
-int Application::FindFreeSlot() const {
-  for (int i = 0; i < 2; ++i) {
-    if (slots_[i].animating_window == nullptr && !slots_[i].overlay.active()) {
+int Application::FindAvailableRun() {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (runs_[i].state == RunState::kIdle && runs_[i].animating_window == nullptr &&
+        !runs_[i].overlay.active()) {
       return i;
     }
   }
-  return -1;
+  runs_.emplace_back();
+  if (!InitializeRun(runs_.back())) {
+    runs_.pop_back();
+    return -1;
+  }
+  return static_cast<int>(runs_.size() - 1);
+}
+
+bool Application::IsOverlayWindow(HWND window) const {
+  return std::any_of(runs_.begin(), runs_.end(), [window](const AnimationRun& slot) {
+    return slot.overlay.window() == window;
+  });
+}
+
+bool Application::InitializeRun(AnimationRun& slot) {
+  if (!slot.overlay.Initialize(
+          instance_, d3d_device_.get(), [this](HWND window) { return OnMinimizeStart(window); },
+          [this](HWND window) { return OnRestoreAttempt(window); })) {
+    return false;
+  }
+  slot.overlay.SetAnimationDuration(minimize_duration_seconds_);
+  slot.state = RunState::kIdle;
+  slot.state_entered_ms = GetTickCount64();
+  return true;
 }
 
 bool Application::CreateAnimationRenderer() {
-  for (int i = 0; i < 2; ++i) {
-    slots_[i].overlay.Shutdown();
-  }
+  for (AnimationRun& slot : runs_) slot.overlay.Shutdown();
+  runs_.clear();
   desktop_capture_.reset();
   d3d_device_.reset();
 
@@ -513,26 +666,22 @@ bool Application::CreateAnimationRenderer() {
   if (d3d_device_ == nullptr) {
     return false;
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!slots_[i].overlay.Initialize(
-            instance_, d3d_device_.get(), [this](HWND window) { return OnMinimizeStart(window); },
-            [this](HWND window) { return OnRestoreAttempt(window); })) {
-      for (int j = 0; j <= i; ++j) {
-        slots_[j].overlay.Shutdown();
-      }
-      d3d_device_.reset();
-      return false;
-    }
-    slots_[i].overlay.SetAnimationDuration(minimize_duration_seconds_);
+  runs_.emplace_back();
+  if (!InitializeRun(runs_.back())) {
+    runs_.clear();
+    d3d_device_.reset();
+    return false;
   }
   desktop_capture_ = std::make_unique<rendering::DesktopCapture>(d3d_device_.get());
   return true;
 }
 
 bool Application::AnimationRendererDeviceLost() const {
-  return slots_[0].overlay.device_lost() ||
-         slots_[1].overlay.device_lost() ||
-         (desktop_capture_ != nullptr && desktop_capture_->device_lost()) ||
+  const bool overlay_lost = std::any_of(runs_.begin(), runs_.end(),
+                                        [](const AnimationRun& slot) {
+                                          return slot.overlay.device_lost();
+                                        });
+  return overlay_lost || (desktop_capture_ != nullptr && desktop_capture_->device_lost()) ||
          (d3d_device_ != nullptr && d3d_device_->IsDeviceLost());
 }
 
@@ -544,8 +693,8 @@ void Application::BeginAnimationRendererRecovery() {
   LogDebug(L"App", L"Animation renderer device lost; rebuilding D3D resources");
   native_animation_blocker_.Disable();
 
-  for (int i = 0; i < 2; ++i) {
-    auto& slot = slots_[i];
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    auto& slot = runs_[i];
     HWND interrupted_window = slot.animating_window;
     const bool interrupted_restore = slot.animating_restore;
     slot.overlay.Shutdown();
@@ -592,8 +741,8 @@ bool Application::TryRecoverAnimationRenderer() {
   if (CreateAnimationRenderer()) {
     animation_renderer_recovery_pending_ = false;
     animation_renderer_recovery_delay_ms_ = kInitialRendererRecoveryDelayMs;
-    if (is_enabled_) {
-      native_animation_blocker_.Enable(slots_[0].overlay.window());
+    if (IsEffectActive()) {
+      native_animation_blocker_.Enable(GetOverlayWindow());
     }
     LogDebug(L"App", L"Animation renderer recovery completed");
     return true;
@@ -618,16 +767,23 @@ int Application::Run() {
       break;
     }
 
+    UpdateTemporaryPause();
+    UpdateFullscreenSuppression();
+    UpdatePowerState();
+    UpdateWindowsAnimationPreference();
+    CheckAnimationTimeouts();
+
     while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
       if (message.message == WM_QUIT) {
         running = false;
         break;
       }
       if (message.message == WM_DISPLAYCHANGE) {
-        for (int i = 0; i < 2; ++i) {
-          slots_[i].animation_monitor = nullptr;
+        for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+          runs_[i].animation_monitor = nullptr;
         }
       }
+      if (message.message == WM_SETTINGCHANGE) UpdateWindowsAnimationPreference(true);
       TranslateMessage(&message);
       DispatchMessageW(&message);
     }
@@ -653,8 +809,8 @@ int Application::Run() {
       continue;
     }
 
-    for (int i = 0; i < 2; ++i) {
-      auto& slot = slots_[i];
+    for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+      auto& slot = runs_[i];
       if (slot.pending_native_minimize_window != nullptr) {
         TraceWindowEvent(L"Run pending_native_minimize before CompletePendingNativeMinimize",
                          slot.pending_native_minimize_window);
@@ -669,6 +825,8 @@ int Application::Run() {
           const bool is_moved = GetPropW(slot.animating_window, kMovedOffscreenProperty) != nullptr;
           if (is_iconic || is_moved) {
             slot.overlay.StartAnimationClock();
+            SetRunState(i, slot.animating_restore ? RunState::kRestoring
+                                                   : RunState::kAnimating);
             if (slot.pending_native_minimize_window == slot.animating_window) {
               slot.pending_native_minimize_window = nullptr;
             }
@@ -691,6 +849,7 @@ int Application::Run() {
               slot.animating_window = nullptr;
               slot.animating_restore = false;
               slot.pending_native_minimize_window = nullptr;
+              SetRunState(i, RunState::kIdle);
             }
           }
         }
@@ -704,10 +863,14 @@ int Application::Run() {
           slot.live_animation_capture_enabled = false;
         } else {
           const ULONGLONG now_ms = GetTickCount64();
-          if (now_ms - slot.last_animation_texture_refresh_ms >= 16) {
+          const ULONGLONG refresh_interval_ms =
+              settings_.reduce_effects_on_battery && running_on_battery_ ? 33 : 16;
+          if (now_ms - slot.last_animation_texture_refresh_ms >= refresh_interval_ms) {
             slot.last_animation_texture_refresh_ms = now_ms;
-            desktop_capture_->RefreshCapturedTexture(
-                slot.live_animation_bounds, slot.overlay.mutable_captured_texture());
+            if (!desktop_capture_->RefreshCapturedTexture(
+                    slot.live_animation_bounds, slot.overlay.mutable_captured_texture())) {
+              slot.live_animation_capture_enabled = false;
+            }
           }
         }
       }
@@ -744,26 +907,27 @@ int Application::Run() {
         }
         slot.animating_window = nullptr;
         slot.animating_restore = false;
+        SetRunState(i, RunState::kIdle);
       }
     }
 
     bool any_active = false;
-    for (int i = 0; i < 2; ++i) {
-      if (slots_[i].overlay.active()) {
+    for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+      if (runs_[i].overlay.active()) {
         any_active = true;
       }
     }
 
     const ULONGLONG now_ms = GetTickCount64();
-    if (is_enabled_ && now_ms - last_snapshot_refresh_ms_ >= 120) {
+    if (IsEffectActive() && now_ms - last_snapshot_refresh_ms_ >= 120) {
       last_snapshot_refresh_ms_ = now_ms;
       UpdatePreMinimizeSnapshot(GetForegroundWindow());
     }
 
-    if (is_enabled_ && FindFreeSlot() != -1) {
+    if (IsEffectActive() && FindAvailableRun() != -1) {
       for (auto& [hwnd, snapshot] : restore_snapshots_) {
         (void)snapshot;
-        if (FindSlotForWindow(hwnd) != -1) {
+        if (FindRunForWindow(hwnd) != -1) {
           continue;
         }
         if (IsWindow(hwnd) && IsWindowVisible(hwnd) && IsGenieWindowRestored(hwnd)) {
@@ -776,8 +940,8 @@ int Application::Run() {
     }
 
     any_active = false;
-    for (int i = 0; i < 2; ++i) {
-      if (slots_[i].overlay.active()) {
+    for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+      if (runs_[i].overlay.active()) {
         any_active = true;
       }
     }
@@ -807,8 +971,8 @@ void Application::RequestShutdown() {
   }
 }
 
-void Application::ResetAnimationFramePacing(int slot_index, HWND window, const RECT& animation_bounds) {
-  auto& slot = slots_[slot_index];
+void Application::ResetAnimationFramePacing(int run_index, HWND window, const RECT& animation_bounds) {
+  auto& slot = runs_[run_index];
   BeginFallbackTimerResolution();
   slot.live_animation_bounds = animation_bounds;
   if (window != nullptr && IsWindow(window)) {
@@ -820,11 +984,11 @@ void Application::ResetAnimationFramePacing(int slot_index, HWND window, const R
   slot.animation_monitor = nullptr;
   slot.animation_frame_interval = std::chrono::steady_clock::duration::zero();
   slot.next_animation_frame_time = std::chrono::steady_clock::now();
-  UpdateAnimationFramePacingMonitor(slot_index);
+  UpdateAnimationFramePacingMonitor(run_index);
 }
 
-void Application::UpdateAnimationFramePacingMonitor(int slot_index) {
-  auto& slot = slots_[slot_index];
+void Application::UpdateAnimationFramePacingMonitor(int run_index) {
+  auto& slot = runs_[run_index];
   RECT monitor_bounds = slot.live_animation_bounds;
   if (slot.animating_window != nullptr && IsWindow(slot.animating_window) &&
       IsIconic(slot.animating_window) == FALSE) {
@@ -863,14 +1027,14 @@ void Application::UpdateAnimationFramePacingMonitor(int slot_index) {
                        std::to_wstring(*refresh_rate) + L"Hz");
 }
 
-bool Application::IsAnimationFrameDue(int slot_index) const {
-  const auto& slot = slots_[slot_index];
+bool Application::IsAnimationFrameDue(int run_index) const {
+  const auto& slot = runs_[run_index];
   return slot.animation_frame_interval <= std::chrono::steady_clock::duration::zero() ||
          std::chrono::steady_clock::now() >= slot.next_animation_frame_time;
 }
 
-void Application::AdvanceAnimationFrameDeadline(int slot_index) {
-  auto& slot = slots_[slot_index];
+void Application::AdvanceAnimationFrameDeadline(int run_index) {
+  auto& slot = runs_[run_index];
   if (slot.animation_frame_interval <= std::chrono::steady_clock::duration::zero()) {
     return;
   }
@@ -891,8 +1055,8 @@ void Application::WaitForAnimationFrameOrMessage() {
   bool has_valid_interval = false;
   auto earliest_next = std::chrono::steady_clock::time_point::max();
 
-  for (int i = 0; i < 2; ++i) {
-    auto& slot = slots_[i];
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    auto& slot = runs_[i];
     if (slot.overlay.active()) {
       if (slot.animation_frame_interval <= std::chrono::steady_clock::duration::zero()) {
         DwmFlush();
@@ -959,56 +1123,769 @@ void Application::EndFallbackTimerResolution() {
   fallback_timer_resolution_active_ = false;
 }
 
-void Application::SetEnabled(bool enabled) {
+bool Application::SetEnabled(bool enabled) {
   if (is_enabled_ == enabled) {
-    settings_window_.UpdateState(enabled, minimize_duration_seconds_, restore_duration_seconds_);
-    return;
+    settings_window_.UpdateState(settings_);
+    return true;
   }
 
-  if (!enabled) {
-    for (int i = 0; i < 2; ++i) {
-      FinishActiveAnimation(i);
-    }
-    UninstallCbtHook();
-    native_animation_blocker_.Disable();
-
-    std::vector<HWND> tracked_windows;
-    for (const auto& [window, snapshot] : restore_snapshots_) {
-      (void)snapshot;
-      tracked_windows.push_back(window);
-    }
-    for (HWND window : tracked_windows) {
-      RestoreWindowFromGenieState(window, false);
-    }
-    restore_snapshots_.clear();
-    pre_minimize_snapshots_.clear();
-    if (desktop_capture_ != nullptr) {
-      desktop_capture_->ClearHistory();
-    }
-  } else {
-    InstallCbtHook();
-    if (!animation_renderer_recovery_pending_ && slots_[0].overlay.window() != nullptr) {
-      native_animation_blocker_.Enable(slots_[0].overlay.window());
-    }
+  AppSettings proposed = settings_;
+  proposed.enabled = enabled;
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Settings", L"Failed to persist enabled state");
+    return false;
   }
 
   is_enabled_ = enabled;
-  settings_window_.UpdateState(enabled, minimize_duration_seconds_, restore_duration_seconds_);
+  settings_ = std::move(proposed);
+  RefreshEffectRuntimeState();
+  settings_window_.UpdateState(settings_);
+  return true;
 }
 
-void Application::SetAnimationDurations(float minimize_duration, float restore_duration) {
-  minimize_duration_seconds_ = std::clamp(minimize_duration, 0.10f, 2.00f);
-  restore_duration_seconds_ = std::clamp(restore_duration, 0.10f, 2.00f);
-  for (int i = 0; i < 2; ++i) {
-    if (slots_[i].overlay.active()) {
-      if (slots_[i].animating_restore) {
-        slots_[i].overlay.SetAnimationDuration(restore_duration_seconds_);
-      } else {
-        slots_[i].overlay.SetAnimationDuration(minimize_duration_seconds_);
+const char* Application::RunStateName(RunState state) {
+  switch (state) {
+    case RunState::kIdle: return "Idle";
+    case RunState::kCapturing: return "Capturing";
+    case RunState::kWaitingForNativeMinimize: return "WaitingForNativeMinimize";
+    case RunState::kAnimating: return "Animating";
+    case RunState::kRestoring: return "Restoring";
+    case RunState::kAborting: return "Aborting";
+    case RunState::kCleaningUp: return "CleaningUp";
+  }
+  return "Unknown";
+}
+
+void Application::SetRunState(int run_index, RunState state) {
+  if (run_index < 0 || run_index >= static_cast<int>(runs_.size())) return;
+  runs_[run_index].state = state;
+  runs_[run_index].state_entered_ms = GetTickCount64();
+}
+
+void Application::CheckAnimationTimeouts() {
+  const ULONGLONG now = GetTickCount64();
+  for (int index = 0; index < static_cast<int>(runs_.size()); ++index) {
+    AnimationRun& slot = runs_[index];
+    if (slot.state == RunState::kIdle) continue;
+    ULONGLONG timeout_ms = 10000;
+    if (slot.state == RunState::kCapturing) timeout_ms = 2500;
+    if (slot.state == RunState::kWaitingForNativeMinimize) timeout_ms = 2000;
+    if (slot.state == RunState::kAborting || slot.state == RunState::kCleaningUp) {
+      timeout_ms = 1500;
+    }
+    const ULONGLONG elapsed = now - slot.state_entered_ms;
+    if (elapsed <= timeout_ms) continue;
+
+    HWND window = slot.animating_window != nullptr ? slot.animating_window
+                                                    : slot.pending_native_minimize_window;
+    wchar_t title[128]{};
+    if (window != nullptr) GetWindowTextW(window, title, 128);
+    LogDebug(L"Watchdog", L"Aborting stuck animation=" + std::to_wstring(index) + L" state=" +
+                               std::wstring(RunStateName(slot.state),
+                                            RunStateName(slot.state) +
+                                                std::strlen(RunStateName(slot.state))) +
+                               L" elapsed_ms=" + std::to_wstring(elapsed) + L" hwnd=" +
+                               std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) +
+                               L" title=\"" + title + L"\"");
+    SetRunState(index, RunState::kAborting);
+    slot.overlay.CancelAnimation();
+    slot.live_animation_capture_enabled = false;
+    slot.animating_window = nullptr;
+    slot.pending_native_minimize_window = nullptr;
+    slot.animating_restore = false;
+    SetRunState(index, RunState::kCleaningUp);
+    if (window != nullptr && IsWindow(window)) RestoreWindowFromGenieState(window, true);
+    restore_snapshots_.erase(window);
+    pre_minimize_snapshots_.erase(window);
+    slot.animation_monitor = nullptr;
+    slot.animation_frame_interval = std::chrono::steady_clock::duration::zero();
+    SetRunState(index, RunState::kIdle);
+  }
+}
+
+bool Application::IsTemporarilyPaused() const {
+  return paused_until_restart_ ||
+         (paused_until_tick_ms_ != 0 && GetTickCount64() < paused_until_tick_ms_);
+}
+
+bool Application::IsEffectActive() const {
+  return !safe_mode_ && is_enabled_ && !IsTemporarilyPaused() && !fullscreen_suppressed_ &&
+         !battery_saver_suppressed_ && !windows_animations_suppressed_;
+}
+
+bool Application::IsFullscreenApplicationActive() const {
+  const HWND window = GetForegroundWindow();
+  if (window == nullptr || window == settings_window_.hwnd() ||
+      IsOverlayWindow(window) ||
+      WindowProcessId(window) == GetCurrentProcessId() || IsWindowVisible(window) == FALSE ||
+      IsIconic(window) != FALSE || IsZoomed(window) != FALSE ||
+      !platform::IsInterestingTopLevelWindow(window, GetOverlayWindow())) {
+    return false;
+  }
+
+  RECT bounds{};
+  const std::optional<RECT> extended_bounds = platform::GetExtendedFrameBounds(window);
+  if (extended_bounds.has_value()) {
+    bounds = *extended_bounds;
+  } else if (!GetWindowRect(window, &bounds)) {
+    return false;
+  }
+  const HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (monitor == nullptr || !GetMonitorInfoW(monitor, &monitor_info)) return false;
+
+  constexpr int kBoundsTolerance = 2;
+  const RECT& monitor_bounds = monitor_info.rcMonitor;
+  const bool covers_monitor = bounds.left <= monitor_bounds.left + kBoundsTolerance &&
+                              bounds.top <= monitor_bounds.top + kBoundsTolerance &&
+                              bounds.right >= monitor_bounds.right - kBoundsTolerance &&
+                              bounds.bottom >= monitor_bounds.bottom - kBoundsTolerance;
+  if (!covers_monitor) return false;
+
+  const LONG_PTR style = GetWindowLongPtrW(window, GWL_STYLE);
+  return (style & WS_CAPTION) == 0 || (style & WS_THICKFRAME) == 0;
+}
+
+void Application::UpdateFullscreenSuppression(bool force) {
+  const ULONGLONG now = GetTickCount64();
+  if (!force && now - last_fullscreen_check_ms_ < 500) return;
+  last_fullscreen_check_ms_ = now;
+  const bool suppressed =
+      settings_.disable_animations_fullscreen && IsFullscreenApplicationActive();
+  if (fullscreen_suppressed_ == suppressed) return;
+  fullscreen_suppressed_ = suppressed;
+  LogDebug(L"Fullscreen", suppressed ? L"Fullscreen application detected; effect suspended"
+                                      : L"Fullscreen application ended; effect resumed");
+  RefreshEffectRuntimeState();
+}
+
+void Application::UpdatePowerState(bool force) {
+  const ULONGLONG now = GetTickCount64();
+  if (!force && now - last_power_check_ms_ < 5000) return;
+  last_power_check_ms_ = now;
+  SYSTEM_POWER_STATUS status{};
+  if (!GetSystemPowerStatus(&status)) return;
+  const bool on_battery = status.ACLineStatus == 0;
+  const bool saver_active = status.SystemStatusFlag != 0;
+  const bool suppressed = settings_.disable_effects_battery_saver && saver_active;
+  const bool suppression_changed = battery_saver_suppressed_ != suppressed;
+  const bool power_changed = running_on_battery_ != on_battery ||
+                             battery_saver_active_ != saver_active;
+  running_on_battery_ = on_battery;
+  battery_saver_active_ = saver_active;
+  battery_saver_suppressed_ = suppressed;
+  if (power_changed) {
+    LogDebug(L"Power", L"Power state changed: battery=" + std::to_wstring(on_battery) +
+                            L" saver=" + std::to_wstring(saver_active));
+  }
+  if (suppression_changed) RefreshEffectRuntimeState();
+}
+
+void Application::UpdateWindowsAnimationPreference(bool force) {
+  const ULONGLONG now = GetTickCount64();
+  if (!force && now - last_windows_animation_check_ms_ < 1000) return;
+  last_windows_animation_check_ms_ = now;
+  BOOL animations_enabled = TRUE;
+  if (!SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations_enabled, 0)) return;
+  const bool suppressed = settings_.follow_windows_animation_preference && !animations_enabled;
+  if (windows_animations_suppressed_ == suppressed) return;
+  windows_animations_suppressed_ = suppressed;
+  LogDebug(L"Windows", suppressed ? L"System animations disabled; Genie suspended"
+                                    : L"System animation preference allows Genie");
+  RefreshEffectRuntimeState();
+}
+
+void Application::DisableEffectRuntime() {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    FinishActiveAnimation(i);
+  }
+  UninstallCbtHook();
+  native_animation_blocker_.Disable();
+
+  std::vector<HWND> tracked_windows;
+  for (const auto& [window, snapshot] : restore_snapshots_) {
+    (void)snapshot;
+    tracked_windows.push_back(window);
+  }
+  for (HWND window : tracked_windows) {
+    RestoreWindowFromGenieState(window, false);
+  }
+  restore_snapshots_.clear();
+  pre_minimize_snapshots_.clear();
+  if (desktop_capture_ != nullptr) desktop_capture_->ClearHistory();
+  effect_runtime_active_ = false;
+}
+
+void Application::EnableEffectRuntime() {
+  const bool cbt_hook_installed = InstallCbtHook();
+  if (!cbt_hook_installed) {
+    LogDebug(L"Pause", L"Global CBT hook unavailable; WinEvent fallback remains active");
+  }
+  if (!animation_renderer_recovery_pending_ && GetOverlayWindow() != nullptr) {
+    native_animation_blocker_.Enable(GetOverlayWindow());
+  }
+  effect_runtime_active_ = true;
+}
+
+void Application::RefreshEffectRuntimeState() {
+  const bool should_be_active = IsEffectActive();
+  if (should_be_active != effect_runtime_active_) {
+    if (should_be_active) {
+      EnableEffectRuntime();
+    } else {
+      DisableEffectRuntime();
+    }
+  }
+  ApplyExclusionTransitionOverrides();
+}
+
+void Application::SetTemporaryPause(TemporaryPauseAction action) {
+  paused_until_restart_ = action == TemporaryPauseAction::kUntilRestart;
+  paused_until_tick_ms_ = 0;
+  if (action == TemporaryPauseAction::kTenMinutes) {
+    paused_until_tick_ms_ = GetTickCount64() + 10ULL * 60ULL * 1000ULL;
+  } else if (action == TemporaryPauseAction::kOneHour) {
+    paused_until_tick_ms_ = GetTickCount64() + 60ULL * 60ULL * 1000ULL;
+  }
+  RefreshEffectRuntimeState();
+  settings_window_.UpdatePauseState(IsTemporarilyPaused(), paused_until_restart_);
+}
+
+void Application::UpdateTemporaryPause() {
+  if (paused_until_tick_ms_ == 0 || GetTickCount64() < paused_until_tick_ms_) return;
+  paused_until_tick_ms_ = 0;
+  LogDebug(L"Pause", L"Temporary pause expired; resuming Genie Effect");
+  RefreshEffectRuntimeState();
+  settings_window_.UpdatePauseState(false, false);
+}
+
+void Application::UnregisterAllHotkeys() {
+  if (settings_window_.hwnd() == nullptr) return;
+  for (size_t index = 0; index < static_cast<size_t>(HotkeyAction::kCount); ++index) {
+    UnregisterHotKey(settings_window_.hwnd(), kHotkeyBaseId + static_cast<int>(index));
+  }
+}
+
+void Application::RegisterConfiguredHotkeys() {
+  UnregisterAllHotkeys();
+  for (size_t index = 0; index < settings_.hotkeys.size(); ++index) {
+    const HotkeyBinding& binding = settings_.hotkeys[index];
+    bool duplicate = false;
+    if (binding.virtual_key != 0) {
+      for (size_t previous = 0; previous < index; ++previous) {
+        if (settings_.hotkeys[previous].virtual_key == binding.virtual_key &&
+            settings_.hotkeys[previous].modifiers == binding.modifiers) {
+          duplicate = true;
+          break;
+        }
+      }
+    }
+    const bool available = binding.virtual_key == 0 ||
+                           (!duplicate &&
+                            RegisterHotKey(settings_window_.hwnd(),
+                                           kHotkeyBaseId + static_cast<int>(index),
+                                           binding.modifiers | MOD_NOREPEAT,
+                                           binding.virtual_key) != FALSE);
+    settings_window_.SetHotkeyRegistrationStatus(static_cast<HotkeyAction>(index), available);
+    if (!available) {
+      LogDebug(L"Hotkey", L"Configured hotkey could not be registered for action " +
+                                std::to_wstring(index));
+    }
+  }
+}
+
+HotkeyUpdateResult Application::SetHotkey(HotkeyAction action, HotkeyBinding binding) {
+  const size_t index = static_cast<size_t>(action);
+  if (index >= settings_.hotkeys.size() || binding.virtual_key > 254 ||
+      (binding.modifiers & ~kSupportedHotkeyModifiers) != 0) {
+    return HotkeyUpdateResult::kInvalid;
+  }
+  if (binding.virtual_key == 0) binding.modifiers = 0;
+  if (binding.virtual_key == VK_CONTROL || binding.virtual_key == VK_SHIFT ||
+      binding.virtual_key == VK_MENU || binding.virtual_key == VK_LWIN ||
+      binding.virtual_key == VK_RWIN) {
+    return HotkeyUpdateResult::kInvalid;
+  }
+  for (size_t other = 0; other < settings_.hotkeys.size(); ++other) {
+    if (other != index && binding.virtual_key != 0 &&
+        settings_.hotkeys[other].virtual_key == binding.virtual_key &&
+        settings_.hotkeys[other].modifiers == binding.modifiers) {
+      return HotkeyUpdateResult::kDuplicate;
+    }
+  }
+
+  const HotkeyBinding previous = settings_.hotkeys[index];
+  const int identifier = kHotkeyBaseId + static_cast<int>(index);
+  if (previous.virtual_key != 0) UnregisterHotKey(settings_window_.hwnd(), identifier);
+  if (binding.virtual_key != 0 &&
+      RegisterHotKey(settings_window_.hwnd(), identifier, binding.modifiers | MOD_NOREPEAT,
+                     binding.virtual_key) == FALSE) {
+    const bool restored = previous.virtual_key == 0 ||
+                          RegisterHotKey(settings_window_.hwnd(), identifier,
+                                         previous.modifiers | MOD_NOREPEAT,
+                                         previous.virtual_key) != FALSE;
+    settings_window_.SetHotkeyRegistrationStatus(action, restored);
+    return HotkeyUpdateResult::kUnavailable;
+  }
+
+  AppSettings proposed = settings_;
+  proposed.hotkeys[index] = binding;
+  if (!SaveSettings(proposed)) {
+    if (binding.virtual_key != 0) UnregisterHotKey(settings_window_.hwnd(), identifier);
+    const bool restored = previous.virtual_key == 0 ||
+                          RegisterHotKey(settings_window_.hwnd(), identifier,
+                                         previous.modifiers | MOD_NOREPEAT,
+                                         previous.virtual_key) != FALSE;
+    settings_window_.SetHotkeyRegistrationStatus(action, restored);
+    return HotkeyUpdateResult::kSaveFailed;
+  }
+
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  RegisterConfiguredHotkeys();
+  return HotkeyUpdateResult::kSuccess;
+}
+
+void Application::ExecuteHotkeyAction(HotkeyAction action) {
+  switch (action) {
+    case HotkeyAction::kToggleEffect: (void)SetEnabled(!is_enabled_); break;
+    case HotkeyAction::kOpenSettings: settings_window_.Show(true); break;
+    case HotkeyAction::kRepairWindows: HealLeftoverWindows(); break;
+    case HotkeyAction::kCount: break;
+  }
+}
+
+DiagnosticsSnapshot Application::BuildDiagnosticsSnapshot() const {
+  DiagnosticsSnapshot snapshot;
+  snapshot.status = "Running";
+  snapshot.effect = IsEffectActive() ? "Enabled" : "Paused";
+  snapshot.pause = IsTemporarilyPaused()
+                       ? (paused_until_restart_ ? "Until next restart" : "Timed pause")
+                       : "Not paused";
+  snapshot.hook = cbt_hook_ != nullptr ? "Installed" : "Not installed";
+  snapshot.renderer = animation_renderer_recovery_pending_ ? "Recovering" : "Healthy";
+  snapshot.d3d_device =
+      d3d_device_ != nullptr && !d3d_device_->IsDeviceLost() ? "OK" : "Unavailable";
+  int active_animations = 0;
+  for (const AnimationRun& slot : runs_) {
+    if (slot.animating_window != nullptr || slot.overlay.active()) ++active_animations;
+  }
+  snapshot.active_animations = std::to_string(active_animations);
+  snapshot.watchdog = "Per-window cleanup enabled";
+  snapshot.safe_mode = safe_mode_ ? "On" : "Off";
+  snapshot.startup_repair = startup_repair_status_;
+  snapshot.log_folder_size = std::format("{:.2f} MB", GenieLogFolderSize() / (1024.0 * 1024.0));
+  snapshot.version = std::string("Development build ") + __DATE__ + " " + __TIME__;
+
+  OSVERSIONINFOW version{};
+  version.dwOSVersionInfoSize = sizeof(version);
+  using RtlGetVersionFn = LONG(WINAPI*)(OSVERSIONINFOW*);
+  const auto rtl_get_version = reinterpret_cast<RtlGetVersionFn>(
+      GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"));
+  if (rtl_get_version != nullptr && rtl_get_version(&version) == 0) {
+    snapshot.windows_version = std::to_string(version.dwMajorVersion) + "." +
+                               std::to_string(version.dwMinorVersion) + " build " +
+                               std::to_string(version.dwBuildNumber);
+  } else {
+    snapshot.windows_version = "Unavailable";
+  }
+
+  snapshot.graphics_adapter = "Unavailable";
+  if (d3d_device_ != nullptr && d3d_device_->dxgi_device() != nullptr) {
+    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+    if (SUCCEEDED(d3d_device_->dxgi_device()->GetAdapter(&adapter))) {
+      DXGI_ADAPTER_DESC description{};
+      if (SUCCEEDED(adapter->GetDesc(&description))) {
+        snapshot.graphics_adapter = WideToUtf8(description.Description);
       }
     }
   }
-  settings_window_.UpdateState(is_enabled_, minimize_duration_seconds_, restore_duration_seconds_);
+
+  HWND reference_window = last_foreground_window_;
+  if (reference_window == nullptr || !IsWindow(reference_window)) reference_window = GetForegroundWindow();
+  HMONITOR monitor = reference_window == nullptr
+                         ? MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY)
+                         : MonitorFromWindow(reference_window, MONITOR_DEFAULTTONEAREST);
+  MONITORINFOEXW monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (monitor != nullptr && GetMonitorInfoW(monitor, &monitor_info)) {
+    snapshot.window_monitor = WideToUtf8(monitor_info.szDevice);
+    const std::optional<double> refresh = platform::GetMonitorRefreshRateHz(monitor);
+    snapshot.display_refresh = refresh.has_value()
+                                   ? std::to_string(static_cast<int>(std::lround(*refresh))) + " Hz"
+                                   : "Unavailable";
+  } else {
+    snapshot.window_monitor = "Unavailable";
+    snapshot.display_refresh = "Unavailable";
+  }
+
+  snapshot.taskbar = "Unavailable";
+  if (reference_window != nullptr && IsWindow(reference_window)) {
+    RECT bounds{};
+    if (GetWindowRect(reference_window, &bounds)) {
+      const platform::TaskbarTarget target =
+          taskbar_target_provider_.GetTargetForWindow(reference_window, bounds);
+      switch (target.edge) {
+        case animation::GenieEdge::kLeft: snapshot.taskbar = "Left"; break;
+        case animation::GenieEdge::kTop: snapshot.taskbar = "Top"; break;
+        case animation::GenieEdge::kRight: snapshot.taskbar = "Right"; break;
+        case animation::GenieEdge::kBottom: snapshot.taskbar = "Bottom"; break;
+      }
+    }
+  }
+
+  int monitor_count = 0;
+  EnumDisplayMonitors(nullptr, nullptr,
+                      [](HMONITOR, HDC, LPRECT, LPARAM data) -> BOOL {
+                        ++*reinterpret_cast<int*>(data);
+                        return TRUE;
+                      },
+                      reinterpret_cast<LPARAM>(&monitor_count));
+  const RECT virtual_screen = platform::GetVirtualScreenRect();
+  snapshot.monitor_configuration = std::to_string(monitor_count) + " monitor(s), " +
+                                   std::to_string(virtual_screen.right - virtual_screen.left) +
+                                   "x" +
+                                   std::to_string(virtual_screen.bottom - virtual_screen.top);
+
+  std::ostringstream report;
+  report << "Genie Effect Diagnostics\r\n"
+         << "Version: " << snapshot.version << "\r\n"
+         << "Windows: " << snapshot.windows_version << "\r\n"
+         << "Graphics adapter: " << snapshot.graphics_adapter << "\r\n"
+         << "Status: " << snapshot.status << "\r\n"
+         << "Effect: " << snapshot.effect << "\r\n"
+         << "Pause state: " << snapshot.pause << "\r\n"
+         << "Hook: " << snapshot.hook << "\r\n"
+         << "Renderer: " << snapshot.renderer << "\r\n"
+         << "D3D Device: " << snapshot.d3d_device << "\r\n"
+         << "Active animations: " << snapshot.active_animations << "\r\n"
+         << "Watchdog: " << snapshot.watchdog << "\r\n"
+         << "Display refresh: " << snapshot.display_refresh << "\r\n"
+         << "Window monitor: " << snapshot.window_monitor << "\r\n"
+         << "Taskbar: " << snapshot.taskbar << "\r\n"
+         << "Monitors: " << snapshot.monitor_configuration << "\r\n"
+         << "Safe Mode: " << snapshot.safe_mode << "\r\n"
+         << "Startup repair: " << snapshot.startup_repair << "\r\n";
+  snapshot.report = report.str();
+  return snapshot;
+}
+
+bool Application::ExecuteDiagnosticsAction(DiagnosticsAction action) {
+  if (action == DiagnosticsAction::kExitSafeMode) return ExitSafeMode();
+  if (action == DiagnosticsAction::kRepairWindows) {
+    HealLeftoverWindows();
+    return true;
+  }
+  if (action == DiagnosticsAction::kRestartRenderer) {
+    if (safe_mode_) return false;
+    BeginAnimationRendererRecovery();
+    return !animation_renderer_recovery_pending_ && d3d_device_ != nullptr;
+  }
+  if (action == DiagnosticsAction::kOpenLogFolder) {
+    const std::filesystem::path folder = std::filesystem::path(GenieDebugLogPath()).parent_path();
+    return reinterpret_cast<INT_PTR>(ShellExecuteW(settings_window_.hwnd(), L"open",
+                                                    folder.c_str(), nullptr, nullptr,
+                                                    SW_SHOWNORMAL)) > 32;
+  }
+  if (action == DiagnosticsAction::kCopy) {
+    const std::string report = BuildDiagnosticsSnapshot().report;
+    const int required = MultiByteToWideChar(CP_UTF8, 0, report.data(),
+                                             static_cast<int>(report.size()), nullptr, 0);
+    if (required <= 0 || !OpenClipboard(settings_window_.hwnd())) return false;
+    EmptyClipboard();
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, (static_cast<size_t>(required) + 1) * sizeof(wchar_t));
+    if (memory == nullptr) {
+      CloseClipboard();
+      return false;
+    }
+    auto* text = static_cast<wchar_t*>(GlobalLock(memory));
+    MultiByteToWideChar(CP_UTF8, 0, report.data(), static_cast<int>(report.size()), text, required);
+    text[required] = L'\0';
+    GlobalUnlock(memory);
+    if (SetClipboardData(CF_UNICODETEXT, memory) == nullptr) {
+      GlobalFree(memory);
+      CloseClipboard();
+      return false;
+    }
+    CloseClipboard();
+    return true;
+  }
+  return false;
+}
+
+bool Application::ExitSafeMode() {
+  if (!safe_mode_) return true;
+  if (!CreateAnimationRenderer()) return false;
+  if (!window_event_monitor_.Start(
+          [this](HWND window) { OnMinimizeStart(window); },
+          [this](HWND window) { OnRestoreAttempt(window); },
+          [this](HWND window, DWORD event) { OnWindowSeen(window, event); })) {
+    for (AnimationRun& slot : runs_) slot.overlay.Shutdown();
+    desktop_capture_.reset();
+    d3d_device_.reset();
+    return false;
+  }
+  safe_mode_ = false;
+  RegisterConfiguredHotkeys();
+  RefreshEffectRuntimeState();
+  if (!WriteSessionState("running")) {
+    LogDebug(L"SafeMode", L"Failed to update the session marker after leaving Safe Mode");
+  }
+  return true;
+}
+
+bool Application::SetAnimationDurations(float minimize_duration, float restore_duration, bool save) {
+  minimize_duration_seconds_ = std::clamp(minimize_duration, 0.10f, 2.00f);
+  restore_duration_seconds_ = std::clamp(restore_duration, 0.10f, 2.00f);
+  settings_.minimize_duration = minimize_duration_seconds_;
+  settings_.restore_duration = restore_duration_seconds_;
+  const bool saved = !save || SaveSettings(settings_);
+  if (!saved) LogDebug(L"Settings", L"Failed to persist animation durations");
+  settings_window_.UpdateState(settings_);
+  return saved;
+}
+
+bool Application::SetLinkSpeeds(bool linked) {
+  AppSettings proposed = settings_;
+  proposed.link_speeds = linked;
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Settings", L"Failed to persist linked speed state");
+    return false;
+  }
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetAdaptiveDuration(bool enabled) {
+  AppSettings proposed = settings_;
+  proposed.adaptive_duration = enabled;
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Settings", L"Failed to persist adaptive duration state");
+    return false;
+  }
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetDisableAnimationsFullscreen(bool enabled) {
+  AppSettings proposed = settings_;
+  proposed.disable_animations_fullscreen = enabled;
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Settings", L"Failed to persist fullscreen animation behavior");
+    return false;
+  }
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  UpdateFullscreenSuppression(true);
+  return true;
+}
+
+bool Application::SetPowerBehavior(bool reduce_on_battery, bool disable_in_saver) {
+  AppSettings proposed = settings_;
+  proposed.reduce_effects_on_battery = reduce_on_battery;
+  proposed.disable_effects_battery_saver = disable_in_saver;
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Settings", L"Failed to persist battery behavior");
+    return false;
+  }
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  UpdatePowerState(true);
+  return true;
+}
+
+bool Application::SetEasing(const std::string& minimize_easing,
+                            const std::string& restore_easing) {
+  constexpr std::array names = {
+      std::string_view{"Linear"}, std::string_view{"Ease In"},
+      std::string_view{"Ease Out"}, std::string_view{"Ease In Out"},
+      std::string_view{"Cubic"}, std::string_view{"Back"}, std::string_view{"Elastic"},
+  };
+  const auto valid = [&names](std::string_view value) {
+    return std::find(names.begin(), names.end(), value) != names.end();
+  };
+  if (!valid(minimize_easing) || !valid(restore_easing)) return false;
+  AppSettings proposed = settings_;
+  proposed.minimize_easing = minimize_easing;
+  proposed.restore_easing = restore_easing;
+  if (!SaveSettings(proposed)) return false;
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetAnimationStyle(const std::string& style) {
+  if (style != "Classic Genie" && style != "Soft" && style != "Snappy" &&
+      style != "Elastic" && style != "Linear") {
+    return false;
+  }
+  AppSettings proposed = settings_;
+  proposed.animation_style = style;
+  if (style == "Soft") {
+    proposed.minimize_easing = "Ease In Out";
+    proposed.restore_easing = "Ease In Out";
+  } else if (style == "Snappy") {
+    proposed.minimize_easing = "Ease Out";
+    proposed.restore_easing = "Ease In";
+  } else if (style == "Elastic") {
+    proposed.minimize_easing = "Elastic";
+    proposed.restore_easing = "Elastic";
+  } else {
+    proposed.minimize_easing = "Linear";
+    proposed.restore_easing = "Linear";
+  }
+  if (!SaveSettings(proposed)) return false;
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetGenieStrength(float strength, bool save) {
+  settings_.genie_strength = std::clamp(strength, 0.25f, 1.0f);
+  const bool saved = !save || SaveSettings(settings_);
+  settings_window_.UpdateState(settings_);
+  return saved;
+}
+
+bool Application::SetFadeStrength(const std::string& strength) {
+  if (strength != "No fade" && strength != "Subtle" && strength != "Strong") return false;
+  AppSettings proposed = settings_;
+  proposed.fade_strength = strength;
+  if (!SaveSettings(proposed)) return false;
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetTargetIndicator(bool enabled) {
+  AppSettings proposed = settings_;
+  proposed.show_target_indicator = enabled;
+  if (!SaveSettings(proposed)) return false;
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetFollowWindowsAnimationPreference(bool enabled) {
+  AppSettings proposed = settings_;
+  proposed.follow_windows_animation_preference = enabled;
+  if (!SaveSettings(proposed)) return false;
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  UpdateWindowsAnimationPreference(true);
+  return true;
+}
+
+float Application::CalculateAnimationDuration(float base_duration, const RECT& source,
+                                              const animation::RectF& target) const {
+  if (!settings_.adaptive_duration) return base_duration;
+
+  RECT source_copy = source;
+  const HMONITOR monitor = MonitorFromRect(&source_copy, MONITOR_DEFAULTTONEAREST);
+  MONITORINFO monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (monitor == nullptr || !GetMonitorInfoW(monitor, &monitor_info)) return base_duration;
+
+  const float source_x = static_cast<float>(source.left + source.right) * 0.5f;
+  const float source_y = static_cast<float>(source.top + source.bottom) * 0.5f;
+  const float distance = std::hypot(source_x - target.CenterX(), source_y - target.CenterY());
+  const float monitor_width =
+      static_cast<float>(monitor_info.rcMonitor.right - monitor_info.rcMonitor.left);
+  const float monitor_height =
+      static_cast<float>(monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top);
+  const float reference_distance = std::max(1.0f, std::hypot(monitor_width, monitor_height));
+  const float distance_ratio = std::clamp(distance / reference_distance, 0.0f, 1.0f);
+  const float duration_scale = 0.35f + 0.65f * distance_ratio;
+  const float lower_limit = std::min(base_duration, 0.18f);
+  return std::clamp(base_duration * duration_scale, lower_limit, base_duration);
+}
+
+bool Application::SetCloseBehavior(const std::string& close_behavior) {
+  if (close_behavior != "exit" && close_behavior != "tray") return false;
+  AppSettings proposed = settings_;
+  proposed.close_behavior = close_behavior;
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Settings", L"Failed to persist close behavior");
+    return false;
+  }
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetStartupOptions(bool run_at_startup, bool start_minimized) {
+  const AppSettings previous = settings_;
+  AppSettings proposed = settings_;
+  proposed.run_at_startup = run_at_startup;
+  proposed.start_minimized = start_minimized;
+
+  if (!SaveSettings(proposed)) {
+    LogDebug(L"Startup", L"Could not persist startup options");
+    return false;
+  }
+
+  if (run_at_startup != previous.run_at_startup && !ConfigureRunAtStartup(run_at_startup)) {
+    LogDebug(L"Startup", L"Could not update the per-user startup entry");
+    if (!SaveSettings(previous)) {
+      LogDebug(L"Startup", L"Could not roll back persisted startup options");
+    }
+    return false;
+  }
+
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetApplicationExcluded(const std::string& executable_name, bool excluded) {
+  std::optional<std::string> normalized = NormalizeExecutableName(executable_name);
+  if (!normalized.has_value()) return false;
+
+  const std::vector<std::string> previous = settings_.excluded_applications;
+  auto& applications = settings_.excluded_applications;
+  const auto existing = std::find_if(applications.begin(), applications.end(),
+                                     [&normalized](const std::string& entry) {
+                                       return ExecutableNamesEqual(entry, *normalized);
+                                     });
+  if (excluded) {
+    if (existing != applications.end()) return false;
+    applications.push_back(std::move(*normalized));
+  } else {
+    if (existing == applications.end()) return false;
+    applications.erase(existing);
+  }
+  if (!SaveSettings(settings_)) {
+    settings_.excluded_applications = previous;
+    return false;
+  }
+  ApplyExclusionTransitionOverrides();
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::IsWindowExcluded(HWND window) const {
+  const std::optional<std::string> executable_name = platform::GetWindowExecutableName(window);
+  return executable_name.has_value() &&
+         ContainsExcludedApplication(settings_.excluded_applications, *executable_name);
+}
+
+HWND Application::GetOverlayWindow() const {
+  return runs_.empty() ? nullptr : runs_[0].overlay.window();
+}
+
+void Application::ApplyExclusionTransitionOverrides() {
+  for (HWND window : platform::EnumerateTopLevelWindows(GetOverlayWindow())) {
+    const bool excluded = IsEffectActive() && IsWindowExcluded(window);
+    if (excluded) {
+      SetPropW(window, kExcludedApplicationProperty, reinterpret_cast<HANDLE>(1));
+    } else {
+      RemovePropW(window, kExcludedApplicationProperty);
+    }
+    platform::SetDwmTransitionsDisabled(window, IsEffectActive() && !excluded);
+  }
 }
 
 bool Application::InstallCbtHook() {
@@ -1073,9 +1950,13 @@ void Application::UninstallCbtHook() {
 }
 
 bool Application::OnMinimizeStart(HWND window) {
-  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_ ||
+  if (shutting_down_.load(std::memory_order_acquire) || !IsEffectActive() ||
       animation_renderer_recovery_pending_ || desktop_capture_ == nullptr ||
-      slots_[0].overlay.window() == nullptr) {
+      GetOverlayWindow() == nullptr) {
+    return false;
+  }
+  if (IsWindowExcluded(window)) {
+    platform::SetDwmTransitionsDisabled(window, false);
     return false;
   }
   TraceWindowEvent(L"OnMinimizeStart begin", window);
@@ -1092,27 +1973,27 @@ bool Application::OnMinimizeStart(HWND window) {
     return false;
   }
 
-  if (window == slots_[0].overlay.window() || window == slots_[1].overlay.window() || !IsWindow(window)) {
+  if (IsOverlayWindow(window) || !IsWindow(window)) {
     LogDebug(L"App", L"OnMinimizeStart: Ignored because window is overlay or invalid");
     return false;
   }
 
-  if (!platform::IsInterestingTopLevelWindow(window, slots_[0].overlay.window())) {
+  if (!platform::IsInterestingTopLevelWindow(window, GetOverlayWindow())) {
     LogDebug(L"App", L"OnMinimizeStart: Ignored because window is not interesting");
     return false;
   }
 
-  int slot_index = FindSlotForWindow(window);
-  if (slot_index != -1) {
-    auto& slot = slots_[slot_index];
+  int run_index = FindRunForWindow(window);
+  if (run_index != -1) {
+    auto& slot = runs_[run_index];
     if (slot.pending_native_minimize_window == window ||
         GetPropW(window, kAllowMinimizeProperty) != nullptr) {
       LogDebug(L"App", L"OnMinimizeStart: Allow minimize because already pending/allowed");
       return true;
     }
     slot.animating_restore = false;
-    slot.overlay.SetAnimationDuration(minimize_duration_seconds_);
     slot.overlay.ContinueMinimizeAnimation();
+    SetRunState(run_index, RunState::kAnimating);
     slot.live_animation_capture_enabled = false;
     std::wcout << L"Minimize requested during active animation; continuing "
                   L"toward taskbar.\n";
@@ -1120,18 +2001,17 @@ bool Application::OnMinimizeStart(HWND window) {
     return true;
   }
 
-  slot_index = FindFreeSlot();
-  if (slot_index == -1) {
-    // Both slots occupied, fall back to native minimize behavior
-    LogDebug(L"App", L"OnMinimizeStart: Both slots occupied; fallback to native minimize");
+  run_index = FindAvailableRun();
+  if (run_index == -1) {
+    LogDebug(L"App", L"OnMinimizeStart: Could not create an animation renderer");
     return false;
   }
-
-  auto& slot = slots_[slot_index];
+  auto& slot = runs_[run_index];
 
   if (restore_snapshots_.count(window) > 0 || GetPropW(window, kIsMinimizingProperty) != nullptr) {
     return true;
   }
+  SetRunState(run_index, RunState::kCapturing);
 
   std::wcout << L"Minimize detected: hwnd=0x" << std::hex
              << reinterpret_cast<std::uintptr_t>(window) << std::dec << L"\n";
@@ -1154,6 +2034,7 @@ bool Application::OnMinimizeStart(HWND window) {
     std::wcerr << L"Minimized window bounds are unavailable for hwnd=0x" << std::hex
                << reinterpret_cast<std::uintptr_t>(window) << std::dec << L" class=\"" << class_name
                << L"\" title=\"" << title << L"\".\n";
+    SetRunState(run_index, RunState::kIdle);
     return false;
   }
   LogTrace(L"App", L"OnMinimizeStart animation_bounds=" + RectTraceString(*animation_bounds) +
@@ -1215,6 +2096,7 @@ bool Application::OnMinimizeStart(HWND window) {
     TraceWindowEvent(L"OnMinimizeStart failed: captured texture missing", window);
     std::wcerr << L"Could not capture window texture; iconic=" << window_is_already_minimized
                << L", cached=" << has_pre_minimize_snapshot << L".\n";
+    SetRunState(run_index, RunState::kIdle);
     return false;
   }
 
@@ -1238,11 +2120,22 @@ bool Application::OnMinimizeStart(HWND window) {
   slot.animating_window = window;
   slot.animating_restore = false;
   slot.live_animation_bounds = source_bounds;
-  ResetAnimationFramePacing(slot_index, window, source_bounds);
+  ResetAnimationFramePacing(run_index, window, source_bounds);
   slot.last_animation_texture_refresh_ms = 0;
   slot.live_animation_capture_enabled = false;
 
-  slot.overlay.SetAnimationDuration(minimize_duration_seconds_);
+  const float animation_duration =
+      CalculateAnimationDuration(minimize_duration_seconds_, source_bounds, target.rect) *
+      AnimationStyleDurationScale(settings_.animation_style);
+  slot.overlay.SetAnimationDuration(animation_duration);
+  slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.minimize_easing));
+  slot.overlay.SetGenieStrength(
+      std::clamp(settings_.genie_strength * AnimationStyleStrength(settings_.animation_style),
+                 0.0f, 1.0f));
+  slot.overlay.SetFadeStrength(settings_.fade_strength == "Strong" ? 0.55f :
+                               settings_.fade_strength == "Subtle" ? 0.25f : 0.0f);
+  slot.overlay.SetTargetIndicatorEnabled(settings_.show_target_indicator);
+  LogTrace(L"App", L"Captured minimize duration=" + std::to_wstring(animation_duration));
   if (!slot.overlay.StartAnimation(captured_texture, ToRectF(source_bounds), target.rect,
                                       target.edge)) {
     TraceWindowEvent(L"OnMinimizeStart failed: overlay StartAnimation", window);
@@ -1251,6 +2144,7 @@ bool Application::OnMinimizeStart(HWND window) {
     slot.animating_window = nullptr;
     slot.animating_restore = false;
     slot.live_animation_capture_enabled = false;
+    SetRunState(run_index, RunState::kIdle);
     return false;
   }
   pre_minimize_snapshots_.erase(window);
@@ -1280,12 +2174,15 @@ bool Application::OnMinimizeStart(HWND window) {
       slot.animating_window = nullptr;
       slot.animating_restore = false;
       slot.live_animation_capture_enabled = false;
+      SetRunState(run_index, RunState::kIdle);
       return false;
     }
     slot.pending_native_minimize_window = window;
+    SetRunState(run_index, RunState::kWaitingForNativeMinimize);
   } else {
     slot.pending_native_minimize_window = nullptr;
     slot.overlay.StartAnimationClock();
+    SetRunState(run_index, RunState::kAnimating);
     SetPropW(window, kMovedOffscreenProperty, reinterpret_cast<HANDLE>(1));
     auto snap_it = restore_snapshots_.find(window);
     if (snap_it != restore_snapshots_.end()) {
@@ -1300,12 +2197,14 @@ bool Application::OnMinimizeStart(HWND window) {
   return true;
 }
 
-void Application::FinishActiveAnimation(int slot_index) {
-  auto& slot = slots_[slot_index];
+void Application::FinishActiveAnimation(int run_index) {
+  auto& slot = runs_[run_index];
   HWND finished_window = slot.animating_window;
   if (finished_window == nullptr) {
+    SetRunState(run_index, RunState::kIdle);
     return;
   }
+  SetRunState(run_index, RunState::kCleaningUp);
 
   const bool was_restoring = slot.animating_restore;
   // Set animating_window to nullptr first to prevent re-entrancy
@@ -1336,8 +2235,8 @@ void Application::FinishActiveAnimation(int slot_index) {
   slot.live_animation_capture_enabled = false;
   
   bool any_other_active = false;
-  for (int i = 0; i < 2; ++i) {
-    if (slots_[i].overlay.active()) {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (runs_[i].overlay.active()) {
       any_other_active = true;
     }
   }
@@ -1353,14 +2252,15 @@ void Application::FinishActiveAnimation(int slot_index) {
     SetWaitableTimer(animation_frame_timer_, &wake_now, 0, nullptr, nullptr, FALSE);
   }
   DwmFlush();
+  SetRunState(run_index, RunState::kIdle);
 }
 
-void Application::CompletePendingNativeMinimize(int slot_index) {
-  auto& slot = slots_[slot_index];
+void Application::CompletePendingNativeMinimize(int run_index) {
+  auto& slot = runs_[run_index];
   HWND window = slot.pending_native_minimize_window;
   TraceWindowEvent(L"CompletePendingNativeMinimize begin", window);
 
-  auto abort_pending_minimize = [this, slot_index, window]() {
+  auto abort_pending_minimize = [this, run_index, window]() {
     TraceWindowEvent(L"CompletePendingNativeMinimize abort", window);
     if (window != nullptr && IsWindow(window)) {
       platform::SetWindowCloaked(window, false);
@@ -1368,15 +2268,16 @@ void Application::CompletePendingNativeMinimize(int slot_index) {
       platform::SetOwnedWindowRegion(window, nullptr, true);
       ClearGenieWindowProperties(window);
     }
-    slots_[slot_index].live_animation_capture_enabled = false;
-    if (slots_[slot_index].overlay.active() && !slots_[slot_index].overlay.restoring()) {
-      slots_[slot_index].overlay.CancelAnimation();
+    runs_[run_index].live_animation_capture_enabled = false;
+    if (runs_[run_index].overlay.active() && !runs_[run_index].overlay.restoring()) {
+      runs_[run_index].overlay.CancelAnimation();
     }
-    if (slots_[slot_index].animating_window == window) {
+    if (runs_[run_index].animating_window == window) {
       restore_snapshots_.erase(window);
-      slots_[slot_index].animating_window = nullptr;
-      slots_[slot_index].animating_restore = false;
+      runs_[run_index].animating_window = nullptr;
+      runs_[run_index].animating_restore = false;
     }
+    SetRunState(run_index, RunState::kIdle);
   };
 
   if (window == nullptr || !IsWindow(window) || slot.animating_window != window ||
@@ -1432,6 +2333,7 @@ void Application::CompletePendingNativeMinimize(int slot_index) {
 
   TraceWindowEvent(L"CompletePendingNativeMinimize before StartAnimationClock", window);
   slot.overlay.StartAnimationClock();
+  SetRunState(run_index, RunState::kAnimating);
   std::wcout << L"Native minimize completed; starting animation clock.\n";
 }
 
@@ -1482,10 +2384,25 @@ bool Application::IsGenieWindowRestored(HWND window) const {
 }
 
 bool Application::OnRestoreAttempt(HWND window) {
-  if (!is_enabled_ || animation_renderer_recovery_pending_ || slots_[0].overlay.window() == nullptr) {
+  if (!IsEffectActive() || animation_renderer_recovery_pending_ ||
+      GetOverlayWindow() == nullptr) {
     return false;
   }
   if (shutting_down_.load(std::memory_order_acquire)) {
+    return false;
+  }
+  if (IsWindowExcluded(window)) {
+    platform::SetDwmTransitionsDisabled(window, false);
+    const int run_index = FindRunForWindow(window);
+    if (run_index != -1) FinishActiveAnimation(run_index);
+    const bool has_genie_state = restore_snapshots_.count(window) != 0 ||
+                                 GetPropW(window, kIsMinimizingProperty) != nullptr ||
+                                 GetPropW(window, kMovedOffscreenProperty) != nullptr;
+    if (has_genie_state) {
+      RestoreWindowFromGenieState(window, false);
+      restore_snapshots_.erase(window);
+      pre_minimize_snapshots_.erase(window);
+    }
     return false;
   }
   TraceWindowEvent(L"OnRestoreAttempt begin", window);
@@ -1514,12 +2431,12 @@ bool Application::OnRestoreAttempt(HWND window) {
     return false;
   }
 
-  if (window == slots_[0].overlay.window() || window == slots_[1].overlay.window() || !IsWindow(window)) {
+  if (IsOverlayWindow(window) || !IsWindow(window)) {
     LogDebug(L"App", L"OnRestoreAttempt: Ignored because window is overlay or invalid");
     return false;
   }
 
-  if (!platform::IsInterestingTopLevelWindow(window, slots_[0].overlay.window())) {
+  if (!platform::IsInterestingTopLevelWindow(window, GetOverlayWindow())) {
     LogDebug(L"App", L"OnRestoreAttempt: Ignored because window is not interesting");
     return false;
   }
@@ -1528,15 +2445,15 @@ bool Application::OnRestoreAttempt(HWND window) {
              << std::dec << L" iconic=" << (IsIconic(window) != FALSE) << L" genie_minimized="
              << window_was_genie_minimized << L" offscreen=" << is_moved_offscreen << L"\n";
 
-  int slot_index = FindSlotForWindow(window);
-  if (slot_index != -1) {
-    auto& slot = slots_[slot_index];
+  int run_index = FindRunForWindow(window);
+  if (run_index != -1) {
+    auto& slot = runs_[run_index];
     if (slot.pending_native_minimize_window == window) {
       slot.pending_native_minimize_window = nullptr;
     }
     slot.animating_restore = true;
-    slot.overlay.SetAnimationDuration(restore_duration_seconds_);
     slot.overlay.ReverseAnimation();
+    SetRunState(run_index, RunState::kRestoring);
     slot.live_animation_capture_enabled = false;
     std::wcout << L"Restore requested during active animation; reversing "
                   L"toward window.\n";
@@ -1598,24 +2515,36 @@ bool Application::OnRestoreAttempt(HWND window) {
   }
   const CachedSnapshot& current_snapshot = it->second;
 
-  slot_index = FindFreeSlot();
-  if (slot_index == -1) {
-    // Both slots occupied, fall back to native restore behavior
-    LogDebug(L"App", L"OnRestoreAttempt: Both slots occupied; fallback to native restore");
+  run_index = FindAvailableRun();
+  if (run_index == -1) {
+    LogDebug(L"App", L"OnRestoreAttempt: Could not create an animation renderer");
     RestoreWindowFromGenieState(window, false);
     restore_snapshots_.erase(window);
     return false;
   }
+  SetRunState(run_index, RunState::kRestoring);
 
-  auto& slot = slots_[slot_index];
+  auto& slot = runs_[run_index];
   slot.animating_window = window;
   slot.animating_restore = true;
   slot.live_animation_capture_enabled = false;
-  ResetAnimationFramePacing(slot_index, window, current_snapshot.bounds);
+  ResetAnimationFramePacing(run_index, window, current_snapshot.bounds);
 
   native_animation_blocker_.SetTransitionsDisabledForWindow(window, true);
 
-  slot.overlay.SetAnimationDuration(restore_duration_seconds_);
+  const float animation_duration = CalculateAnimationDuration(
+                                       restore_duration_seconds_, current_snapshot.bounds,
+                                       current_snapshot.target.rect) *
+                                   AnimationStyleDurationScale(settings_.animation_style);
+  slot.overlay.SetAnimationDuration(animation_duration);
+  slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.restore_easing));
+  slot.overlay.SetGenieStrength(
+      std::clamp(settings_.genie_strength * AnimationStyleStrength(settings_.animation_style),
+                 0.0f, 1.0f));
+  slot.overlay.SetFadeStrength(settings_.fade_strength == "Strong" ? 0.55f :
+                               settings_.fade_strength == "Subtle" ? 0.25f : 0.0f);
+  slot.overlay.SetTargetIndicatorEnabled(settings_.show_target_indicator);
+  LogTrace(L"App", L"Captured restore duration=" + std::to_wstring(animation_duration));
   if (!slot.overlay.StartAnimation(current_snapshot.texture, ToRectF(current_snapshot.bounds),
                                       current_snapshot.target.rect, current_snapshot.target.edge,
                                       1.0f, 0.0f)) {
@@ -1625,6 +2554,7 @@ bool Application::OnRestoreAttempt(HWND window) {
     restore_snapshots_.erase(window);
     slot.animating_window = nullptr;
     slot.animating_restore = false;
+    SetRunState(run_index, RunState::kIdle);
     return false;
   }
 
@@ -1636,15 +2566,25 @@ bool Application::OnRestoreAttempt(HWND window) {
 }
 
 void Application::OnWindowSeen(HWND window, DWORD event) {
-  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_ ||
+  if (shutting_down_.load(std::memory_order_acquire) || !IsEffectActive() ||
       animation_renderer_recovery_pending_) {
     return;
   }
-  if (window == slots_[0].overlay.window() || window == slots_[1].overlay.window()) {
+  if (IsOverlayWindow(window)) {
     return;
   }
-  for (int i = 0; i < 2; ++i) {
-    if (window == slots_[i].animating_window) {
+  if (event == EVENT_SYSTEM_FOREGROUND && WindowProcessId(window) != GetCurrentProcessId() &&
+      platform::IsInterestingTopLevelWindow(window, GetOverlayWindow())) {
+    last_foreground_window_ = window;
+  }
+  if (IsWindowExcluded(window)) {
+    SetPropW(window, kExcludedApplicationProperty, reinterpret_cast<HANDLE>(1));
+    platform::SetDwmTransitionsDisabled(window, false);
+    return;
+  }
+  RemovePropW(window, kExcludedApplicationProperty);
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (window == runs_[i].animating_window) {
       return;
     }
   }
@@ -1673,12 +2613,13 @@ void Application::OnWindowSeen(HWND window, DWORD event) {
 
 void Application::UpdatePreMinimizeSnapshot(HWND window) {
   if (desktop_capture_ == nullptr || animation_renderer_recovery_pending_ ||
-      window == slots_[0].overlay.window() || window == slots_[1].overlay.window() ||
-      !IsWindow(window) || IsIconic(window) || !IsWindowVisible(window)) {
+      IsOverlayWindow(window) ||
+      !IsWindow(window) || IsIconic(window) || !IsWindowVisible(window) ||
+      IsWindowExcluded(window)) {
     return;
   }
-  for (int i = 0; i < 2; ++i) {
-    if (window == slots_[i].animating_window) {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (window == runs_[i].animating_window) {
       return;
     }
   }
@@ -1858,13 +2799,14 @@ void Application::CleanupAndRestoreAll() {
   shutting_down_.store(true, std::memory_order_release);
 
   LogDebug(L"App", L"CleanupAndRestoreAll starting");
+  UnregisterAllHotkeys();
   window_event_monitor_.Stop();
   UninstallCbtHook();
   native_animation_blocker_.Disable();
 
   // Post WM_QUIT so the main message loop exits if it's still running.
-  if (slots_[0].overlay.window() != nullptr) {
-    PostMessageW(slots_[0].overlay.window(), WM_CLOSE, 0, 0);
+  if (GetOverlayWindow() != nullptr) {
+    PostMessageW(GetOverlayWindow(), WM_CLOSE, 0, 0);
   }
 
   // Take ownership of the maps so the main thread can't see them anymore.
@@ -1872,16 +2814,17 @@ void Application::CleanupAndRestoreAll() {
   auto pre_minimize_copy = std::move(pre_minimize_snapshots_);
   
   HWND animating_copies[2];
-  for (int i = 0; i < 2; ++i) {
-    animating_copies[i] = slots_[i].animating_window;
-    slots_[i].animating_window = nullptr;
-    slots_[i].animating_restore = false;
-    slots_[i].pending_native_minimize_window = nullptr;
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    animating_copies[i] = runs_[i].animating_window;
+    runs_[i].animating_window = nullptr;
+    runs_[i].animating_restore = false;
+    runs_[i].pending_native_minimize_window = nullptr;
   }
 
   // Enumerate and heal all windows in the system
   EnumWindows(
       [](HWND hwnd, LPARAM) -> BOOL {
+        RemovePropW(hwnd, kExcludedApplicationProperty);
         if (HasGenieWindowState(hwnd)) {
           // Inline restore: don't use RestoreWindowFromGenieState to avoid
           // setting in_restore_window_state_ which can race with the main thread.
@@ -1895,7 +2838,7 @@ void Application::CleanupAndRestoreAll() {
       0);
 
   // Also restore any tracked windows from our maps
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
     if (animating_copies[i] != nullptr && IsWindow(animating_copies[i])) {
       RestoreWindowFromGenieState(animating_copies[i]);
     }
@@ -1907,8 +2850,8 @@ void Application::CleanupAndRestoreAll() {
     RestoreWindowFromGenieState(hwnd);
   }
 
-  for (int i = 0; i < 2; ++i) {
-    slots_[i].overlay.Shutdown();
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    runs_[i].overlay.Shutdown();
   }
   settings_window_.Shutdown();
   restore_copy.clear();
@@ -1923,22 +2866,37 @@ void Application::CleanupAndRestoreAll() {
     LARGE_INTEGER wake_now{};
     SetWaitableTimer(animation_frame_timer_, &wake_now, 0, nullptr, nullptr, FALSE);
   }
+  if (session_started_) {
+    if (!WriteSessionState("clean")) {
+      LogDebug(L"SafeMode", L"Failed to write the clean session marker");
+    }
+    session_started_ = false;
+  }
   LogDebug(L"App", L"CleanupAndRestoreAll completed");
 }
 
 void Application::HealLeftoverWindows() {
   LogDebug(L"App", L"HealLeftoverWindows checking for leftover Genie windows");
+  std::size_t repaired_count = 0;
+  std::pair<Application*, std::size_t*> repair_context{this, &repaired_count};
   EnumWindows(
       [](HWND hwnd, LPARAM lParam) -> BOOL {
+        auto* context = reinterpret_cast<std::pair<Application*, std::size_t*>*>(lParam);
+        RemovePropW(hwnd, kExcludedApplicationProperty);
         if (HasGenieWindowState(hwnd)) {
-          auto* app = reinterpret_cast<Application*>(lParam);
           LogDebug(L"App", L"HealLeftoverWindows: restoring leftover window hwnd=0x" +
                                std::to_wstring(reinterpret_cast<std::uintptr_t>(hwnd)));
-          app->RestoreWindowFromGenieState(hwnd, false);
+          context->first->RestoreWindowFromGenieState(hwnd, false);
+          ++*context->second;
         }
         return TRUE;
       },
-      reinterpret_cast<LPARAM>(this));
+      reinterpret_cast<LPARAM>(&repair_context));
+  startup_repair_status_ = repaired_count == 0
+                               ? "No issues found"
+                               : std::to_string(repaired_count) + " window(s) repaired";
+  LogDebug(L"App", L"Startup repair result: " + std::to_wstring(repaired_count) +
+                       L" suspicious window(s) repaired");
 }
 
 }  // namespace genie::app

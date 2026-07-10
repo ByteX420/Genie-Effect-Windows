@@ -18,6 +18,7 @@ namespace genie::rendering {
 namespace {
 
 constexpr wchar_t kOverlayWindowClassName[] = L"GenieEffectOverlayWindow";
+constexpr wchar_t kTargetIndicatorClassName[] = L"GenieEffectTargetIndicator";
 constexpr wchar_t kAllowMinimizeProperty[] = L"GenieAllowMinimize";
 constexpr UINT kMaxMeshVertices = 102;
 constexpr UINT kMaxMeshIndices = 300;
@@ -188,6 +189,10 @@ void OverlayWindow::Shutdown() {
     DestroyWindow(window_);
     window_ = nullptr;
   }
+  if (target_indicator_window_ != nullptr) {
+    DestroyWindow(target_indicator_window_);
+    target_indicator_window_ = nullptr;
+  }
   rasterizer_state_.Reset();
   blend_state_.Reset();
   sampler_state_.Reset();
@@ -246,7 +251,12 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   animation_state_.edge = edge;
   animation_state_.progress = std::clamp(start_progress, 0.0f, 1.0f);
   animation_state_.target_progress = std::clamp(target_progress, 0.0f, 1.0f);
+  animation_state_.duration_seconds = animation_duration_seconds_;
+  animation_state_.easing = animation_easing_;
+  animation_state_.genie_strength = genie_strength_;
+  animation_state_.fade_strength = fade_strength_;
   animation_state_.clock_started = false;
+  if (target_indicator_enabled_) ShowTargetIndicator(target_screen_rect);
 
   if (!Render(animation_state_.progress)) {
     LogTrace(L"Overlay", L"StartAnimation failed: first Render returned false");
@@ -339,6 +349,10 @@ bool OverlayWindow::Tick() {
   if (!animation_state_.active) {
     return false;
   }
+  if (target_indicator_window_ != nullptr && IsWindowVisible(target_indicator_window_) &&
+      std::chrono::steady_clock::now() >= target_indicator_hide_time_) {
+    HideTargetIndicator();
+  }
   if (!animation_state_.clock_started) {
     if (IsTraceLoggingEnabled()) {
       LogTrace(L"Overlay", L"Tick waiting_for_clock progress=" +
@@ -353,7 +367,7 @@ bool OverlayWindow::Tick() {
       std::chrono::duration<float>(now - animation_state_.last_tick_time).count();
   animation_state_.last_tick_time = now;
 
-  const float step = elapsed_seconds / animation_duration_seconds_;
+  const float step = elapsed_seconds / animation_state_.duration_seconds;
   [[maybe_unused]] const float previous_progress = animation_state_.progress;
   if (animation_state_.target_progress >= animation_state_.progress) {
     animation_state_.progress =
@@ -405,12 +419,14 @@ void OverlayWindow::CancelAnimation() {
     animation_state_.captured_texture = CapturedTexture{};
     HideOverlay();
   }
+  HideTargetIndicator();
 }
 
 void OverlayWindow::FinishRestoreAnimation() {
   LogTrace(L"Overlay", L"FinishRestoreAnimation");
   animation_state_.captured_texture = CapturedTexture{};
   HideOverlay();
+  HideTargetIndicator();
 }
 
 LRESULT CALLBACK OverlayWindow::WindowProc(HWND window, UINT message, WPARAM w_param,
@@ -478,7 +494,17 @@ bool OverlayWindow::RegisterWindowClass(HINSTANCE instance) {
 
   if (RegisterClassExW(&window_class) == 0) {
     const DWORD error = GetLastError();
-    return error == ERROR_CLASS_ALREADY_EXISTS;
+    if (error != ERROR_CLASS_ALREADY_EXISTS) return false;
+  }
+
+  WNDCLASSEXW indicator_class{};
+  indicator_class.cbSize = sizeof(indicator_class);
+  indicator_class.lpfnWndProc = DefWindowProcW;
+  indicator_class.hInstance = instance;
+  indicator_class.hbrBackground = CreateSolidBrush(RGB(92, 154, 255));
+  indicator_class.lpszClassName = kTargetIndicatorClassName;
+  if (RegisterClassExW(&indicator_class) == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+    return false;
   }
   return true;
 }
@@ -490,7 +516,33 @@ bool OverlayWindow::CreateOverlayWindow(HINSTANCE instance) {
       CreateWindowExW(kExStyle, kOverlayWindowClassName, L"Genie Effect Overlay", WS_POPUP,
                       overlay_screen_rect_.left, overlay_screen_rect_.top, static_cast<int>(width_),
                       static_cast<int>(height_), nullptr, nullptr, instance, this);
-  return window_ != nullptr;
+  target_indicator_window_ = CreateWindowExW(
+      WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED,
+      kTargetIndicatorClassName, L"", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, instance, nullptr);
+  if (target_indicator_window_ != nullptr) {
+    SetLayeredWindowAttributes(target_indicator_window_, 0, 190, LWA_ALPHA);
+  }
+  return window_ != nullptr && target_indicator_window_ != nullptr;
+}
+
+void OverlayWindow::ShowTargetIndicator(const genie::animation::RectF& target) {
+  if (target_indicator_window_ == nullptr) return;
+  const int left = static_cast<int>(std::floor(target.left)) - 3;
+  const int top = static_cast<int>(std::floor(target.top)) - 3;
+  const int width = std::max(8, static_cast<int>(std::ceil(target.right - target.left)) + 6);
+  const int height = std::max(8, static_cast<int>(std::ceil(target.bottom - target.top)) + 6);
+  HRGN outer = CreateRectRgn(0, 0, width, height);
+  HRGN inner = CreateRectRgn(2, 2, width - 2, height - 2);
+  if (outer != nullptr && inner != nullptr) CombineRgn(outer, outer, inner, RGN_DIFF);
+  if (inner != nullptr) DeleteObject(inner);
+  if (outer != nullptr) SetWindowRgn(target_indicator_window_, outer, TRUE);
+  SetWindowPos(target_indicator_window_, HWND_TOPMOST, left, top, width, height,
+               SWP_NOACTIVATE | SWP_SHOWWINDOW);
+  target_indicator_hide_time_ = std::chrono::steady_clock::now() + std::chrono::milliseconds(180);
+}
+
+void OverlayWindow::HideTargetIndicator() {
+  if (target_indicator_window_ != nullptr) ShowWindow(target_indicator_window_, SW_HIDE);
 }
 
 bool OverlayWindow::InitializeComposition() {
@@ -792,7 +844,11 @@ bool OverlayWindow::UpdateFrameConstants() {
   auto* constants = static_cast<FrameConstants*>(mapped_resource.pData);
   constants->viewport_size[0] = static_cast<float>(width_);
   constants->viewport_size[1] = static_cast<float>(height_);
-  constants->opacity = 1.0f;
+  // Keep a useful silhouette at the taskbar end while making restore emerge smoothly.
+  constants->opacity = animation_state_.active
+                           ? 1.0f - std::clamp(animation_state_.fade_strength, 0.0f, 0.65f) *
+                                        std::clamp(animation_state_.progress, 0.0f, 1.0f)
+                           : 1.0f;
   constants->padding = 0.0f;
   context->Unmap(constant_buffer_.Get(), 0);
   return true;
@@ -803,9 +859,12 @@ bool OverlayWindow::Render(float progress) {
     return false;
   }
 
+  const float eased_progress = genie::animation::ApplyEasing(animation_state_.easing, progress);
+  if (!UpdateFrameConstants()) return false;
+  mesh_generator_.SetStrength(animation_state_.genie_strength);
   const bool indices_changed = mesh_generator_.GenerateInto(
       animation_state_.source_rect, animation_state_.target_rect, animation_state_.edge,
-      genie::animation::GenieDirection::kMinimize, progress, static_cast<float>(height_),
+      genie::animation::GenieDirection::kMinimize, eased_progress, static_cast<float>(height_),
       &reusable_mesh_);
   if (!UploadMesh(reusable_mesh_, indices_changed)) {
     std::wcerr << L"Overlay render failed: mesh upload failed. vertices="

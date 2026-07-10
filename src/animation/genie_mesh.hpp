@@ -33,6 +33,7 @@ struct GenieMesh {
 
 class GenieMeshGenerator {
 public:
+  void SetStrength(float strength) { strength_ = strength; }
   // Returns true when the index layout changed and must be uploaded again.
   bool GenerateInto(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
                     GenieDirection direction, float progress, float viewport_height,
@@ -45,6 +46,7 @@ private:
   std::vector<PointF> screen_positions_;
   bool has_index_layout_ = false;
   bool index_layout_horizontal_ = false;
+  float strength_ = 1.0f;
 };
 
 }  // namespace genie::animation

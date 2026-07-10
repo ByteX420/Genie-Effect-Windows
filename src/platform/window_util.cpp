@@ -12,6 +12,21 @@
 namespace genie::platform {
 namespace {
 
+std::string WideToUtf8(std::wstring_view value) {
+  if (value.empty()) return {};
+  const int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+                                         static_cast<int>(value.size()), nullptr, 0, nullptr,
+                                         nullptr);
+  if (length <= 0) return {};
+  std::string result(static_cast<size_t>(length), '\0');
+  if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+                          static_cast<int>(value.size()), result.data(), length, nullptr,
+                          nullptr) != length) {
+    return {};
+  }
+  return result;
+}
+
 bool IsExcludedClassName(std::wstring_view class_name) {
   constexpr std::array<std::wstring_view, 8> kExcludedClassNames = {
       L"Progman",
@@ -40,6 +55,28 @@ BOOL CALLBACK CollectWindowsProc(HWND window, LPARAM parameter) {
 }
 
 }  // namespace
+
+std::optional<std::string> GetWindowExecutableName(HWND window) {
+  if (window == nullptr || !IsWindow(window)) return std::nullopt;
+  DWORD process_id = 0;
+  GetWindowThreadProcessId(window, &process_id);
+  if (process_id == 0) return std::nullopt;
+  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+  if (process == nullptr) return std::nullopt;
+
+  std::vector<wchar_t> path(32768);
+  DWORD length = static_cast<DWORD>(path.size());
+  const BOOL queried = QueryFullProcessImageNameW(process, 0, path.data(), &length);
+  CloseHandle(process);
+  if (!queried || length == 0) return std::nullopt;
+  std::wstring_view full_path(path.data(), length);
+  const size_t separator = full_path.find_last_of(L"\\/");
+  const std::wstring_view filename =
+      separator == std::wstring_view::npos ? full_path : full_path.substr(separator + 1);
+  std::string utf8 = WideToUtf8(filename);
+  if (utf8.empty()) return std::nullopt;
+  return utf8;
+}
 
 std::optional<RECT> GetExtendedFrameBounds(HWND window) {
   if (!IsWindow(window)) {

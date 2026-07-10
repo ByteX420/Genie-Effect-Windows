@@ -74,9 +74,20 @@ bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& tar
       const float column_fraction = static_cast<float>(column) / columns;
       const int index = row * (columns + 1) + column;
       const PointF pt = screen_positions_[index];
+      const float linear_left =
+          source_rect.left + (target_rect.left - source_rect.left) * oriented_progress;
+      const float linear_top =
+          source_rect.top + (target_rect.top - source_rect.top) * oriented_progress;
+      const float linear_right =
+          source_rect.right + (target_rect.right - source_rect.right) * oriented_progress;
+      const float linear_bottom =
+          source_rect.bottom + (target_rect.bottom - source_rect.bottom) * oriented_progress;
+      const float linear_x = linear_left + (linear_right - linear_left) * column_fraction;
+      const float linear_y = linear_top + (linear_bottom - linear_top) * row_fraction;
+      const float strength = std::clamp(strength_, 0.0f, 1.0f);
       mesh->vertices[index] = MeshVertex{
-          .x = pt.x,
-          .y = pt.y,
+          .x = linear_x + (pt.x - linear_x) * strength,
+          .y = linear_y + (pt.y - linear_y) * strength,
           .u = column_fraction,
           .v = row_fraction,
       };

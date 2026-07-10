@@ -8,6 +8,7 @@
 #include <windows.h>
 #include <wrl/client.h>
 
+#include "animation/easing.hpp"
 #include "animation/genie_mesh.hpp"
 #include "rendering/d3d_device.hpp"
 #include "rendering/desktop_capture.hpp"
@@ -31,6 +32,10 @@ public:
   void SetAnimationDuration(float duration_seconds) {
     animation_duration_seconds_ = duration_seconds;
   }
+  void SetAnimationEasing(genie::animation::EasingCurve easing) { animation_easing_ = easing; }
+  void SetGenieStrength(float strength) { genie_strength_ = strength; }
+  void SetFadeStrength(float strength) { fade_strength_ = strength; }
+  void SetTargetIndicatorEnabled(bool enabled) { target_indicator_enabled_ = enabled; }
 
   [[nodiscard]] HWND window() const { return window_; }
   [[nodiscard]] bool active() const { return animation_state_.active; }
@@ -65,6 +70,10 @@ private:
     std::chrono::steady_clock::time_point last_tick_time;
     float progress = 0.0f;
     float target_progress = 1.0f;
+    float duration_seconds = 0.70f;
+    genie::animation::EasingCurve easing = genie::animation::EasingCurve::kLinear;
+    float genie_strength = 1.0f;
+    float fade_strength = 0.0f;
     bool clock_started = false;
   };
 
@@ -84,12 +93,15 @@ private:
   [[nodiscard]] bool Render(float progress);
   void ClearFrame();
   void HideOverlay();
+  void ShowTargetIndicator(const genie::animation::RectF& target);
+  void HideTargetIndicator();
   void MarkDeviceLost(const wchar_t* operation, HRESULT hr);
   [[nodiscard]] genie::animation::RectF ToOverlayRect(
       const genie::animation::RectF& screen_rect) const;
 
   D3dDevice* d3d_device_ = nullptr;
   HWND window_ = nullptr;
+  HWND target_indicator_window_ = nullptr;
   RECT virtual_screen_rect_{};
   RECT overlay_screen_rect_{};
   UINT width_ = 0;
@@ -117,6 +129,11 @@ private:
   MinimizeCallback minimize_callback_;
   RestoreCallback restore_callback_;
   float animation_duration_seconds_ = 0.70f;
+  genie::animation::EasingCurve animation_easing_ = genie::animation::EasingCurve::kLinear;
+  float genie_strength_ = 1.0f;
+  float fade_strength_ = 0.0f;
+  bool target_indicator_enabled_ = false;
+  std::chrono::steady_clock::time_point target_indicator_hide_time_{};
   UINT minimize_attempt_message_ = 0;
   UINT restore_attempt_message_ = 0;
   bool device_lost_ = false;
