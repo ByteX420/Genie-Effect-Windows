@@ -161,6 +161,60 @@ bool Slider(const char* id, float* value, float minimum, float maximum, float wi
   return active;
 }
 
+static void DrawSymmetricX(
+    ImDrawList* draw,
+    const ImVec2& min,
+    float size,
+    ImU32 color,
+    float scale = 3.0f)
+{
+  const ImVec2 center(
+      min.x + size * 0.5f - 0.5f,
+      min.y + size * 0.5f - 0.5f
+  );
+
+  const float armLength = 4.0f * scale;
+  const float thickness = 1.0f;
+
+  // Disable anti-aliasing to prevent double-blending/halo in the center
+  const ImDrawListFlags old_flags = draw->Flags;
+  draw->Flags &= ~ImDrawListFlags_AntiAliasedLines;
+
+  // Center to Top-Left
+  draw->AddLine(
+      center,
+      ImVec2(center.x - armLength, center.y - armLength),
+      color,
+      thickness
+  );
+
+  // Center to Bottom-Right
+  draw->AddLine(
+      center,
+      ImVec2(center.x + armLength, center.y + armLength),
+      color,
+      thickness
+  );
+
+  // Center to Top-Right
+  draw->AddLine(
+      center,
+      ImVec2(center.x + armLength, center.y - armLength),
+      color,
+      thickness
+  );
+
+  // Center to Bottom-Left
+  draw->AddLine(
+      center,
+      ImVec2(center.x - armLength, center.y + armLength),
+      color,
+      thickness
+  );
+
+  draw->Flags = old_flags;
+}
+
 bool CloseButton(float scale, float alpha) {
   const float size = 16.0f * scale;
   const ImVec2 min = ImGui::GetCursorScreenPos();
@@ -169,12 +223,38 @@ bool CloseButton(float scale, float alpha) {
       Animate(ImGui::GetID("##close_panel"), ImGui::IsItemHovered() ? 1.0f : 0.0f, 24.0f);
   ImDrawList* draw = ImGui::GetWindowDrawList();
   const ImU32 color = Blend(IM_COL32(150, 150, 150, 255), IM_COL32(255, 255, 255, 255), hover);
-  const float inset = 4.0f * scale;
-  draw->AddLine(ImVec2(min.x + inset, min.y + inset),
-                ImVec2(min.x + size - inset, min.y + size - inset), WithAlpha(color, alpha),
-                1.5f * scale);
-  draw->AddLine(ImVec2(min.x + size - inset, min.y + inset),
-                ImVec2(min.x + inset, min.y + size - inset), WithAlpha(color, alpha), 1.5f * scale);
+
+  DrawSymmetricX(draw, min, size, WithAlpha(color, alpha), scale);
+  return ImGui::IsItemClicked();
+}
+
+bool MinimizeButton(float scale, float alpha) {
+  const float size = 16.0f * scale;
+  const ImVec2 min = ImGui::GetCursorScreenPos();
+  ImGui::InvisibleButton("##minimize_panel", ImVec2(size, size));
+  const float hover =
+      Animate(ImGui::GetID("##minimize_panel"), ImGui::IsItemHovered() ? 1.0f : 0.0f, 24.0f);
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  const ImU32 color = Blend(IM_COL32(150, 150, 150, 255), IM_COL32(255, 255, 255, 255), hover);
+
+  const ImVec2 center(
+      min.x + size * 0.5f - 0.5f,
+      min.y + size * 0.5f - 0.5f
+  );
+  const float arm_length = 4.0f * scale;
+  const float thickness = 1.0f;
+
+  const ImDrawListFlags old_flags = draw->Flags;
+  draw->Flags &= ~ImDrawListFlags_AntiAliasedLines;
+
+  draw->AddLine(
+      ImVec2(center.x - arm_length, center.y),
+      ImVec2(center.x + arm_length, center.y),
+      WithAlpha(color, alpha),
+      thickness
+  );
+
+  draw->Flags = old_flags;
   return ImGui::IsItemClicked();
 }
 
@@ -249,7 +329,28 @@ void SettingsWindow::Shutdown() {
 
 void SettingsWindow::Show(bool show) {
   if (hwnd_ == nullptr) return;
-  ShowWindow(hwnd_, show ? SW_SHOW : SW_HIDE);
+  if (show) {
+    if (IsIconic(hwnd_)) {
+      ShowWindow(hwnd_, SW_RESTORE);
+    }
+    POINT cursor_pos{};
+    GetCursorPos(&cursor_pos);
+    HMONITOR monitor = MonitorFromPoint(cursor_pos, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{};
+    info.cbSize = sizeof(info);
+    if (GetMonitorInfoW(monitor, &info)) {
+      RECT rect{};
+      GetWindowRect(hwnd_, &rect);
+      const int w = rect.right - rect.left;
+      const int h = rect.bottom - rect.top;
+      const int x = info.rcWork.left + (info.rcWork.right - info.rcWork.left - w) / 2;
+      const int y = info.rcWork.top + (info.rcWork.bottom - info.rcWork.top - h) / 2;
+      SetWindowPos(hwnd_, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    ShowWindow(hwnd_, SW_SHOW);
+  } else {
+    ShowWindow(hwnd_, SW_HIDE);
+  }
   if (!show) {
     render_requested_ = false;
     return;
@@ -516,9 +617,21 @@ void SettingsWindow::RenderContents() {
   draw->AddText(font_medium_, px(14.0f), point(px(18.0f), px(16.0f) + y_offset),
                 WithAlpha(kPrimaryTextColor, content_alpha), "Genie Effect");
 
+  // Minimize Button
+  ImGui::SetCursorPos(ImVec2(size.x - px(54.0f), px(14.0f) + y_offset));
+  if (MinimizeButton(scale, content_alpha)) {
+    ShowWindow(hwnd_, SW_MINIMIZE);
+  }
+
   // Close Button
   ImGui::SetCursorPos(ImVec2(size.x - px(34.0f), px(14.0f) + y_offset));
-  if (CloseButton(scale, content_alpha)) Show(false);
+  if (CloseButton(scale, content_alpha)) {
+    if (exit_callback_) {
+      exit_callback_();
+    } else {
+      Show(false);
+    }
+  }
 
   // Row 1: Animations (y = 52)
   draw->AddText(font_body_, px(13.5f), point(px(18.0f), px(52.0f) + y_offset),
