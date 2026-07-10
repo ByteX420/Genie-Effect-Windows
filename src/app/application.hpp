@@ -62,6 +62,8 @@ private:
   [[nodiscard]] bool IsAnimationFrameDue() const;
   void AdvanceAnimationFrameDeadline();
   void WaitForAnimationFrameOrMessage();
+  void BeginFallbackTimerResolution();
+  void EndFallbackTimerResolution();
 
   std::unique_ptr<rendering::D3dDevice> d3d_device_;
   std::unique_ptr<rendering::DesktopCapture> desktop_capture_;
@@ -81,6 +83,9 @@ private:
   ULONGLONG last_snapshot_refresh_ms_ = 0;
   ULONGLONG last_animation_texture_refresh_ms_ = 0;
   HANDLE animation_frame_timer_ = nullptr;
+  bool animation_frame_timer_is_high_resolution_ = false;
+  bool fallback_timer_resolution_active_ = false;
+  UINT fallback_timer_period_ms_ = 0;
   HMONITOR animation_monitor_ = nullptr;
   std::chrono::steady_clock::duration animation_frame_interval_{};
   std::chrono::steady_clock::time_point next_animation_frame_time_{};

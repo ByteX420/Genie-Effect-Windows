@@ -7,10 +7,13 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <timeapi.h>
 
 #include "animation/geometry.hpp"
 #include "common/debug_log.hpp"
 #include "platform/window_util.hpp"
+
+#pragma comment(lib, "winmm.lib")
 
 namespace genie::app {
 namespace {
@@ -421,6 +424,7 @@ bool Application::Initialize(HINSTANCE instance) {
 
   animation_frame_timer_ = CreateWaitableTimerExW(
       nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
+  animation_frame_timer_is_high_resolution_ = animation_frame_timer_ != nullptr;
   if (animation_frame_timer_ == nullptr) {
     animation_frame_timer_ = CreateWaitableTimerW(nullptr, FALSE, nullptr);
   }
@@ -636,6 +640,9 @@ int Application::Run() {
       animating_window_ = nullptr;
       animating_restore_ = false;
     }
+    if (!overlay_window_.active()) {
+      EndFallbackTimerResolution();
+    }
 
     if (animation_active) {
       WaitForAnimationFrameOrMessage();
@@ -670,6 +677,7 @@ int Application::Run() {
 }
 
 void Application::ResetAnimationFramePacing(HWND window, const RECT& animation_bounds) {
+  BeginFallbackTimerResolution();
   live_animation_bounds_ = animation_bounds;
   if (window != nullptr && IsWindow(window)) {
     const std::optional<RECT> current_bounds = platform::GetExtendedFrameBounds(window);
@@ -782,6 +790,31 @@ void Application::WaitForAnimationFrameOrMessage() {
   const DWORD timeout_ms =
       static_cast<DWORD>(std::max<std::int64_t>(1, (wait_ns + 999999) / 1000000));
   MsgWaitForMultipleObjects(0, nullptr, FALSE, timeout_ms, QS_ALLINPUT);
+}
+
+void Application::BeginFallbackTimerResolution() {
+  if (animation_frame_timer_is_high_resolution_ || fallback_timer_resolution_active_) {
+    return;
+  }
+
+  TIMECAPS capabilities{};
+  if (timeGetDevCaps(&capabilities, sizeof(capabilities)) != TIMERR_NOERROR ||
+      capabilities.wPeriodMin == 0) {
+    return;
+  }
+  if (timeBeginPeriod(capabilities.wPeriodMin) == TIMERR_NOERROR) {
+    fallback_timer_period_ms_ = capabilities.wPeriodMin;
+    fallback_timer_resolution_active_ = true;
+  }
+}
+
+void Application::EndFallbackTimerResolution() {
+  if (!fallback_timer_resolution_active_) {
+    return;
+  }
+  timeEndPeriod(fallback_timer_period_ms_);
+  fallback_timer_period_ms_ = 0;
+  fallback_timer_resolution_active_ = false;
 }
 
 void Application::SetEnabled(bool enabled) {
@@ -1106,6 +1139,7 @@ void Application::FinishActiveAnimation() {
   }
 
   overlay_window_.CancelAnimation();
+  EndFallbackTimerResolution();
   animation_monitor_ = nullptr;
   animation_frame_interval_ = std::chrono::steady_clock::duration::zero();
   if (animation_frame_timer_ != nullptr) {
@@ -1646,6 +1680,7 @@ void Application::CleanupAndRestoreAll() {
 
   overlay_window_.Shutdown();
   settings_window_.Shutdown();
+  EndFallbackTimerResolution();
   if (animation_frame_timer_ != nullptr) {
     // Cleanup may run on the console-control thread while the main thread is
     // waiting on this handle. Signal it here; the owning Application
