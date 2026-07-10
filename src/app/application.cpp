@@ -32,7 +32,6 @@ constexpr wchar_t kWasLayeredProperty[] = L"GenieWasLayered";
 constexpr wchar_t kOriginalAlphaProperty[] = L"GenieOriginalAlpha";
 constexpr wchar_t kOriginalFlagsProperty[] = L"GenieOriginalFlags";
 constexpr ULONGLONG kDesktopRefreshIntervalMs = 16;
-constexpr ULONGLONG kAnimationFrameIntervalMs = 8;
 
 using CbtProc = LRESULT(CALLBACK*)(int, WPARAM, LPARAM);
 
@@ -388,7 +387,13 @@ void RestoreWindowTransparency(HWND window) {
 
 }  // namespace
 
-Application::~Application() { CleanupAndRestoreAll(); }
+Application::~Application() {
+  CleanupAndRestoreAll();
+  if (animation_frame_timer_ != nullptr) {
+    CloseHandle(animation_frame_timer_);
+    animation_frame_timer_ = nullptr;
+  }
+}
 
 bool Application::Initialize(HINSTANCE instance) {
 #ifdef _DEBUG
@@ -407,6 +412,12 @@ bool Application::Initialize(HINSTANCE instance) {
 
   LogDebug(L"App", L"Application::Initialize started");
   LogTrace(L"App", L"Application::Initialize started");
+
+  animation_frame_timer_ = CreateWaitableTimerExW(
+      nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_MODIFY_STATE | SYNCHRONIZE);
+  if (animation_frame_timer_ == nullptr) {
+    animation_frame_timer_ = CreateWaitableTimerW(nullptr, FALSE, nullptr);
+  }
 
   HealLeftoverWindows();
 
@@ -483,6 +494,12 @@ int Application::Run() {
       if (message.message == WM_QUIT) {
         running = false;
         break;
+      }
+      if (message.message == WM_DISPLAYCHANGE) {
+        // The HMONITOR handle can remain stable while Windows changes the
+        // active mode. Force a fresh DisplayConfig query before the next
+        // animation frame.
+        animation_monitor_ = nullptr;
       }
       TranslateMessage(&message);
       DispatchMessageW(&message);
@@ -584,12 +601,10 @@ int Application::Run() {
 
     bool animation_active = false;
     if (was_active) {
-      const ULONGLONG now_ms = GetTickCount64();
-      const bool should_tick = !overlay_window_.clock_started() || last_animation_tick_ms_ == 0 ||
-                               now_ms - last_animation_tick_ms_ >= kAnimationFrameIntervalMs;
-      if (should_tick) {
-        last_animation_tick_ms_ = now_ms;
+      UpdateAnimationFramePacingMonitor();
+      if (IsAnimationFrameDue()) {
         animation_active = overlay_window_.Tick();
+        AdvanceAnimationFrameDeadline();
       } else {
         animation_active = true;
       }
@@ -602,7 +617,6 @@ int Application::Run() {
                            L" window " + WindowTraceString(animating_window_));
     }
     if (was_active && !animation_active && animating_window_ != nullptr) {
-      last_animation_tick_ms_ = 0;
       live_animation_capture_enabled_ = false;
       if (was_restoring) {
         TraceWindowEvent(L"Run restore animation completed before RestoreWindowFromGenieState",
@@ -626,14 +640,7 @@ int Application::Run() {
     }
 
     if (animation_active) {
-      // Calculate remaining time until the next frame tick is due (8ms intervals)
-      const ULONGLONG now_ms = GetTickCount64();
-      const ULONGLONG elapsed_since_last = now_ms - last_animation_tick_ms_;
-      DWORD timeout_ms = 1;
-      if (elapsed_since_last < kAnimationFrameIntervalMs) {
-        timeout_ms = static_cast<DWORD>(kAnimationFrameIntervalMs - elapsed_since_last);
-      }
-      MsgWaitForMultipleObjects(0, nullptr, FALSE, timeout_ms, QS_ALLINPUT);
+      WaitForAnimationFrameOrMessage();
     } else {
       const ULONGLONG now_ms = GetTickCount64();
       if (now_ms - last_snapshot_refresh_ms_ >= 120) {
@@ -662,6 +669,121 @@ int Application::Run() {
   }
 
   return static_cast<int>(message.wParam);
+}
+
+void Application::ResetAnimationFramePacing(HWND window, const RECT& animation_bounds) {
+  live_animation_bounds_ = animation_bounds;
+  if (window != nullptr && IsWindow(window)) {
+    const std::optional<RECT> current_bounds = platform::GetExtendedFrameBounds(window);
+    if (current_bounds.has_value()) {
+      live_animation_bounds_ = *current_bounds;
+    }
+  }
+  animation_monitor_ = nullptr;
+  animation_frame_interval_ = std::chrono::steady_clock::duration::zero();
+  next_animation_frame_time_ = std::chrono::steady_clock::now();
+  UpdateAnimationFramePacingMonitor();
+}
+
+void Application::UpdateAnimationFramePacingMonitor() {
+  RECT monitor_bounds = live_animation_bounds_;
+  if (animating_window_ != nullptr && IsWindow(animating_window_) &&
+      IsIconic(animating_window_) == FALSE) {
+    const std::optional<RECT> current_bounds = platform::GetExtendedFrameBounds(animating_window_);
+    if (current_bounds.has_value()) {
+      monitor_bounds = *current_bounds;
+      live_animation_bounds_ = *current_bounds;
+    }
+  }
+
+  HMONITOR monitor = nullptr;
+  if (animating_window_ != nullptr && IsWindow(animating_window_)) {
+    // MonitorFromWindow uses the monitor with the largest window intersection
+    // and retains the window's pre-minimize placement while it is iconic.
+    monitor = MonitorFromWindow(animating_window_, MONITOR_DEFAULTTONEAREST);
+  }
+  if (monitor == nullptr) {
+    monitor = MonitorFromRect(&monitor_bounds, MONITOR_DEFAULTTONEAREST);
+  }
+  if (monitor == nullptr || monitor == animation_monitor_) {
+    return;
+  }
+
+  animation_monitor_ = monitor;
+  const std::optional<double> refresh_rate = platform::GetMonitorRefreshRateHz(monitor);
+  if (!refresh_rate.has_value() || *refresh_rate <= 0.0) {
+    // Do not substitute a fixed FPS value: if Windows cannot report the
+    // current mode, Present/DirectComposition provides the only pacing.
+    animation_frame_interval_ = std::chrono::steady_clock::duration::zero();
+    next_animation_frame_time_ = std::chrono::steady_clock::now();
+    LogDebug(L"App", L"No monitor refresh rate available; fixed FPS limit disabled");
+    return;
+  }
+
+  animation_frame_interval_ = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+      std::chrono::duration<double>(1.0 / *refresh_rate));
+  next_animation_frame_time_ = std::chrono::steady_clock::now() + animation_frame_interval_;
+  LogDebug(L"App", L"Animation frame pacing monitor=0x" +
+                       std::to_wstring(reinterpret_cast<std::uintptr_t>(monitor)) + L" refresh=" +
+                       std::to_wstring(*refresh_rate) + L"Hz");
+}
+
+bool Application::IsAnimationFrameDue() const {
+  return animation_frame_interval_ <= std::chrono::steady_clock::duration::zero() ||
+         std::chrono::steady_clock::now() >= next_animation_frame_time_;
+}
+
+void Application::AdvanceAnimationFrameDeadline() {
+  if (animation_frame_interval_ <= std::chrono::steady_clock::duration::zero()) {
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  if (next_animation_frame_time_ == std::chrono::steady_clock::time_point{}) {
+    next_animation_frame_time_ = now + animation_frame_interval_;
+    return;
+  }
+
+  // Keep deadlines locked to the monitor cadence. If rendering missed one or
+  // more refreshes, skip those slots instead of rendering a burst of late
+  // frames and permanently drifting away from the display clock.
+  if (next_animation_frame_time_ <= now) {
+    const auto missed_intervals = (now - next_animation_frame_time_) / animation_frame_interval_;
+    next_animation_frame_time_ += animation_frame_interval_ * (missed_intervals + 1);
+  }
+}
+
+void Application::WaitForAnimationFrameOrMessage() {
+  if (animation_frame_interval_ <= std::chrono::steady_clock::duration::zero()) {
+    // A driver that exposes neither DisplayConfig nor DEVMODE timing must not
+    // turn the animation loop into an uncapped CPU spin. DWM supplies the
+    // current compositor cadence without inventing a fixed fallback rate.
+    DwmFlush();
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  if (now >= next_animation_frame_time_) {
+    return;
+  }
+
+  const auto wait_duration = next_animation_frame_time_ - now;
+  if (animation_frame_timer_ != nullptr) {
+    const auto hundred_ns =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(wait_duration).count() / 100;
+    LARGE_INTEGER due_time{};
+    due_time.QuadPart = -std::max<std::int64_t>(1, hundred_ns);
+    if (SetWaitableTimerEx(animation_frame_timer_, &due_time, 0, nullptr, nullptr, nullptr, 0)) {
+      const HANDLE handles[] = {animation_frame_timer_};
+      MsgWaitForMultipleObjectsEx(1, handles, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+      return;
+    }
+  }
+
+  const auto wait_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(wait_duration).count();
+  const DWORD timeout_ms =
+      static_cast<DWORD>(std::max<std::int64_t>(1, (wait_ns + 999999) / 1000000));
+  MsgWaitForMultipleObjects(0, nullptr, FALSE, timeout_ms, QS_ALLINPUT);
 }
 
 void Application::SetEnabled(bool enabled) {
@@ -916,6 +1038,7 @@ bool Application::OnMinimizeStart(HWND window) {
   animating_window_ = window;
   animating_restore_ = false;
   live_animation_bounds_ = source_bounds;
+  ResetAnimationFramePacing(window, source_bounds);
   last_animation_texture_refresh_ms_ = 0;
   live_animation_capture_enabled_ = false;
 
@@ -982,7 +1105,12 @@ void Application::FinishActiveAnimation() {
   }
 
   overlay_window_.CancelAnimation();
-  last_animation_tick_ms_ = 0;
+  animation_monitor_ = nullptr;
+  animation_frame_interval_ = std::chrono::steady_clock::duration::zero();
+  if (animation_frame_timer_ != nullptr) {
+    LARGE_INTEGER wake_now{};
+    SetWaitableTimer(animation_frame_timer_, &wake_now, 0, nullptr, nullptr, FALSE);
+  }
   DwmFlush();
 }
 
@@ -1239,6 +1367,7 @@ bool Application::OnRestoreAttempt(HWND window) {
   animating_window_ = window;
   animating_restore_ = true;
   live_animation_capture_enabled_ = false;
+  ResetAnimationFramePacing(window, current_snapshot.bounds);
 
   native_animation_blocker_.SetTransitionsDisabledForWindow(window, true);
 
@@ -1482,6 +1611,13 @@ void Application::CleanupAndRestoreAll() {
 
   overlay_window_.Shutdown();
   settings_window_.Shutdown();
+  if (animation_frame_timer_ != nullptr) {
+    // Cleanup may run on the console-control thread while the main thread is
+    // waiting on this handle. Signal it here; the owning Application
+    // destructor closes it only after Run has left the wait.
+    LARGE_INTEGER wake_now{};
+    SetWaitableTimer(animation_frame_timer_, &wake_now, 0, nullptr, nullptr, FALSE);
+  }
   LogDebug(L"App", L"CleanupAndRestoreAll completed");
 }
 

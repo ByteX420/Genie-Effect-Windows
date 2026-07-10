@@ -213,6 +213,78 @@ HWND FindTaskbarWindowForRect(const RECT& rect) {
   return taskbar;
 }
 
+std::optional<double> GetMonitorRefreshRateHz(HMONITOR monitor) {
+  if (monitor == nullptr) {
+    return std::nullopt;
+  }
+
+  MONITORINFOEXW monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (!GetMonitorInfoW(monitor, &monitor_info)) {
+    return std::nullopt;
+  }
+
+  // QueryDisplayConfig exposes the active path as a rational refresh rate and
+  // therefore preserves rates such as 59.94 Hz instead of rounding them to an
+  // integer. Match the path through the monitor's GDI device name so mixed-rate
+  // multi-monitor setups select the mode belonging to the animated window.
+  constexpr UINT32 kDisplayConfigFlags = QDC_ONLY_ACTIVE_PATHS | QDC_VIRTUAL_MODE_AWARE;
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    UINT32 path_count = 0;
+    UINT32 mode_count = 0;
+    LONG result = GetDisplayConfigBufferSizes(kDisplayConfigFlags, &path_count, &mode_count);
+    if (result != ERROR_SUCCESS) {
+      break;
+    }
+
+    std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+    std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+    result = QueryDisplayConfig(kDisplayConfigFlags, &path_count, paths.data(), &mode_count,
+                                modes.data(), nullptr);
+    if (result == ERROR_INSUFFICIENT_BUFFER) {
+      continue;
+    }
+    if (result != ERROR_SUCCESS) {
+      break;
+    }
+
+    paths.resize(path_count);
+    for (const DISPLAYCONFIG_PATH_INFO& path : paths) {
+      DISPLAYCONFIG_SOURCE_DEVICE_NAME source_name{};
+      source_name.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+      source_name.header.size = sizeof(source_name);
+      source_name.header.adapterId = path.sourceInfo.adapterId;
+      source_name.header.id = path.sourceInfo.id;
+      if (DisplayConfigGetDeviceInfo(&source_name.header) != ERROR_SUCCESS ||
+          _wcsicmp(source_name.viewGdiDeviceName, monitor_info.szDevice) != 0) {
+        continue;
+      }
+
+      const DISPLAYCONFIG_RATIONAL refresh = path.targetInfo.refreshRate;
+      if (refresh.Numerator != 0 && refresh.Denominator != 0) {
+        const double hertz =
+            static_cast<double>(refresh.Numerator) / static_cast<double>(refresh.Denominator);
+        if (hertz > 0.0) {
+          return hertz;
+        }
+      }
+    }
+    break;
+  }
+
+  // Older display drivers can omit usable DisplayConfig path data. The
+  // current DEVMODE is still monitor-specific because szDevice came from the
+  // HMONITOR selected for the animated window.
+  DEVMODEW current_mode{};
+  current_mode.dmSize = sizeof(current_mode);
+  if (EnumDisplaySettingsExW(monitor_info.szDevice, ENUM_CURRENT_SETTINGS, &current_mode, 0) &&
+      (current_mode.dmFields & DM_DISPLAYFREQUENCY) != 0 && current_mode.dmDisplayFrequency > 1) {
+    return static_cast<double>(current_mode.dmDisplayFrequency);
+  }
+
+  return std::nullopt;
+}
+
 bool GrantAppContainerPermissions(const std::wstring& path) {
   std::wstring normalized_path = path;
   if (normalized_path.size() > 1 &&

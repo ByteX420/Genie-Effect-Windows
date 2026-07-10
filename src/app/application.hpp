@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -54,6 +55,11 @@ private:
   void SetAnimationDuration(float duration_seconds);
   bool InstallCbtHook();
   void UninstallCbtHook();
+  void ResetAnimationFramePacing(HWND window, const RECT& animation_bounds);
+  void UpdateAnimationFramePacingMonitor();
+  [[nodiscard]] bool IsAnimationFrameDue() const;
+  void AdvanceAnimationFrameDeadline();
+  void WaitForAnimationFrameOrMessage();
 
   std::unique_ptr<rendering::D3dDevice> d3d_device_;
   std::unique_ptr<rendering::DesktopCapture> desktop_capture_;
@@ -72,8 +78,11 @@ private:
   RECT live_animation_bounds_{};
   ULONGLONG last_desktop_refresh_ms_ = 0;
   ULONGLONG last_snapshot_refresh_ms_ = 0;
-  ULONGLONG last_animation_tick_ms_ = 0;
   ULONGLONG last_animation_texture_refresh_ms_ = 0;
+  HANDLE animation_frame_timer_ = nullptr;
+  HMONITOR animation_monitor_ = nullptr;
+  std::chrono::steady_clock::duration animation_frame_interval_{};
+  std::chrono::steady_clock::time_point next_animation_frame_time_{};
   bool live_animation_capture_enabled_ = false;
   bool in_restore_window_state_ = false;
   bool is_enabled_ = true;

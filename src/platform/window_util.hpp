@@ -14,6 +14,7 @@ void SetWindowCloaked(HWND window, bool cloaked);
 bool SetOwnedWindowRegion(HWND window, HRGN region, bool redraw);
 [[nodiscard]] RECT GetVirtualScreenRect();
 [[nodiscard]] HWND FindTaskbarWindowForRect(const RECT& rect);
+[[nodiscard]] std::optional<double> GetMonitorRefreshRateHz(HMONITOR monitor);
 bool GrantAppContainerPermissions(const std::wstring& path);
 
 }  // namespace genie::platform
