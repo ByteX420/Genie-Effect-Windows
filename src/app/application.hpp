@@ -44,12 +44,29 @@ private:
     ULONGLONG captured_at_ms = 0;
   };
 
+  struct AnimationSlot {
+    rendering::OverlayWindow overlay;
+    HWND animating_window = nullptr;
+    HWND pending_native_minimize_window = nullptr;
+    bool animating_restore = false;
+    ULONGLONG minimize_start_time_ms = 0;
+    RECT live_animation_bounds{};
+    ULONGLONG last_animation_texture_refresh_ms = 0;
+    HMONITOR animation_monitor = nullptr;
+    std::chrono::steady_clock::duration animation_frame_interval{};
+    std::chrono::steady_clock::time_point next_animation_frame_time{};
+    bool live_animation_capture_enabled = false;
+  };
+
+  int FindSlotForWindow(HWND window) const;
+  int FindFreeSlot() const;
+
   bool OnMinimizeStart(HWND window);
   bool OnRestoreAttempt(HWND window);
   void OnWindowSeen(HWND window, DWORD event);
   void UpdatePreMinimizeSnapshot(HWND window);
-  void CompletePendingNativeMinimize();
-  void FinishActiveAnimation();
+  void CompletePendingNativeMinimize(int slot_index);
+  void FinishActiveAnimation(int slot_index);
   void PruneSnapshots();
   bool PreserveRestorePlacementAndMarkOffscreen(HWND window, CachedSnapshot* snapshot);
   bool IsGenieWindowRestored(HWND window) const;
@@ -58,10 +75,10 @@ private:
   void SetAnimationDuration(float duration_seconds);
   bool InstallCbtHook();
   void UninstallCbtHook();
-  void ResetAnimationFramePacing(HWND window, const RECT& animation_bounds);
-  void UpdateAnimationFramePacingMonitor();
-  [[nodiscard]] bool IsAnimationFrameDue() const;
-  void AdvanceAnimationFrameDeadline();
+  void ResetAnimationFramePacing(int slot_index, HWND window, const RECT& animation_bounds);
+  void UpdateAnimationFramePacingMonitor(int slot_index);
+  [[nodiscard]] bool IsAnimationFrameDue(int slot_index) const;
+  void AdvanceAnimationFrameDeadline(int slot_index);
   void WaitForAnimationFrameOrMessage();
   void BeginFallbackTimerResolution();
   void EndFallbackTimerResolution();
@@ -72,31 +89,21 @@ private:
 
   std::unique_ptr<rendering::D3dDevice> d3d_device_;
   std::unique_ptr<rendering::DesktopCapture> desktop_capture_;
-  rendering::OverlayWindow overlay_window_;
+  AnimationSlot slots_[2];
   platform::NativeAnimationBlocker native_animation_blocker_;
   platform::WindowEventMonitor window_event_monitor_;
   platform::TaskbarTargetProvider taskbar_target_provider_;
   HINSTANCE instance_ = nullptr;
   DWORD main_thread_id_ = 0;
-  HWND animating_window_ = nullptr;
-  HWND pending_native_minimize_window_ = nullptr;
-  bool animating_restore_ = false;
-  ULONGLONG minimize_start_time_ms_ = 0;
   HMODULE hook_dll_ = nullptr;
   HHOOK cbt_hook_ = nullptr;
   std::unordered_map<HWND, CachedSnapshot> pre_minimize_snapshots_;
   std::unordered_map<HWND, CachedSnapshot> restore_snapshots_;
-  RECT live_animation_bounds_{};
   ULONGLONG last_snapshot_refresh_ms_ = 0;
-  ULONGLONG last_animation_texture_refresh_ms_ = 0;
   HANDLE animation_frame_timer_ = nullptr;
   bool animation_frame_timer_is_high_resolution_ = false;
   bool fallback_timer_resolution_active_ = false;
   UINT fallback_timer_period_ms_ = 0;
-  HMONITOR animation_monitor_ = nullptr;
-  std::chrono::steady_clock::duration animation_frame_interval_{};
-  std::chrono::steady_clock::time_point next_animation_frame_time_{};
-  bool live_animation_capture_enabled_ = false;
   bool animation_renderer_recovery_pending_ = false;
   ULONGLONG next_animation_renderer_recovery_ms_ = 0;
   DWORD animation_renderer_recovery_delay_ms_ = 0;
