@@ -791,7 +791,13 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
       }
       return 0;
     case WM_CLOSE:
-      if (settings != nullptr) settings->Show(false);
+      if (settings != nullptr) {
+        if (settings->exit_callback_) {
+          settings->exit_callback_();
+        } else {
+          settings->Show(false);
+        }
+      }
       return 0;
     case WM_NCHITTEST: {
       POINT pt{static_cast<short>(LOWORD(l_param)), static_cast<short>(HIWORD(l_param))};
