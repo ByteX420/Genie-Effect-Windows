@@ -261,8 +261,6 @@ bool BringWindowForwardForCapture(HWND window) {
   const BOOL foreground_ok = SetForegroundWindow(window);
   BringWindowToTop(window);
   DwmFlush();
-  Sleep(16);
-  DwmFlush();
   LogTrace(L"App", L"BringWindowForwardForCapture foreground_ok=" +
                        std::to_wstring(foreground_ok != FALSE) + L" top_ok=" +
                        std::to_wstring(top_ok != FALSE) + L" was_topmost=" +
@@ -623,7 +621,6 @@ int Application::Run() {
         TraceWindowEvent(L"Run restore animation completed before RestoreWindowFromGenieState",
                          animating_window_);
         RestoreWindowFromGenieState(animating_window_);
-        DwmFlush();
         DwmFlush();
         overlay_window_.FinishRestoreAnimation();
         restore_snapshots_.erase(animating_window_);

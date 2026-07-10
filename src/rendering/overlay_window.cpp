@@ -253,8 +253,6 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
     std::wcerr << L"Overlay start failed: first frame render failed.\n";
     return false;
   }
-  d3d_device_->context()->Flush();
-
   RECT target_rect_win{};
   target_rect_win.left = static_cast<LONG>(target_screen_rect.left);
   target_rect_win.top = static_cast<LONG>(target_screen_rect.top);
