@@ -35,6 +35,8 @@ constexpr wchar_t kWasLayeredProperty[] = L"GenieWasLayered";
 constexpr wchar_t kOriginalAlphaProperty[] = L"GenieOriginalAlpha";
 constexpr wchar_t kOriginalFlagsProperty[] = L"GenieOriginalFlags";
 constexpr std::size_t kMaxPreMinimizeSnapshots = 4;
+constexpr DWORD kInitialRendererRecoveryDelayMs = 250;
+constexpr DWORD kMaximumRendererRecoveryDelayMs = 4000;
 
 using CbtProc = LRESULT(CALLBACK*)(int, WPARAM, LPARAM);
 
@@ -409,6 +411,8 @@ Application::~Application() {
 }
 
 bool Application::Initialize(HINSTANCE instance) {
+  instance_ = instance;
+  main_thread_id_ = GetCurrentThreadId();
 #ifdef _DEBUG
   // Touch log file and grant permissions so AppContainers can write to it
   {
@@ -445,32 +449,17 @@ bool Application::Initialize(HINSTANCE instance) {
     LogDebug(L"App", L"Running as Administrator");
   }
 
-  d3d_device_ = rendering::D3dDevice::Create();
-  if (d3d_device_ == nullptr) {
-    return false;
-  }
-
-  if (!overlay_window_.Initialize(
-          instance, d3d_device_.get(), [this](HWND window) { return OnMinimizeStart(window); },
-          [this](HWND window) { return OnRestoreAttempt(window); })) {
-    return false;
-  }
-  overlay_window_.SetAnimationDuration(animation_duration_seconds_);
+  if (!CreateAnimationRenderer()) return false;
 
   if (!settings_window_.Initialize(
           instance, [this](bool enabled) { SetEnabled(enabled); },
           [this](float duration) { SetAnimationDuration(duration); },
-          [this]() { HealLeftoverWindows(); },
-          [this]() {
-            shutting_down_.store(true, std::memory_order_release);
-            PostQuitMessage(0);
-          })) {
+          [this]() { HealLeftoverWindows(); }, [this]() { RequestShutdown(); })) {
     return false;
   }
   settings_window_.UpdateState(is_enabled_, animation_duration_seconds_);
   settings_window_.Show(true);
 
-  desktop_capture_ = std::make_unique<rendering::DesktopCapture>(d3d_device_.get());
   native_animation_blocker_.Enable(overlay_window_.window());
   const bool cbt_hook_installed = InstallCbtHook();
   if (cbt_hook_installed) {
@@ -495,9 +484,105 @@ bool Application::Initialize(HINSTANCE instance) {
   return true;
 }
 
+bool Application::CreateAnimationRenderer() {
+  overlay_window_.Shutdown();
+  desktop_capture_.reset();
+  d3d_device_.reset();
+
+  d3d_device_ = rendering::D3dDevice::Create();
+  if (d3d_device_ == nullptr) {
+    return false;
+  }
+  if (!overlay_window_.Initialize(
+          instance_, d3d_device_.get(), [this](HWND window) { return OnMinimizeStart(window); },
+          [this](HWND window) { return OnRestoreAttempt(window); })) {
+    overlay_window_.Shutdown();
+    d3d_device_.reset();
+    return false;
+  }
+  overlay_window_.SetAnimationDuration(animation_duration_seconds_);
+  desktop_capture_ = std::make_unique<rendering::DesktopCapture>(d3d_device_.get());
+  return true;
+}
+
+bool Application::AnimationRendererDeviceLost() const {
+  return overlay_window_.device_lost() ||
+         (desktop_capture_ != nullptr && desktop_capture_->device_lost()) ||
+         (d3d_device_ != nullptr && d3d_device_->IsDeviceLost());
+}
+
+void Application::BeginAnimationRendererRecovery() {
+  if (animation_renderer_recovery_pending_) {
+    return;
+  }
+
+  LogDebug(L"App", L"Animation renderer device lost; rebuilding D3D resources");
+  native_animation_blocker_.Disable();
+
+  HWND interrupted_window = animating_window_;
+  const bool interrupted_restore = animating_restore_;
+  overlay_window_.Shutdown();
+
+  if (interrupted_window != nullptr && IsWindow(interrupted_window)) {
+    RestoreWindowFromGenieState(interrupted_window, interrupted_restore);
+    if (!interrupted_restore) {
+      SetPropW(interrupted_window, kAllowMinimizeProperty, reinterpret_cast<HANDLE>(1));
+      ShowWindow(interrupted_window, SW_MINIMIZE);
+      RemovePropW(interrupted_window, kAllowMinimizeProperty);
+    }
+  }
+
+  animating_window_ = nullptr;
+  pending_native_minimize_window_ = nullptr;
+  animating_restore_ = false;
+  live_animation_capture_enabled_ = false;
+  EndFallbackTimerResolution();
+  animation_monitor_ = nullptr;
+  animation_frame_interval_ = std::chrono::steady_clock::duration::zero();
+
+  desktop_capture_.reset();
+  restore_snapshots_.clear();
+  pre_minimize_snapshots_.clear();
+  d3d_device_.reset();
+
+  animation_renderer_recovery_pending_ = true;
+  animation_renderer_recovery_delay_ms_ = kInitialRendererRecoveryDelayMs;
+  next_animation_renderer_recovery_ms_ = GetTickCount64();
+  TryRecoverAnimationRenderer();
+}
+
+bool Application::TryRecoverAnimationRenderer() {
+  if (!animation_renderer_recovery_pending_) {
+    return true;
+  }
+  const ULONGLONG now = GetTickCount64();
+  if (now < next_animation_renderer_recovery_ms_) {
+    return false;
+  }
+
+  if (CreateAnimationRenderer()) {
+    animation_renderer_recovery_pending_ = false;
+    animation_renderer_recovery_delay_ms_ = kInitialRendererRecoveryDelayMs;
+    if (is_enabled_) {
+      native_animation_blocker_.Enable(overlay_window_.window());
+    }
+    LogDebug(L"App", L"Animation renderer recovery completed");
+    return true;
+  }
+
+  next_animation_renderer_recovery_ms_ = now + animation_renderer_recovery_delay_ms_;
+  animation_renderer_recovery_delay_ms_ =
+      std::min(animation_renderer_recovery_delay_ms_ * 2, kMaximumRendererRecoveryDelayMs);
+  LogDebug(L"App", L"Animation renderer recovery retry scheduled");
+  return false;
+}
+
 int Application::Run() {
   MSG message{};
   bool running = true;
+#ifdef _DEBUG
+  bool device_recovery_test_pending = GenieEnvFlagEnabled(L"GENIE_TEST_DEVICE_RECOVERY");
+#endif
 
   while (running) {
     if (shutting_down_.load(std::memory_order_acquire)) {
@@ -524,6 +609,21 @@ int Application::Run() {
     }
 
     settings_window_.Render();
+
+#ifdef _DEBUG
+    if (device_recovery_test_pending) {
+      device_recovery_test_pending = false;
+      BeginAnimationRendererRecovery();
+    }
+#endif
+
+    if (AnimationRendererDeviceLost()) {
+      BeginAnimationRendererRecovery();
+    }
+    if (animation_renderer_recovery_pending_ && !TryRecoverAnimationRenderer()) {
+      MsgWaitForMultipleObjects(0, nullptr, FALSE, 16, QS_ALLINPUT);
+      continue;
+    }
 
     if (pending_native_minimize_window_ != nullptr) {
       TraceWindowEvent(L"Run pending_native_minimize before CompletePendingNativeMinimize",
@@ -623,6 +723,10 @@ int Application::Run() {
                            L" animating_restore=" + std::to_wstring(animating_restore_) +
                            L" window " + WindowTraceString(animating_window_));
     }
+    if (AnimationRendererDeviceLost()) {
+      BeginAnimationRendererRecovery();
+      continue;
+    }
     if (was_active && !animation_active && animating_window_ != nullptr) {
       live_animation_capture_enabled_ = false;
       if (was_restoring) {
@@ -678,6 +782,17 @@ int Application::Run() {
   }
 
   return static_cast<int>(message.wParam);
+}
+
+void Application::RequestShutdown() {
+  shutting_down_.store(true, std::memory_order_release);
+  if (animation_frame_timer_ != nullptr) {
+    LARGE_INTEGER wake_now{};
+    SetWaitableTimer(animation_frame_timer_, &wake_now, 0, nullptr, nullptr, FALSE);
+  }
+  if (main_thread_id_ != 0) {
+    PostThreadMessageW(main_thread_id_, WM_QUIT, 0, 0);
+  }
 }
 
 void Application::ResetAnimationFramePacing(HWND window, const RECT& animation_bounds) {
@@ -843,10 +958,14 @@ void Application::SetEnabled(bool enabled) {
     }
     restore_snapshots_.clear();
     pre_minimize_snapshots_.clear();
-    desktop_capture_->ClearHistory();
+    if (desktop_capture_ != nullptr) {
+      desktop_capture_->ClearHistory();
+    }
   } else {
-    native_animation_blocker_.Enable(overlay_window_.window());
     InstallCbtHook();
+    if (!animation_renderer_recovery_pending_ && overlay_window_.window() != nullptr) {
+      native_animation_blocker_.Enable(overlay_window_.window());
+    }
   }
 
   is_enabled_ = enabled;
@@ -921,7 +1040,9 @@ void Application::UninstallCbtHook() {
 }
 
 bool Application::OnMinimizeStart(HWND window) {
-  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_) {
+  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_ ||
+      animation_renderer_recovery_pending_ || desktop_capture_ == nullptr ||
+      overlay_window_.window() == nullptr) {
     return false;
   }
   TraceWindowEvent(L"OnMinimizeStart begin", window);
@@ -1288,7 +1409,7 @@ bool Application::IsGenieWindowRestored(HWND window) const {
 }
 
 bool Application::OnRestoreAttempt(HWND window) {
-  if (!is_enabled_) {
+  if (!is_enabled_ || animation_renderer_recovery_pending_ || overlay_window_.window() == nullptr) {
     return false;
   }
   if (shutting_down_.load(std::memory_order_acquire)) {
@@ -1416,6 +1537,7 @@ bool Application::OnRestoreAttempt(HWND window) {
     TraceWindowEvent(L"OnRestoreAttempt failed: overlay StartAnimation", window);
     std::wcerr << L"Restore animation did not start because overlay start "
                   L"failed.\n";
+    RestoreWindowFromGenieState(window, true);
     animating_window_ = nullptr;
     animating_restore_ = false;
     return false;
@@ -1429,7 +1551,8 @@ bool Application::OnRestoreAttempt(HWND window) {
 }
 
 void Application::OnWindowSeen(HWND window, DWORD event) {
-  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_) {
+  if (shutting_down_.load(std::memory_order_acquire) || !is_enabled_ ||
+      animation_renderer_recovery_pending_) {
     return;
   }
   if (window == overlay_window_.window() || window == animating_window_) {
@@ -1459,7 +1582,8 @@ void Application::OnWindowSeen(HWND window, DWORD event) {
 }
 
 void Application::UpdatePreMinimizeSnapshot(HWND window) {
-  if (window == overlay_window_.window() || !IsWindow(window) || IsIconic(window) ||
+  if (desktop_capture_ == nullptr || animation_renderer_recovery_pending_ ||
+      window == overlay_window_.window() || !IsWindow(window) || IsIconic(window) ||
       !IsWindowVisible(window)) {
     return;
   }
@@ -1684,6 +1808,10 @@ void Application::CleanupAndRestoreAll() {
 
   overlay_window_.Shutdown();
   settings_window_.Shutdown();
+  restore_copy.clear();
+  pre_minimize_copy.clear();
+  desktop_capture_.reset();
+  d3d_device_.reset();
   EndFallbackTimerResolution();
   if (animation_frame_timer_ != nullptr) {
     // Cleanup may run on the console-control thread while the main thread is

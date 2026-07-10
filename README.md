@@ -41,3 +41,5 @@ Debug builds write diagnostics to:
 ```
 
 Set `GENIE_DEBUG_LOG` to override the log path. Set `GENIE_TRACE=1` only when detailed timing traces are needed. Set `GENIE_LOG_SYNC=1` only when you need every log line flushed immediately after hangs or crashes.
+
+Debug builds also support `GENIE_TEST_DEVICE_RECOVERY=1`. It performs one controlled teardown and recreation of both D3D renderers after startup so the recovery path can be smoke-tested without resetting the graphics driver.

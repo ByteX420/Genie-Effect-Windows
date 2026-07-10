@@ -37,6 +37,10 @@ private:
   bool CreateRenderWindow(HINSTANCE instance);
   bool CreateDeviceResources();
   bool CreateRenderTarget();
+  void ReleaseDeviceResources();
+  void HandleDeviceLost();
+  bool TryRecoverDeviceResources();
+  [[nodiscard]] static bool IsDeviceLostError(HRESULT hr);
   void CleanupRenderTarget();
   void ApplyStyle();
   void RebuildFonts(UINT dpi);
@@ -56,6 +60,13 @@ private:
   bool is_enabled_ = true;
   float duration_seconds_ = 0.70f;
   bool imgui_ready_ = false;
+  bool imgui_context_ready_ = false;
+  bool imgui_win32_ready_ = false;
+  bool imgui_dx11_ready_ = false;
+  bool device_recovery_pending_ = false;
+  ULONGLONG next_device_recovery_ms_ = 0;
+  DWORD device_recovery_delay_ms_ = 0;
+  bool device_recovery_test_pending_ = false;
   bool render_requested_ = false;
   ULONGLONG shown_at_ms_ = 0;
   UINT current_dpi_ = USER_DEFAULT_SCREEN_DPI;

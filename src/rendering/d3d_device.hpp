@@ -18,6 +18,9 @@ public:
   [[nodiscard]] ID3D11DeviceContext* context() const { return context_.Get(); }
   [[nodiscard]] IDXGIDevice* dxgi_device() const { return dxgi_device_.Get(); }
   [[nodiscard]] IDXGIFactory2* factory() const { return factory_.Get(); }
+  [[nodiscard]] static bool IsDeviceLostError(HRESULT hr);
+  [[nodiscard]] bool IsDeviceLost(HRESULT operation_result = S_OK) const;
+  [[nodiscard]] HRESULT DeviceRemovedReason() const;
 
 private:
   D3dDevice() = default;

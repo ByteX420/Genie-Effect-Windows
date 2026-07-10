@@ -35,6 +35,7 @@ public:
   [[nodiscard]] HWND window() const { return window_; }
   [[nodiscard]] bool active() const { return animation_state_.active; }
   [[nodiscard]] bool clock_started() const { return animation_state_.clock_started; }
+  [[nodiscard]] bool device_lost() const { return device_lost_; }
 
   [[nodiscard]] bool StartAnimation(CapturedTexture captured_texture,
                                     const genie::animation::RectF& source_screen_rect,
@@ -68,7 +69,7 @@ private:
   };
 
   static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
-  LRESULT HandleMessage(UINT message, WPARAM w_param, LPARAM l_param);
+  LRESULT HandleMessage(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param);
 
   bool RegisterWindowClass(HINSTANCE instance);
   bool CreateOverlayWindow(HINSTANCE instance);
@@ -83,6 +84,7 @@ private:
   [[nodiscard]] bool Render(float progress);
   void ClearFrame();
   void HideOverlay();
+  void MarkDeviceLost(const wchar_t* operation, HRESULT hr);
   [[nodiscard]] genie::animation::RectF ToOverlayRect(
       const genie::animation::RectF& screen_rect) const;
 
@@ -117,6 +119,7 @@ private:
   float animation_duration_seconds_ = 0.70f;
   UINT minimize_attempt_message_ = 0;
   UINT restore_attempt_message_ = 0;
+  bool device_lost_ = false;
 };
 
 }  // namespace genie::rendering

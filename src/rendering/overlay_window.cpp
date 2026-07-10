@@ -154,6 +154,7 @@ bool OverlayWindow::Initialize(HINSTANCE instance, D3dDevice* d3d_device,
                                MinimizeCallback minimize_callback,
                                RestoreCallback restore_callback) {
   d3d_device_ = d3d_device;
+  device_lost_ = false;
   minimize_callback_ = std::move(minimize_callback);
   restore_callback_ = std::move(restore_callback);
   minimize_attempt_message_ = RegisterWindowMessageW(L"GenieMinimizeAttempt");
@@ -201,6 +202,7 @@ void OverlayWindow::Shutdown() {
   composition_target_.Reset();
   composition_device_.Reset();
   swap_chain_.Reset();
+  d3d_device_ = nullptr;
 }
 
 bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
@@ -275,6 +277,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   DwmFlush();
   HRESULT hr = composition_device_->WaitForCommitCompletion();
   if (FAILED(hr)) {
+    MarkDeviceLost(L"WaitForCommitCompletion", hr);
     LogTrace(L"Overlay", L"StartAnimation failed: WaitForCommitCompletion hr=0x" +
                              std::to_wstring(static_cast<unsigned long>(hr)));
     animation_state_.active = false;
@@ -423,12 +426,12 @@ LRESULT CALLBACK OverlayWindow::WindowProc(HWND window, UINT message, WPARAM w_p
   }
 
   if (overlay != nullptr) {
-    return overlay->HandleMessage(message, w_param, l_param);
+    return overlay->HandleMessage(window, message, w_param, l_param);
   }
   return DefWindowProcW(window, message, w_param, l_param);
 }
 
-LRESULT OverlayWindow::HandleMessage(UINT message, WPARAM w_param, LPARAM l_param) {
+LRESULT OverlayWindow::HandleMessage(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param) {
   if (message == minimize_attempt_message_ && minimize_attempt_message_ != 0) {
     HWND minimize_window = reinterpret_cast<HWND>(w_param);
     if (minimize_callback_ && minimize_callback_(minimize_window)) {
@@ -460,7 +463,7 @@ LRESULT OverlayWindow::HandleMessage(UINT message, WPARAM w_param, LPARAM l_para
       window_ = nullptr;
       return 0;
     default:
-      return DefWindowProcW(window_, message, w_param, l_param);
+      return DefWindowProcW(hwnd, message, w_param, l_param);
   }
 }
 
@@ -535,6 +538,9 @@ bool OverlayWindow::InitializeComposition() {
     return false;
   }
   hr = composition_device_->Commit();
+  if (FAILED(hr)) {
+    MarkDeviceLost(L"Initial DirectComposition commit", hr);
+  }
   return SUCCEEDED(hr);
 }
 
@@ -542,12 +548,14 @@ bool OverlayWindow::CreateRenderTarget() {
   Microsoft::WRL::ComPtr<ID3D11Texture2D> back_buffer;
   HRESULT hr = swap_chain_->GetBuffer(0, IID_PPV_ARGS(&back_buffer));
   if (FAILED(hr)) {
+    MarkDeviceLost(L"Swap-chain GetBuffer", hr);
     return false;
   }
 
   hr = d3d_device_->device()->CreateRenderTargetView(back_buffer.Get(), nullptr,
                                                      &render_target_view_);
   if (FAILED(hr)) {
+    MarkDeviceLost(L"CreateRenderTargetView", hr);
     std::wcerr << L"CreateRenderTargetView failed: 0x" << std::hex << hr << L"\n";
     return false;
   }
@@ -567,6 +575,7 @@ bool OverlayWindow::ResizeOverlaySurface(const RECT& screen_rect) {
     render_target_view_.Reset();
     const HRESULT hr = swap_chain_->ResizeBuffers(0, new_width, new_height, DXGI_FORMAT_UNKNOWN, 0);
     if (FAILED(hr)) {
+      MarkDeviceLost(L"ResizeBuffers", hr);
       std::wcerr << L"ResizeBuffers for animation surface failed: 0x" << std::hex << hr << std::dec
                  << L"\n";
       return false;
@@ -747,6 +756,7 @@ bool OverlayWindow::UploadMesh(const genie::animation::GenieMesh& mesh, bool upl
   D3D11_MAPPED_SUBRESOURCE mapped_resource{};
   HRESULT hr = context->Map(vertex_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
   if (FAILED(hr)) {
+    MarkDeviceLost(L"Map vertex buffer", hr);
     return false;
   }
   std::memcpy(mapped_resource.pData, mesh.vertices.data(),
@@ -756,6 +766,7 @@ bool OverlayWindow::UploadMesh(const genie::animation::GenieMesh& mesh, bool upl
   if (upload_indices) {
     hr = context->Map(index_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
     if (FAILED(hr)) {
+      MarkDeviceLost(L"Map index buffer", hr);
       return false;
     }
     std::memcpy(mapped_resource.pData, mesh.indices.data(),
@@ -775,6 +786,7 @@ bool OverlayWindow::UpdateFrameConstants() {
   const HRESULT hr =
       context->Map(constant_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
   if (FAILED(hr)) {
+    MarkDeviceLost(L"Map frame constants", hr);
     return false;
   }
   auto* constants = static_cast<FrameConstants*>(mapped_resource.pData);
@@ -787,7 +799,7 @@ bool OverlayWindow::UpdateFrameConstants() {
 }
 
 bool OverlayWindow::Render(float progress) {
-  if (!animation_state_.active || render_target_view_ == nullptr) {
+  if (device_lost_ || !animation_state_.active || render_target_view_ == nullptr) {
     return false;
   }
 
@@ -838,12 +850,14 @@ bool OverlayWindow::Render(float progress) {
   context->PSSetShaderResources(0, 1, &null_resource);
   HRESULT hr = swap_chain_->Present(0, 0);
   if (FAILED(hr)) {
+    MarkDeviceLost(L"Present", hr);
     std::wcerr << L"Overlay render failed: Present failed: 0x" << std::hex << hr << std::dec
                << L"\n";
     return false;
   }
   hr = composition_device_->Commit();
   if (FAILED(hr)) {
+    MarkDeviceLost(L"DirectComposition commit", hr);
     std::wcerr << L"Overlay render failed: DComposition Commit failed: 0x" << std::hex << hr
                << std::dec << L"\n";
     return false;
@@ -859,8 +873,27 @@ void OverlayWindow::ClearFrame() {
   ID3D11DeviceContext* context = d3d_device_->context();
   context->OMSetRenderTargets(1, render_target_view_.GetAddressOf(), nullptr);
   context->ClearRenderTargetView(render_target_view_.Get(), kClearColor.data());
-  swap_chain_->Present(0, 0);
-  composition_device_->Commit();
+  HRESULT hr = swap_chain_->Present(0, 0);
+  if (FAILED(hr)) {
+    MarkDeviceLost(L"Clear-frame Present", hr);
+    return;
+  }
+  hr = composition_device_->Commit();
+  if (FAILED(hr)) {
+    MarkDeviceLost(L"Clear-frame DirectComposition commit", hr);
+  }
+}
+
+void OverlayWindow::MarkDeviceLost(const wchar_t* operation, HRESULT hr) {
+  (void)operation;
+  if (d3d_device_ == nullptr || !d3d_device_->IsDeviceLost(hr)) {
+    return;
+  }
+  device_lost_ = true;
+  LogDebug(L"Overlay",
+           std::wstring(L"D3D device lost during ") + operation + L" hr=" +
+               std::to_wstring(static_cast<unsigned long>(hr)) + L" reason=" +
+               std::to_wstring(static_cast<unsigned long>(d3d_device_->DeviceRemovedReason())));
 }
 
 void OverlayWindow::HideOverlay() {

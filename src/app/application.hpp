@@ -27,6 +27,7 @@ public:
 
   bool Initialize(HINSTANCE instance);
   int Run();
+  void RequestShutdown();
   void CleanupAndRestoreAll();
   void HealLeftoverWindows();
 
@@ -64,6 +65,10 @@ private:
   void WaitForAnimationFrameOrMessage();
   void BeginFallbackTimerResolution();
   void EndFallbackTimerResolution();
+  bool CreateAnimationRenderer();
+  void BeginAnimationRendererRecovery();
+  bool TryRecoverAnimationRenderer();
+  [[nodiscard]] bool AnimationRendererDeviceLost() const;
 
   std::unique_ptr<rendering::D3dDevice> d3d_device_;
   std::unique_ptr<rendering::DesktopCapture> desktop_capture_;
@@ -71,6 +76,8 @@ private:
   platform::NativeAnimationBlocker native_animation_blocker_;
   platform::WindowEventMonitor window_event_monitor_;
   platform::TaskbarTargetProvider taskbar_target_provider_;
+  HINSTANCE instance_ = nullptr;
+  DWORD main_thread_id_ = 0;
   HWND animating_window_ = nullptr;
   HWND pending_native_minimize_window_ = nullptr;
   bool animating_restore_ = false;
@@ -90,6 +97,9 @@ private:
   std::chrono::steady_clock::duration animation_frame_interval_{};
   std::chrono::steady_clock::time_point next_animation_frame_time_{};
   bool live_animation_capture_enabled_ = false;
+  bool animation_renderer_recovery_pending_ = false;
+  ULONGLONG next_animation_renderer_recovery_ms_ = 0;
+  DWORD animation_renderer_recovery_delay_ms_ = 0;
   bool in_restore_window_state_ = false;
   bool is_enabled_ = true;
   float animation_duration_seconds_ = 0.70f;

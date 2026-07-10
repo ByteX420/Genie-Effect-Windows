@@ -67,4 +67,17 @@ std::unique_ptr<D3dDevice> D3dDevice::Create() {
   return result;
 }
 
+bool D3dDevice::IsDeviceLostError(HRESULT hr) {
+  return hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET ||
+         hr == DXGI_ERROR_DEVICE_HUNG || hr == DXGI_ERROR_DRIVER_INTERNAL_ERROR;
+}
+
+HRESULT D3dDevice::DeviceRemovedReason() const {
+  return device_ != nullptr ? device_->GetDeviceRemovedReason() : DXGI_ERROR_DEVICE_REMOVED;
+}
+
+bool D3dDevice::IsDeviceLost(HRESULT operation_result) const {
+  return IsDeviceLostError(operation_result) || FAILED(DeviceRemovedReason());
+}
+
 }  // namespace genie::rendering

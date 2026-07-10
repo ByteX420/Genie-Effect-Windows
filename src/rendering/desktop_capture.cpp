@@ -28,10 +28,7 @@ RECT ClampRectToOutput(const RECT& rect, const RECT& output_rect) {
   };
 }
 
-bool IsDeviceLostError(HRESULT hr) {
-  return hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET ||
-         hr == DXGI_ERROR_DRIVER_INTERNAL_ERROR;
-}
+bool IsDeviceLostError(HRESULT hr) { return D3dDevice::IsDeviceLostError(hr); }
 
 int GetWindowCornerRadius(HWND window) {
   if (window == nullptr || !IsWindow(window)) {
@@ -606,6 +603,9 @@ bool DesktopCapture::CopyRegionFromFrame(OutputCapture* output, const RECT& scre
   D3D11_MAPPED_SUBRESOURCE mapped{};
   hr = d3d_device_->context()->Map(staging_texture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
   if (FAILED(hr)) {
+    if (d3d_device_->IsDeviceLost(hr)) {
+      MarkDeviceLost(L"Map rotated capture staging texture", hr);
+    }
     return false;
   }
 
@@ -812,6 +812,9 @@ bool DesktopCapture::CopyRegionIntoTexture(OutputCapture* output, const RECT& sc
   D3D11_MAPPED_SUBRESOURCE mapped{};
   hr = d3d_device_->context()->Map(staging_texture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
   if (FAILED(hr)) {
+    if (d3d_device_->IsDeviceLost(hr)) {
+      MarkDeviceLost(L"Map rotated refresh staging texture", hr);
+    }
     return false;
   }
 

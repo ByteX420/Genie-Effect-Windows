@@ -9,6 +9,7 @@
 
 #include "backends/imgui_impl_dx11.h"
 #include "backends/imgui_impl_win32.h"
+#include "common/debug_log.hpp"
 #include "imgui.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT message,
@@ -37,6 +38,8 @@ constexpr float kSmallFontSize = 12.5f;
 constexpr float kBodyFontSize = 14.5f;
 constexpr float kTitleFontSize = 21.0f;
 constexpr float kAppearanceDurationMs = 130.0f;
+constexpr DWORD kInitialDeviceRecoveryDelayMs = 250;
+constexpr DWORD kMaximumDeviceRecoveryDelayMs = 4000;
 
 std::string SystemFontPath(const wchar_t* file_name) {
   wchar_t windows_directory[MAX_PATH]{};
@@ -145,11 +148,10 @@ bool Slider(const char* id, float* value, float minimum, float maximum, float wi
 
   const float track_h = 4.0f * scale;
   draw->AddRectFilled(ImVec2(start, track_y - track_h * 0.5f),
-                      ImVec2(end, track_y + track_h * 0.5f),
-                      WithAlpha(kTrackColor, alpha), 0.0f);
+                      ImVec2(end, track_y + track_h * 0.5f), WithAlpha(kTrackColor, alpha), 0.0f);
   draw->AddRectFilled(ImVec2(start, track_y - track_h * 0.5f),
-                      ImVec2(knob_x, track_y + track_h * 0.5f),
-                      WithAlpha(kAccentColor, alpha), 0.0f);
+                      ImVec2(knob_x, track_y + track_h * 0.5f), WithAlpha(kAccentColor, alpha),
+                      0.0f);
 
   const float knob_w = (8.0f + 2.0f * hover) * scale;
   const float knob_h = (12.0f + 2.0f * hover) * scale;
@@ -191,15 +193,21 @@ bool SettingsWindow::Initialize(HINSTANCE instance, ToggleCallback toggle_callba
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
+  imgui_context_ready_ = true;
   ImGuiIO& io = ImGui::GetIO();
   io.IniFilename = nullptr;
   io.LogFilename = nullptr;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   RebuildFonts(GetDpiForWindow(hwnd_));
   ApplyStyle();
-  ImGui_ImplWin32_Init(hwnd_);
-  ImGui_ImplDX11_Init(device_.Get(), context_.Get());
+  if (!ImGui_ImplWin32_Init(hwnd_)) return false;
+  imgui_win32_ready_ = true;
+  if (!ImGui_ImplDX11_Init(device_.Get(), context_.Get())) return false;
+  imgui_dx11_ready_ = true;
   imgui_ready_ = true;
+#ifdef _DEBUG
+  device_recovery_test_pending_ = GenieEnvFlagEnabled(L"GENIE_TEST_DEVICE_RECOVERY");
+#endif
 
   NOTIFYICONDATAW tray_icon{};
   tray_icon.cbSize = sizeof(tray_icon);
@@ -221,16 +229,20 @@ void SettingsWindow::Shutdown() {
     tray_icon.uID = kTrayIconId;
     Shell_NotifyIconW(NIM_DELETE, &tray_icon);
   }
-  if (imgui_ready_) {
+  if (imgui_dx11_ready_) {
     ImGui_ImplDX11_Shutdown();
+    imgui_dx11_ready_ = false;
+  }
+  if (imgui_win32_ready_) {
     ImGui_ImplWin32_Shutdown();
+    imgui_win32_ready_ = false;
+  }
+  if (imgui_context_ready_) {
     ImGui::DestroyContext();
+    imgui_context_ready_ = false;
     imgui_ready_ = false;
   }
-  CleanupRenderTarget();
-  swap_chain_.Reset();
-  context_.Reset();
-  device_.Reset();
+  ReleaseDeviceResources();
   if (hwnd_ != nullptr) DestroyWindow(hwnd_);
   hwnd_ = nullptr;
 }
@@ -319,6 +331,58 @@ bool SettingsWindow::CreateRenderTarget() {
 
 void SettingsWindow::CleanupRenderTarget() { render_target_view_.Reset(); }
 
+bool SettingsWindow::IsDeviceLostError(HRESULT hr) {
+  return hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET ||
+         hr == DXGI_ERROR_DEVICE_HUNG || hr == DXGI_ERROR_DRIVER_INTERNAL_ERROR;
+}
+
+void SettingsWindow::ReleaseDeviceResources() {
+  if (context_ != nullptr) {
+    context_->OMSetRenderTargets(0, nullptr, nullptr);
+    context_->ClearState();
+  }
+  CleanupRenderTarget();
+  swap_chain_.Reset();
+  context_.Reset();
+  device_.Reset();
+}
+
+bool SettingsWindow::TryRecoverDeviceResources() {
+  if (!device_recovery_pending_) {
+    return true;
+  }
+  const ULONGLONG now = GetTickCount64();
+  if (now < next_device_recovery_ms_) {
+    return false;
+  }
+
+  if (CreateDeviceResources() && ImGui_ImplDX11_Init(device_.Get(), context_.Get())) {
+    imgui_dx11_ready_ = true;
+    device_recovery_pending_ = false;
+    device_recovery_delay_ms_ = kInitialDeviceRecoveryDelayMs;
+    render_requested_ = true;
+    return true;
+  }
+
+  ReleaseDeviceResources();
+  next_device_recovery_ms_ = now + device_recovery_delay_ms_;
+  device_recovery_delay_ms_ =
+      std::min(device_recovery_delay_ms_ * 2, kMaximumDeviceRecoveryDelayMs);
+  return false;
+}
+
+void SettingsWindow::HandleDeviceLost() {
+  if (imgui_dx11_ready_) {
+    ImGui_ImplDX11_Shutdown();
+    imgui_dx11_ready_ = false;
+  }
+  ReleaseDeviceResources();
+  device_recovery_pending_ = true;
+  device_recovery_delay_ms_ = kInitialDeviceRecoveryDelayMs;
+  next_device_recovery_ms_ = GetTickCount64();
+  TryRecoverDeviceResources();
+}
+
 void SettingsWindow::ApplyStyle() {
   ImGui::StyleColorsDark();
   ImGuiStyle& style = ImGui::GetStyle();
@@ -338,7 +402,7 @@ void SettingsWindow::RebuildFonts(UINT dpi) {
   current_dpi_ = dpi == 0 ? USER_DEFAULT_SCREEN_DPI : dpi;
   ui_scale_ = static_cast<float>(current_dpi_) / USER_DEFAULT_SCREEN_DPI;
   ImGuiIO& io = ImGui::GetIO();
-  if (imgui_ready_) ImGui_ImplDX11_InvalidateDeviceObjects();
+  if (imgui_dx11_ready_) ImGui_ImplDX11_InvalidateDeviceObjects();
   io.Fonts->Clear();
 
   ImFontConfig config{};
@@ -361,7 +425,7 @@ void SettingsWindow::RebuildFonts(UINT dpi) {
   if (font_small_ == nullptr) font_small_ = font_body_;
   if (font_medium_ == nullptr) font_medium_ = font_body_;
   if (font_title_ == nullptr) font_title_ = font_medium_;
-  if (imgui_ready_) ImGui_ImplDX11_CreateDeviceObjects();
+  if (imgui_dx11_ready_) ImGui_ImplDX11_CreateDeviceObjects();
 }
 
 void SettingsWindow::ApplyWindowShape(int width, int height) {
@@ -378,7 +442,16 @@ void SettingsWindow::UpdateDpi(UINT dpi) {
 }
 
 void SettingsWindow::Render() {
-  if (!imgui_ready_ || !IsWindowVisible(hwnd_) || render_target_view_ == nullptr) return;
+#ifdef _DEBUG
+  if (device_recovery_test_pending_) {
+    device_recovery_test_pending_ = false;
+    HandleDeviceLost();
+  }
+#endif
+  if (device_recovery_pending_ && !TryRecoverDeviceResources()) return;
+  if (!imgui_ready_ || !imgui_dx11_ready_ || !IsWindowVisible(hwnd_) ||
+      render_target_view_ == nullptr)
+    return;
   const ULONGLONG now_ms = GetTickCount64();
   const bool is_animating = (now_ms - shown_at_ms_ < 500);
   const bool is_active = (GetForegroundWindow() == hwnd_);
@@ -396,7 +469,10 @@ void SettingsWindow::Render() {
   context_->OMSetRenderTargets(1, render_target_view_.GetAddressOf(), nullptr);
   context_->ClearRenderTargetView(render_target_view_.Get(), clear_color);
   ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-  if (FAILED(swap_chain_->Present(0, 0))) {
+  const HRESULT present_result = swap_chain_->Present(0, 0);
+  if (IsDeviceLostError(present_result)) {
+    HandleDeviceLost();
+  } else if (FAILED(present_result)) {
     render_requested_ = true;
   }
 }
@@ -423,18 +499,18 @@ void SettingsWindow::RenderContents() {
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(size);
   constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-                                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus;
+                                     ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoBringToFrontOnFocus;
   ImGui::Begin("GenieEffectRoot", nullptr, flags);
   ImDrawList* draw = ImGui::GetWindowDrawList();
   const ImVec2 origin = ImGui::GetWindowPos();
   const auto point = [&origin](float x, float y) { return ImVec2(origin.x + x, origin.y + y); };
 
   // Flat dark grey background (no corners)
-  draw->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), kBackgroundColor,
-                      0.0f);
+  draw->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), kBackgroundColor, 0.0f);
   // Slate border
-  draw->AddRect(origin, ImVec2(origin.x + size.x - 1.0f, origin.y + size.y - 1.0f),
-                kBorderColor, 0.0f);
+  draw->AddRect(origin, ImVec2(origin.x + size.x - 1.0f, origin.y + size.y - 1.0f), kBorderColor,
+                0.0f);
 
   // Title
   draw->AddText(font_medium_, px(14.0f), point(px(18.0f), px(16.0f) + y_offset),
@@ -458,17 +534,20 @@ void SettingsWindow::RenderContents() {
 
   // Value text on the right
   const std::string duration_text = std::format("{:.2f}s", duration_seconds_);
-  const ImVec2 duration_size = font_medium_->CalcTextSizeA(px(13.0f), FLT_MAX, 0.0f, duration_text.c_str());
-  draw->AddText(font_medium_, px(13.0f), point(size.x - px(18.0f) - duration_size.x, px(92.0f) + y_offset),
+  const ImVec2 duration_size =
+      font_medium_->CalcTextSizeA(px(13.0f), FLT_MAX, 0.0f, duration_text.c_str());
+  draw->AddText(font_medium_, px(13.0f),
+                point(size.x - px(18.0f) - duration_size.x, px(92.0f) + y_offset),
                 WithAlpha(kSecondaryTextColor, content_alpha), duration_text.c_str());
 
   // Slider (Right-aligned next to value text)
   const float slider_w = px(120.0f);
-  ImGui::SetCursorPos(ImVec2(size.x - px(18.0f) - duration_size.x - slider_w - px(8.0f), px(92.0f) + y_offset));
+  ImGui::SetCursorPos(
+      ImVec2(size.x - px(18.0f) - duration_size.x - slider_w - px(8.0f), px(92.0f) + y_offset));
   float updated_duration = duration_seconds_;
   if (Slider("##duration", &updated_duration, kMinimumAnimationDurationSeconds,
-             kMaximumAnimationDurationSeconds, slider_w, scale,
-             content_alpha) && std::abs(updated_duration - duration_seconds_) > 0.0001f) {
+             kMaximumAnimationDurationSeconds, slider_w, scale, content_alpha) &&
+      std::abs(updated_duration - duration_seconds_) > 0.0001f) {
     duration_seconds_ = updated_duration;
     if (speed_callback_) speed_callback_(duration_seconds_);
   }
@@ -500,9 +579,8 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
         POINT cursor{};
         GetCursorPos(&cursor);
         SetForegroundWindow(hwnd);
-        const UINT selected =
-            TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, cursor.x,
-                           cursor.y, 0, hwnd, nullptr);
+        const UINT selected = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
+                                             cursor.x, cursor.y, 0, hwnd, nullptr);
         DestroyMenu(menu);
         if (selected == kTrayShowSettings) {
           settings->Show(true);
@@ -578,13 +656,24 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
         settings->CleanupRenderTarget();
         const HRESULT resize_result =
             settings->swap_chain_->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
-        if (SUCCEEDED(resize_result) && settings->CreateRenderTarget()) {
-          settings->ApplyWindowShape(width, height);
-          settings->ForceRender();
+        if (IsDeviceLostError(resize_result)) {
+          settings->HandleDeviceLost();
+        } else if (SUCCEEDED(resize_result)) {
+          if (settings->CreateRenderTarget()) {
+            settings->ApplyWindowShape(width, height);
+            settings->ForceRender();
+          } else if (settings->device_ != nullptr &&
+                     FAILED(settings->device_->GetDeviceRemovedReason())) {
+            settings->HandleDeviceLost();
+          }
         } else if (FAILED(resize_result)) {
           // Keep the previous surface alive if the resize was rejected (for
           // example while Windows is changing the monitor topology).
-          if (settings->CreateRenderTarget()) settings->ForceRender();
+          if (settings->device_ != nullptr && FAILED(settings->device_->GetDeviceRemovedReason())) {
+            settings->HandleDeviceLost();
+          } else if (settings->CreateRenderTarget()) {
+            settings->ForceRender();
+          }
         }
       }
       return 0;

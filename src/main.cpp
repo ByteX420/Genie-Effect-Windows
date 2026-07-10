@@ -12,9 +12,9 @@ BOOL WINAPI ConsoleHandler(DWORD signal) {
   if (signal == CTRL_CLOSE_EVENT || signal == CTRL_C_EVENT || signal == CTRL_BREAK_EVENT ||
       signal == CTRL_LOGOFF_EVENT || signal == CTRL_SHUTDOWN_EVENT) {
     if (g_application != nullptr) {
-      g_application->CleanupAndRestoreAll();
+      g_application->RequestShutdown();
     }
-    return FALSE;
+    return TRUE;
   }
   return FALSE;
 }
