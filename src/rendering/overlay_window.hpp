@@ -78,7 +78,8 @@ private:
   void ApplyVisibleOverlayRegion(HWND taskbar_window);
   bool CreateRenderResources();
   bool CompileShaders();
-  bool UploadMesh(const genie::animation::GenieMesh& mesh);
+  bool UploadMesh(const genie::animation::GenieMesh& mesh, bool upload_indices);
+  bool UpdateFrameConstants();
   [[nodiscard]] bool Render(float progress);
   void ClearFrame();
   void HideOverlay();
@@ -110,6 +111,7 @@ private:
   UINT index_count_ = 0;
   AnimationState animation_state_;
   genie::animation::GenieMeshGenerator mesh_generator_;
+  genie::animation::GenieMesh reusable_mesh_;
   MinimizeCallback minimize_callback_;
   RestoreCallback restore_callback_;
   float animation_duration_seconds_ = 0.70f;

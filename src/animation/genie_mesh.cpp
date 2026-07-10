@@ -50,57 +50,61 @@ void AppendCellIndices(int rows, int columns, std::vector<std::uint16_t>* indice
 
 }  // namespace
 
-GenieMesh GenieMeshGenerator::Generate(const RectF& source_rect, const RectF& target_rect,
-                                       GenieEdge edge, GenieDirection direction, float progress,
-                                       float viewport_height) const {
+bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& target_rect,
+                                      GenieEdge edge, GenieDirection direction, float progress,
+                                      float viewport_height, GenieMesh* mesh) {
+  if (mesh == nullptr) {
+    return false;
+  }
   (void)viewport_height;
   const float oriented_progress =
       direction == GenieDirection::kMinimize ? Clamp01(progress) : 1.0f - Clamp01(progress);
 
-  const std::vector<PointF> screen_positions =
-      GenerateScreenPositions(source_rect, target_rect, edge, oriented_progress);
+  GenerateScreenPositions(source_rect, target_rect, edge, oriented_progress);
 
   const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
   const int rows = horizontal ? kLongGridSegmentCount : 1;
   const int columns = horizontal ? 1 : kLongGridSegmentCount;
 
-  GenieMesh mesh;
-  mesh.vertices.reserve(screen_positions.size());
+  mesh->vertices.resize(screen_positions_.size());
 
   for (int row = 0; row <= rows; ++row) {
     const float row_fraction = static_cast<float>(row) / rows;
     for (int column = 0; column <= columns; ++column) {
       const float column_fraction = static_cast<float>(column) / columns;
       const int index = row * (columns + 1) + column;
-      const PointF pt = screen_positions[index];
-      mesh.vertices.push_back(MeshVertex{
+      const PointF pt = screen_positions_[index];
+      mesh->vertices[index] = MeshVertex{
           .x = pt.x,
           .y = pt.y,
           .u = column_fraction,
           .v = row_fraction,
-      });
+      };
     }
   }
 
-  AppendCellIndices(rows, columns, &mesh.indices);
-  return mesh;
+  const bool indices_changed =
+      !has_index_layout_ || index_layout_horizontal_ != horizontal || mesh->indices.empty();
+  if (indices_changed) {
+    mesh->indices.clear();
+    AppendCellIndices(rows, columns, &mesh->indices);
+    has_index_layout_ = true;
+    index_layout_horizontal_ = horizontal;
+  }
+  return indices_changed;
 }
 
-std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& source_rect,
-                                                                const RectF& target_rect,
-                                                                GenieEdge edge,
-                                                                float progress) const {
+void GenieMeshGenerator::GenerateScreenPositions(const RectF& source_rect, const RectF& target_rect,
+                                                 GenieEdge edge, float progress) {
   const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
   const int row_count = horizontal ? kLongGridSegmentCount : 1;
   const int column_count = horizontal ? 1 : kLongGridSegmentCount;
 
-  std::vector<PointF> positions;
-  positions.reserve(static_cast<std::size_t>((row_count + 1) * (column_count + 1)));
+  screen_positions_.resize(static_cast<std::size_t>((row_count + 1) * (column_count + 1)));
 
   const float slide_progress = Clamp01(progress / kSlideAnimationEndFraction);
-  const float translate_progress =
-      Clamp01((progress - kTranslateAnimationStartFraction) /
-              (1.0f - kTranslateAnimationStartFraction));
+  const float translate_progress = Clamp01((progress - kTranslateAnimationStartFraction) /
+                                           (1.0f - kTranslateAnimationStartFraction));
 
   if (edge == GenieEdge::kBottom) {
     const float left_bezier_bottom_x = source_rect.left;
@@ -115,11 +119,14 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
     const float bezier_height = bezier_top_y - bezier_bottom_y;
 
     const float translation = translate_progress * vertical_distance_to_move;
-    const float top_edge_vertical_position = std::min(source_rect.bottom + translation, target_rect.bottom);
+    const float top_edge_vertical_position =
+        std::min(source_rect.bottom + translation, target_rect.bottom);
     const float bottom_edge_vertical_position = source_rect.top + translation;
 
-    const float left_bezier_top_x = left_bezier_bottom_x + (slide_progress * left_edge_distance_to_move);
-    const float right_bezier_top_x = right_bezier_bottom_x + (slide_progress * right_edge_distance_to_move);
+    const float left_bezier_top_x =
+        left_bezier_bottom_x + (slide_progress * left_edge_distance_to_move);
+    const float right_bezier_top_x =
+        right_bezier_bottom_x + (slide_progress * right_edge_distance_to_move);
 
     auto left_bezier_position = [&](float y) -> float {
       if (y < bezier_bottom_y) {
@@ -145,14 +152,15 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
 
     for (int row = 0; row <= row_count; ++row) {
       float position = static_cast<float>(row) / row_count;
-      float y = (top_edge_vertical_position * position) + (bottom_edge_vertical_position * (1.0f - position));
+      float y = (top_edge_vertical_position * position) +
+                (bottom_edge_vertical_position * (1.0f - position));
       float x_min = left_bezier_position(y);
       float x_max = right_bezier_position(y);
-      positions.push_back(PointF{.x = x_min, .y = y});
-      positions.push_back(PointF{.x = x_max, .y = y});
+      const std::size_t base = static_cast<std::size_t>(row * 2);
+      screen_positions_[base] = PointF{.x = x_min, .y = y};
+      screen_positions_[base + 1] = PointF{.x = x_max, .y = y};
     }
-  }
-  else if (edge == GenieEdge::kTop) {
+  } else if (edge == GenieEdge::kTop) {
     const float left_bezier_top_x = source_rect.left;
     const float right_bezier_top_x = source_rect.right;
 
@@ -164,8 +172,10 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
     const float bezier_bottom_y = target_rect.bottom;
     const float bezier_height = bezier_top_y - bezier_bottom_y;
 
-    const float left_bezier_bottom_x = left_bezier_top_x + (slide_progress * left_edge_distance_to_move);
-    const float right_bezier_bottom_x = right_bezier_top_x + (slide_progress * right_edge_distance_to_move);
+    const float left_bezier_bottom_x =
+        left_bezier_top_x + (slide_progress * left_edge_distance_to_move);
+    const float right_bezier_bottom_x =
+        right_bezier_top_x + (slide_progress * right_edge_distance_to_move);
 
     auto left_bezier_position = [&](float y) -> float {
       if (y < bezier_bottom_y) {
@@ -191,18 +201,20 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
 
     const float translation = translate_progress * vertical_distance_to_move;
     const float top_edge_vertical_position = source_rect.bottom + translation;
-    const float bottom_edge_vertical_position = std::max(source_rect.top + translation, target_rect.top);
+    const float bottom_edge_vertical_position =
+        std::max(source_rect.top + translation, target_rect.top);
 
     for (int row = 0; row <= row_count; ++row) {
       float position = static_cast<float>(row) / row_count;
-      float y = (top_edge_vertical_position * position) + (bottom_edge_vertical_position * (1.0f - position));
+      float y = (top_edge_vertical_position * position) +
+                (bottom_edge_vertical_position * (1.0f - position));
       float x_min = left_bezier_position(y);
       float x_max = right_bezier_position(y);
-      positions.push_back(PointF{.x = x_min, .y = y});
-      positions.push_back(PointF{.x = x_max, .y = y});
+      const std::size_t base = static_cast<std::size_t>(row * 2);
+      screen_positions_[base] = PointF{.x = x_min, .y = y};
+      screen_positions_[base + 1] = PointF{.x = x_max, .y = y};
     }
-  }
-  else if (edge == GenieEdge::kLeft) {
+  } else if (edge == GenieEdge::kLeft) {
     const float top_bezier_left_y = source_rect.bottom;
     const float bottom_bezier_left_y = source_rect.top;
 
@@ -216,10 +228,13 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
 
     const float translation = translate_progress * horizontal_distance_to_move;
     const float left_edge_horizontal_position = source_rect.left + translation;
-    const float right_edge_horizontal_position = std::min(source_rect.right + translation, target_rect.right);
+    const float right_edge_horizontal_position =
+        std::min(source_rect.right + translation, target_rect.right);
 
-    const float top_bezier_right_y = top_bezier_left_y + (slide_progress * top_edge_distance_to_move);
-    const float bottom_bezier_right_y = bottom_bezier_left_y + (slide_progress * bottom_edge_distance_to_move);
+    const float top_bezier_right_y =
+        top_bezier_left_y + (slide_progress * top_edge_distance_to_move);
+    const float bottom_bezier_right_y =
+        bottom_bezier_left_y + (slide_progress * bottom_edge_distance_to_move);
 
     auto top_bezier_position = [&](float x) -> float {
       if (x < bezier_left_x) {
@@ -243,22 +258,17 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
       return bottom_bezier_right_y;
     };
 
-    std::vector<PointF> top_edge_positions;
-    std::vector<PointF> bottom_edge_positions;
-
     for (int col = 0; col <= column_count; ++col) {
       float position = static_cast<float>(col) / column_count;
-      float x = (left_edge_horizontal_position * (1.0f - position)) + (right_edge_horizontal_position * position);
+      float x = (left_edge_horizontal_position * (1.0f - position)) +
+                (right_edge_horizontal_position * position);
       float y_top = top_bezier_position(x);
       float y_bottom = bottom_bezier_position(x);
-      top_edge_positions.push_back(PointF{.x = x, .y = y_top});
-      bottom_edge_positions.push_back(PointF{.x = x, .y = y_bottom});
+      screen_positions_[static_cast<std::size_t>(col)] = PointF{.x = x, .y = y_bottom};
+      screen_positions_[static_cast<std::size_t>(column_count + 1 + col)] =
+          PointF{.x = x, .y = y_top};
     }
-
-    positions.insert(positions.end(), bottom_edge_positions.begin(), bottom_edge_positions.end());
-    positions.insert(positions.end(), top_edge_positions.begin(), top_edge_positions.end());
-  }
-  else if (edge == GenieEdge::kRight) {
+  } else if (edge == GenieEdge::kRight) {
     const float top_bezier_right_y = source_rect.bottom;
     const float bottom_bezier_right_y = source_rect.top;
 
@@ -271,11 +281,14 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
     const float bezier_width = bezier_right_x - bezier_left_x;
 
     const float translation = translate_progress * horizontal_distance_to_move;
-    const float left_edge_horizontal_position = std::max(source_rect.left + translation, target_rect.left);
+    const float left_edge_horizontal_position =
+        std::max(source_rect.left + translation, target_rect.left);
     const float right_edge_horizontal_position = source_rect.right + translation;
 
-    const float top_bezier_left_y = top_bezier_right_y + (slide_progress * top_edge_distance_to_move);
-    const float bottom_bezier_left_y = bottom_bezier_right_y + (slide_progress * bottom_edge_distance_to_move);
+    const float top_bezier_left_y =
+        top_bezier_right_y + (slide_progress * top_edge_distance_to_move);
+    const float bottom_bezier_left_y =
+        bottom_bezier_right_y + (slide_progress * bottom_edge_distance_to_move);
 
     auto top_bezier_position = [&](float x) -> float {
       if (x < bezier_left_x) {
@@ -299,23 +312,17 @@ std::vector<PointF> GenieMeshGenerator::GenerateScreenPositions(const RectF& sou
       return bottom_bezier_right_y;
     };
 
-    std::vector<PointF> top_edge_positions;
-    std::vector<PointF> bottom_edge_positions;
-
     for (int col = 0; col <= column_count; ++col) {
       float position = static_cast<float>(col) / column_count;
-      float x = (left_edge_horizontal_position * (1.0f - position)) + (right_edge_horizontal_position * position);
+      float x = (left_edge_horizontal_position * (1.0f - position)) +
+                (right_edge_horizontal_position * position);
       float y_top = top_bezier_position(x);
       float y_bottom = bottom_bezier_position(x);
-      top_edge_positions.push_back(PointF{.x = x, .y = y_top});
-      bottom_edge_positions.push_back(PointF{.x = x, .y = y_bottom});
+      screen_positions_[static_cast<std::size_t>(col)] = PointF{.x = x, .y = y_bottom};
+      screen_positions_[static_cast<std::size_t>(column_count + 1 + col)] =
+          PointF{.x = x, .y = y_top};
     }
-
-    positions.insert(positions.end(), bottom_edge_positions.begin(), bottom_edge_positions.end());
-    positions.insert(positions.end(), top_edge_positions.begin(), top_edge_positions.end());
   }
-
-  return positions;
 }
 
 }  // namespace genie::animation

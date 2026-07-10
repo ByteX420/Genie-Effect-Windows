@@ -179,6 +179,9 @@ bool OverlayWindow::Initialize(HINSTANCE instance, D3dDevice* d3d_device,
 
 void OverlayWindow::Shutdown() {
   animation_state_.active = false;
+  mesh_generator_ = genie::animation::GenieMeshGenerator{};
+  reusable_mesh_ = genie::animation::GenieMesh{};
+  index_count_ = 0;
   if (window_ != nullptr) {
     DestroyWindow(window_);
     window_ = nullptr;
@@ -574,6 +577,9 @@ bool OverlayWindow::ResizeOverlaySurface(const RECT& screen_rect) {
     if (!CreateRenderTarget()) {
       return false;
     }
+    if (!UpdateFrameConstants()) {
+      return false;
+    }
   }
 
   overlay_screen_rect_ = screen_rect;
@@ -732,7 +738,7 @@ bool OverlayWindow::CompileShaders() {
   return SUCCEEDED(hr);
 }
 
-bool OverlayWindow::UploadMesh(const genie::animation::GenieMesh& mesh) {
+bool OverlayWindow::UploadMesh(const genie::animation::GenieMesh& mesh, bool upload_indices) {
   if (mesh.vertices.empty() || mesh.indices.empty() || mesh.vertices.size() > kMaxMeshVertices ||
       mesh.indices.size() > kMaxMeshIndices) {
     return false;
@@ -748,14 +754,36 @@ bool OverlayWindow::UploadMesh(const genie::animation::GenieMesh& mesh) {
               mesh.vertices.size() * sizeof(genie::animation::MeshVertex));
   context->Unmap(vertex_buffer_.Get(), 0);
 
-  hr = context->Map(index_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
+  if (upload_indices) {
+    hr = context->Map(index_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
+    if (FAILED(hr)) {
+      return false;
+    }
+    std::memcpy(mapped_resource.pData, mesh.indices.data(),
+                mesh.indices.size() * sizeof(std::uint16_t));
+    context->Unmap(index_buffer_.Get(), 0);
+  }
+  index_count_ = static_cast<UINT>(mesh.indices.size());
+  return true;
+}
+
+bool OverlayWindow::UpdateFrameConstants() {
+  if (constant_buffer_ == nullptr) {
+    return false;
+  }
+  D3D11_MAPPED_SUBRESOURCE mapped_resource{};
+  ID3D11DeviceContext* context = d3d_device_->context();
+  const HRESULT hr =
+      context->Map(constant_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource);
   if (FAILED(hr)) {
     return false;
   }
-  std::memcpy(mapped_resource.pData, mesh.indices.data(),
-              mesh.indices.size() * sizeof(std::uint16_t));
-  context->Unmap(index_buffer_.Get(), 0);
-  index_count_ = static_cast<UINT>(mesh.indices.size());
+  auto* constants = static_cast<FrameConstants*>(mapped_resource.pData);
+  constants->viewport_size[0] = static_cast<float>(width_);
+  constants->viewport_size[1] = static_cast<float>(height_);
+  constants->opacity = 1.0f;
+  constants->padding = 0.0f;
+  context->Unmap(constant_buffer_.Get(), 0);
   return true;
 }
 
@@ -764,12 +792,14 @@ bool OverlayWindow::Render(float progress) {
     return false;
   }
 
-  const genie::animation::GenieMesh mesh = mesh_generator_.Generate(
+  const bool indices_changed = mesh_generator_.GenerateInto(
       animation_state_.source_rect, animation_state_.target_rect, animation_state_.edge,
-      genie::animation::GenieDirection::kMinimize, progress, static_cast<float>(height_));
-  if (!UploadMesh(mesh)) {
-    std::wcerr << L"Overlay render failed: mesh upload failed. vertices=" << mesh.vertices.size()
-               << L" indices=" << mesh.indices.size() << L"\n";
+      genie::animation::GenieDirection::kMinimize, progress, static_cast<float>(height_),
+      &reusable_mesh_);
+  if (!UploadMesh(reusable_mesh_, indices_changed)) {
+    std::wcerr << L"Overlay render failed: mesh upload failed. vertices="
+               << reusable_mesh_.vertices.size() << L" indices=" << reusable_mesh_.indices.size()
+               << L"\n";
     return false;
   }
 
@@ -785,17 +815,6 @@ bool OverlayWindow::Render(float progress) {
   context->ClearRenderTargetView(render_target_view_.Get(), kClearColor.data());
   context->RSSetViewports(1, &viewport);
   context->RSSetState(rasterizer_state_.Get());
-
-  D3D11_MAPPED_SUBRESOURCE mapped_resource{};
-  if (SUCCEEDED(
-          context->Map(constant_buffer_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_resource))) {
-    auto* constants = static_cast<FrameConstants*>(mapped_resource.pData);
-    constants->viewport_size[0] = static_cast<float>(width_);
-    constants->viewport_size[1] = static_cast<float>(height_);
-    constants->opacity = 1.0f;
-    constants->padding = 0.0f;
-    context->Unmap(constant_buffer_.Get(), 0);
-  }
 
   constexpr UINT stride = sizeof(genie::animation::MeshVertex);
   constexpr UINT offset = 0;

@@ -33,15 +33,18 @@ struct GenieMesh {
 
 class GenieMeshGenerator {
 public:
-  [[nodiscard]] GenieMesh Generate(const RectF& source_rect, const RectF& target_rect,
-                                   GenieEdge edge, GenieDirection direction, float progress,
-                                   float viewport_height) const;
+  // Returns true when the index layout changed and must be uploaded again.
+  bool GenerateInto(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
+                    GenieDirection direction, float progress, float viewport_height,
+                    GenieMesh* mesh);
 
 private:
-  [[nodiscard]] std::vector<PointF> GenerateScreenPositions(const RectF& source_rect,
-                                                           const RectF& target_rect,
-                                                           GenieEdge edge,
-                                                           float progress) const;
+  void GenerateScreenPositions(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
+                               float progress);
+
+  std::vector<PointF> screen_positions_;
+  bool has_index_layout_ = false;
+  bool index_layout_horizontal_ = false;
 };
 
 }  // namespace genie::animation
