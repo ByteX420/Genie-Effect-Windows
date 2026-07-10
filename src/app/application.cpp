@@ -1111,6 +1111,7 @@ bool Application::OnMinimizeStart(HWND window) {
       return true;
     }
     slot.animating_restore = false;
+    slot.overlay.SetAnimationDuration(minimize_duration_seconds_);
     slot.overlay.ContinueMinimizeAnimation();
     slot.live_animation_capture_enabled = false;
     std::wcout << L"Minimize requested during active animation; continuing "
@@ -1534,6 +1535,7 @@ bool Application::OnRestoreAttempt(HWND window) {
       slot.pending_native_minimize_window = nullptr;
     }
     slot.animating_restore = true;
+    slot.overlay.SetAnimationDuration(restore_duration_seconds_);
     slot.overlay.ReverseAnimation();
     slot.live_animation_capture_enabled = false;
     std::wcout << L"Restore requested during active animation; reversing "
