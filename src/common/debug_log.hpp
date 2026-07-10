@@ -78,6 +78,30 @@ inline std::string GenieLogToUtf8(const std::wstring& text) {
   return utf8;
 }
 
+inline const std::wstring& GenieLogProcessName() {
+  static const std::wstring process_name = [] {
+    wchar_t process_path[MAX_PATH]{};
+    GetModuleFileNameW(nullptr, process_path, MAX_PATH);
+    std::wstring name = process_path;
+    const size_t slash = name.find_last_of(L"\\/");
+    if (slash != std::wstring::npos) {
+      name.erase(0, slash + 1);
+    }
+    return name;
+  }();
+  return process_name;
+}
+
+inline HANDLE& GenieLogFileHandle() {
+  static HANDLE file = INVALID_HANDLE_VALUE;
+  return file;
+}
+
+inline SRWLOCK& GenieLogFileLock() {
+  static SRWLOCK lock = SRWLOCK_INIT;
+  return lock;
+}
+
 inline void LogDebugLine(const std::wstring& module_name, const std::wstring& level,
                          const std::wstring& message) {
 #ifdef _DEBUG
@@ -89,44 +113,37 @@ inline void LogDebugLine(const std::wstring& module_name, const std::wstring& le
   swprintf_s(time_str, L"%04d-%02d-%02d %02d:%02d:%02d.%03d", st.wYear, st.wMonth, st.wDay,
              st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
 
-  wchar_t proc_path[MAX_PATH]{};
-  GetModuleFileNameW(nullptr, proc_path, MAX_PATH);
-  std::wstring proc_name = proc_path;
-  size_t slash = proc_name.find_last_of(L"\\/");
-  if (slash != std::wstring::npos) {
-    proc_name = proc_name.substr(slash + 1);
-  }
-
   std::wstringstream ss;
-  ss << L"[" << time_str << L"] [" << proc_name << L":" << GetCurrentProcessId() << L":"
+  ss << L"[" << time_str << L"] [" << GenieLogProcessName() << L":" << GetCurrentProcessId() << L":"
      << GetCurrentThreadId() << L"] [" << level << L"] [" << module_name << L"] " << message
      << L"\r\n";
   const std::string entry = GenieLogToUtf8(ss.str());
 
-  for (int i = 0; i < 10; ++i) {
-    HANDLE file =
-        CreateFileW(log_path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                    OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-
+  AcquireSRWLockExclusive(&GenieLogFileLock());
+  HANDLE& file = GenieLogFileHandle();
+  if (file == INVALID_HANDLE_VALUE) {
+    file = CreateFileW(log_path.c_str(), FILE_APPEND_DATA,
+                       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file != INVALID_HANDLE_VALUE) {
       LARGE_INTEGER size{};
       if (GetFileSizeEx(file, &size) && size.QuadPart == 0) {
         DWORD written = 0;
-        const unsigned char bom[] = {0xEF, 0xBB, 0xBF};
-        WriteFile(file, bom, static_cast<DWORD>(sizeof(bom)), &written, nullptr);
+        constexpr unsigned char kUtf8Bom[] = {0xEF, 0xBB, 0xBF};
+        WriteFile(file, kUtf8Bom, static_cast<DWORD>(sizeof(kUtf8Bom)), &written, nullptr);
       }
-      DWORD written = 0;
-      if (!entry.empty()) {
-        WriteFile(file, entry.data(), static_cast<DWORD>(entry.size()), &written, nullptr);
-      }
-      if (IsSynchronousLoggingEnabled()) {
-        FlushFileBuffers(file);
-      }
-      CloseHandle(file);
-      break;
     }
-    Sleep(5);
   }
+  if (file != INVALID_HANDLE_VALUE && !entry.empty()) {
+    DWORD written = 0;
+    if (!WriteFile(file, entry.data(), static_cast<DWORD>(entry.size()), &written, nullptr)) {
+      CloseHandle(file);
+      file = INVALID_HANDLE_VALUE;
+    } else if (IsSynchronousLoggingEnabled()) {
+      FlushFileBuffers(file);
+    }
+  }
+  ReleaseSRWLockExclusive(&GenieLogFileLock());
 #else
   (void)module_name;
   (void)level;
@@ -134,12 +151,15 @@ inline void LogDebugLine(const std::wstring& module_name, const std::wstring& le
 #endif
 }
 
-inline void LogDebug(const std::wstring& module_name, const std::wstring& message) {
-  LogDebugLine(module_name, L"DEBUG", message);
-}
-
-inline void LogTrace(const std::wstring& module_name, const std::wstring& message) {
-  if (IsTraceLoggingEnabled()) {
-    LogDebugLine(module_name, L"TRACE", message);
-  }
-}
+#ifdef _DEBUG
+#define LogDebug(module_name, message) LogDebugLine((module_name), L"DEBUG", (message))
+#define LogTrace(module_name, message)                  \
+  do {                                                  \
+    if (IsTraceLoggingEnabled()) {                      \
+      LogDebugLine((module_name), L"TRACE", (message)); \
+    }                                                   \
+  } while (false)
+#else
+#define LogDebug(module_name, message) ((void)0)
+#define LogTrace(module_name, message) ((void)0)
+#endif

@@ -137,6 +137,8 @@ std::wstring WindowTraceString(HWND window) {
 }
 
 void TraceWindowEvent(const std::wstring& event_name, HWND window) {
+  (void)event_name;
+  (void)window;
   LogTrace(L"App", event_name + L" " + WindowTraceString(window));
 }
 
@@ -264,6 +266,8 @@ bool BringWindowForwardForCapture(HWND window) {
   const BOOL foreground_ok = SetForegroundWindow(window);
   BringWindowToTop(window);
   DwmFlush();
+  (void)top_ok;
+  (void)foreground_ok;
   LogTrace(L"App", L"BringWindowForwardForCapture foreground_ok=" +
                        std::to_wstring(foreground_ok != FALSE) + L" top_ok=" +
                        std::to_wstring(top_ok != FALSE) + L" was_topmost=" +

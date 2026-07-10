@@ -128,6 +128,7 @@ HRESULT CompileShader(const char* source, const char* entry_point, const char* t
 }
 
 void AllowCrossIntegrityMessage(HWND window, UINT message, const wchar_t* message_name) {
+  (void)message_name;
   if (window == nullptr || message == 0) {
     return;
   }
@@ -350,7 +351,7 @@ bool OverlayWindow::Tick() {
   animation_state_.last_tick_time = now;
 
   const float step = elapsed_seconds / animation_duration_seconds_;
-  const float previous_progress = animation_state_.progress;
+  [[maybe_unused]] const float previous_progress = animation_state_.progress;
   if (animation_state_.target_progress >= animation_state_.progress) {
     animation_state_.progress =
         std::min(animation_state_.target_progress, animation_state_.progress + step);

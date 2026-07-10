@@ -295,13 +295,10 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
       }
     }
 
-#ifdef _DEBUG
-    std::wstring dbg_msg = L"Checking button: '" + btn_name + L"' rect=" +
-                           std::to_wstring(rect.left) + L"," + std::to_wstring(rect.top) + L"," +
-                           std::to_wstring(rect.right) + L"," + std::to_wstring(rect.bottom) +
-                           L" score=" + std::to_wstring(score);
-    LogTrace(L"UIAutomation", dbg_msg);
-#endif
+    LogTrace(L"UIAutomation",
+             L"Checking button: '" + btn_name + L"' rect=" + std::to_wstring(rect.left) + L"," +
+                 std::to_wstring(rect.top) + L"," + std::to_wstring(rect.right) + L"," +
+                 std::to_wstring(rect.bottom) + L" score=" + std::to_wstring(score));
 
     if (score > best_score) {
       best_score = score;
@@ -316,22 +313,17 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
   automation->Release();
 
   if (best_score > 0) {
-#ifdef _DEBUG
-    std::wstring dbg_msg =
-        L"Matched best button for title='" + title + L"' proc='" + process_no_ext +
-        L"' with score=" + std::to_wstring(best_score) + L" rect=" +
-        std::to_wstring(best_rect.left) + L"," + std::to_wstring(best_rect.top) + L"," +
-        std::to_wstring(best_rect.right) + L"," + std::to_wstring(best_rect.bottom);
-    LogTrace(L"UIAutomation", dbg_msg);
-#endif
+    LogTrace(L"UIAutomation",
+             L"Matched best button for title='" + title + L"' proc='" + process_no_ext +
+                 L"' with score=" + std::to_wstring(best_score) + L" rect=" +
+                 std::to_wstring(best_rect.left) + L"," + std::to_wstring(best_rect.top) + L"," +
+                 std::to_wstring(best_rect.right) + L"," + std::to_wstring(best_rect.bottom));
     *out_rect = best_rect;
     return true;
   }
 
-#ifdef _DEBUG
   LogTrace(L"UIAutomation",
            L"Failed to match any button for title='" + title + L"' proc='" + process_no_ext + L"'");
-#endif
   return false;
 }
 
