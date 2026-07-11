@@ -128,6 +128,7 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClCompile Include="src\app\application.cpp" />
     <ClCompile Include="src\app\settings_store.cpp" />
     <ClCompile Include="src\app\startup_manager.cpp" />
+    <ClCompile Include="src\app\settings_ui_theme.cpp" />
     <ClCompile Include="src\app\settings_window.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -170,6 +171,8 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClInclude Include="src\app\application.hpp" />
     <ClInclude Include="src\app\settings_store.hpp" />
     <ClInclude Include="src\app\startup_manager.hpp" />
+    <ClInclude Include="src\app\resource.hpp" />
+    <ClInclude Include="src\app\settings_ui_theme.hpp" />
     <ClInclude Include="src\app\settings_window.hpp" />
     <ClInclude Include="src\platform\native_animation_blocker.hpp" />
     <ClInclude Include="src\platform\taskbar_target_provider.hpp" />
@@ -178,6 +181,9 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClInclude Include="src\rendering\d3d_device.hpp" />
     <ClInclude Include="src\rendering\desktop_capture.hpp" />
     <ClInclude Include="src\rendering\overlay_window.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="GenieEffect.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

@@ -1,9 +1,9 @@
 #pragma once
 
+#include <array>
 #include <d3d11.h>
 #include <dxgi.h>
 #include <functional>
-#include <array>
 #include <windows.h>
 #include <wrl/client.h>
 
@@ -77,8 +77,7 @@ public:
   using StartupCallback = std::function<bool(bool run_at_startup, bool start_minimized)>;
   using ExclusionCallback = std::function<bool(const std::string&, bool exclude)>;
   using PauseCallback = std::function<void(TemporaryPauseAction)>;
-  using HotkeyUpdateCallback =
-      std::function<HotkeyUpdateResult(HotkeyAction, HotkeyBinding)>;
+  using HotkeyUpdateCallback = std::function<HotkeyUpdateResult(HotkeyAction, HotkeyBinding)>;
   using HotkeyActionCallback = std::function<void(HotkeyAction)>;
   using DiagnosticsCallback = std::function<DiagnosticsSnapshot()>;
   using DiagnosticsActionCallback = std::function<bool(DiagnosticsAction)>;
@@ -93,20 +92,18 @@ public:
   bool Initialize(HINSTANCE instance, ToggleCallback toggle_callback, SpeedCallback speed_callback,
                   LinkCallback link_callback, AdaptiveDurationCallback adaptive_duration_callback,
                   FullscreenBehaviorCallback fullscreen_behavior_callback,
-                  PowerBehaviorCallback power_behavior_callback,
-                  EasingCallback easing_callback,
+                  PowerBehaviorCallback power_behavior_callback, EasingCallback easing_callback,
                   AnimationStyleCallback animation_style_callback,
-                  StrengthCallback strength_callback,
-                  FadeCallback fade_callback,
+                  StrengthCallback strength_callback, FadeCallback fade_callback,
                   TargetIndicatorCallback target_indicator_callback,
                   WindowsAnimationPreferenceCallback windows_animation_preference_callback,
-                  CloseBehaviorCallback close_behavior_callback,
-                  StartupCallback startup_callback, ExclusionCallback exclusion_callback,
-                  PauseCallback pause_callback, HotkeyUpdateCallback hotkey_update_callback,
+                  CloseBehaviorCallback close_behavior_callback, StartupCallback startup_callback,
+                  ExclusionCallback exclusion_callback, PauseCallback pause_callback,
+                  HotkeyUpdateCallback hotkey_update_callback,
                   HotkeyActionCallback hotkey_action_callback,
                   DiagnosticsCallback diagnostics_callback,
-                  DiagnosticsActionCallback diagnostics_action_callback,
-                  HealCallback heal_callback, ExitCallback exit_callback);
+                  DiagnosticsActionCallback diagnostics_action_callback, HealCallback heal_callback,
+                  ExitCallback exit_callback);
   void Shutdown();
   void Show(bool show);
   void UpdateState(const AppSettings& settings);
@@ -124,8 +121,8 @@ private:
   enum class Page {
     kGeneral,
     kAnimation,
-    kWindowsIntegration,
     kApplications,
+    kWindowsIntegration,
     kHotkeys,
     kDiagnostics,
     kAbout,
@@ -223,6 +220,7 @@ private:
   ULONGLONG save_feedback_until_ms_ = 0;
   bool save_feedback_error_ = false;
   Page selected_page_ = Page::kGeneral;
+  bool reset_page_scroll_ = false;
   bool minimize_slider_active_ = false;
   bool minimize_slider_dirty_ = false;
   bool restore_slider_active_ = false;
