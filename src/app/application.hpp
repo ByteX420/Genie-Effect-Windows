@@ -94,15 +94,13 @@ private:
   bool SetEnabled(bool enabled);
   bool SetAnimationDurations(float minimize_duration, float restore_duration, bool save);
   bool SetLinkSpeeds(bool linked);
-  bool SetAdaptiveDuration(bool enabled);
   bool SetDisableAnimationsFullscreen(bool enabled);
-  bool SetPowerBehavior(bool reduce_on_battery, bool disable_in_saver);
+  bool SetDisableEffectsBatterySaver(bool enabled);
   bool SetEasing(const std::string& minimize_easing, const std::string& restore_easing);
   bool SetAnimationStyle(const std::string& style);
   bool SetGenieStrength(float strength, bool save);
   bool SetFadeStrength(const std::string& strength);
   bool SetTargetIndicator(bool enabled);
-  bool SetFollowWindowsAnimationPreference(bool enabled);
   bool SetCloseBehavior(const std::string& close_behavior);
   bool SetStartupOptions(bool run_at_startup, bool start_minimized);
   bool SetApplicationExcluded(const std::string& executable_name, bool excluded);
@@ -122,7 +120,6 @@ private:
   [[nodiscard]] bool IsFullscreenApplicationActive() const;
   void UpdateFullscreenSuppression(bool force = false);
   void UpdatePowerState(bool force = false);
-  void UpdateWindowsAnimationPreference(bool force = false);
   void EnableEffectRuntime();
   void DisableEffectRuntime();
   void RefreshEffectRuntimeState();
@@ -177,8 +174,6 @@ private:
   bool battery_saver_active_ = false;
   bool battery_saver_suppressed_ = false;
   ULONGLONG last_power_check_ms_ = 0;
-  bool windows_animations_suppressed_ = false;
-  ULONGLONG last_windows_animation_check_ms_ = 0;
   bool safe_mode_ = false;
   bool session_started_ = false;
   std::string startup_repair_status_ = "Not checked";

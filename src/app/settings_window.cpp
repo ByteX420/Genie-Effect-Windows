@@ -176,9 +176,9 @@ bool Toggle(const char* id, bool* value, float scale, float alpha) {
 
 bool Slider(const char* id, float* value, float minimum, float maximum, float width, float scale,
             float alpha, float default_value, float step) {
-  const float height = 20.0f * scale;
+  const float height = 30.0f * scale;
   const ImVec2 origin = ImGui::GetCursorScreenPos();
-  const float track_inset = 5.0f * scale;
+  const float track_inset = 9.0f * scale;
   const float start = origin.x + track_inset;
   const float end = origin.x + width - track_inset;
   ImGui::InvisibleButton(id, ImVec2(width, height));
@@ -206,33 +206,49 @@ bool Slider(const char* id, float* value, float minimum, float maximum, float wi
   }
   const float target = (*value - minimum) / (maximum - minimum);
   const ImGuiID slider_id = ImGui::GetID(id);
-  float visual = target;
-  if (active) {
-    // A slider should stay attached to the cursor while dragging.  Keep the
-    // eased value for external updates, but never let it trail live input.
-    ImGui::GetStateStorage()->SetFloat(slider_id, target);
-  } else {
-    visual = Animate(slider_id, target, 19.0f);
-  }
-  const float hover =
-      Animate(ImGui::GetID("slider_hover"), ImGui::IsItemHovered() || active ? 1.0f : 0.0f);
+  // The thumb must always represent the actual value.  In particular, this
+  // keeps it in sync when a value is entered directly or changed by a preset.
+  const float visual = target;
+  const float hover = Animate(slider_id ^ 0x51d3a91u,
+                              ImGui::IsItemHovered() || active || focused ? 1.0f : 0.0f, 22.0f);
   const float track_y = origin.y + height * 0.5f;
   const float knob_x = start + (end - start) * visual;
   ImDrawList* draw = ImGui::GetWindowDrawList();
 
-  const float track_h = 4.0f * scale;
+  const float track_h = 7.0f * scale;
+  draw->AddRectFilled(ImVec2(start, track_y - track_h * 0.5f + scale),
+                      ImVec2(end, track_y + track_h * 0.5f + 2.0f * scale),
+                      WithAlpha(IM_COL32(0, 0, 0, 52), alpha), track_h * 0.5f);
   draw->AddRectFilled(ImVec2(start, track_y - track_h * 0.5f),
-                      ImVec2(end, track_y + track_h * 0.5f), WithAlpha(kTrackColor, alpha),
+                      ImVec2(end, track_y + track_h * 0.5f),
+                      WithAlpha(Blend(kTrackColor, IM_COL32(78, 78, 84, 255), hover * 0.35f), alpha),
                       track_h * 0.5f);
   draw->AddRectFilled(ImVec2(start, track_y - track_h * 0.5f),
                       ImVec2(knob_x, track_y + track_h * 0.5f), WithAlpha(kAccentColor, alpha),
                       track_h * 0.5f);
-
-  const float knob_radius = (6.5f + hover * 0.45f) * scale;
-  draw->AddCircleFilled(ImVec2(knob_x, track_y + scale), knob_radius + scale,
-                        WithAlpha(IM_COL32(0, 0, 0, 75), alpha), 24);
-  draw->AddCircleFilled(ImVec2(knob_x, track_y), knob_radius, WithAlpha(kPrimaryTextColor, alpha),
-                        24);
+  for (int marker = 1; marker < 4; ++marker) {
+    const float marker_x = start + (end - start) * (static_cast<float>(marker) / 4.0f);
+    draw->AddCircleFilled(ImVec2(marker_x, track_y), 1.1f * scale,
+                          WithAlpha(IM_COL32_WHITE, marker_x <= knob_x ? 0.48f * alpha
+                                                                      : 0.20f * alpha),
+                          8);
+  }
+  const float knob_radius = (8.0f + hover * 0.8f) * scale;
+  if (hover > 0.01f) {
+    draw->AddCircleFilled(ImVec2(knob_x, track_y), knob_radius + 4.0f * scale,
+                          WithAlpha(kAccentColor, hover * 0.16f * alpha), 28);
+  }
+  draw->AddCircleFilled(ImVec2(knob_x, track_y + 1.5f * scale), knob_radius + 1.0f * scale,
+                        WithAlpha(IM_COL32(0, 0, 0, 82), alpha), 28);
+  draw->AddCircleFilled(ImVec2(knob_x, track_y), knob_radius, WithAlpha(IM_COL32_WHITE, alpha), 28);
+  draw->AddCircle(ImVec2(knob_x, track_y), knob_radius,
+                  WithAlpha(Blend(IM_COL32(190, 190, 196, 255), kAccentColor, hover), alpha), 28,
+                  std::max(1.0f, scale));
+  if (focused) {
+    draw->AddRect(ImVec2(origin.x, origin.y), ImVec2(origin.x + width, origin.y + height),
+                  WithAlpha(kAccentColor, 0.55f * alpha), 8.0f * scale, 0,
+                  std::max(1.0f, scale));
+  }
   return active;
 }
 
@@ -249,7 +265,7 @@ bool CompactButton(const char* id, const char* label, const ImVec2& size, ImFont
   ImU32 background = Blend(kTrackColor, kBorderColor, hover);
   if (held) background = Blend(background, kAccentColor, 0.35f);
   draw->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y), WithAlpha(background, alpha),
-                      3.0f * scale);
+                      7.0f * scale);
   draw->AddRect(min, ImVec2(min.x + size.x, min.y + size.y),
                 WithAlpha(Blend(kBorderColor, kAccentColor, focused ? 0.9f : hover * 0.45f), alpha),
                 5.0f * scale, 0, std::max(1.0f, scale));
@@ -286,28 +302,41 @@ bool LinkButton(const char* id, bool linked, float scale, float alpha) {
   return pressed;
 }
 
-bool RadioChoice(const char* id, const char* label, bool selected, ImFont* font, float scale,
-                 float alpha) {
+bool SegmentSelector(const char* id, const std::array<const char*, 2>& labels, int* selected,
+                     float width, ImFont* font, float scale, float alpha) {
   const ImVec2 min = ImGui::GetCursorScreenPos();
-  const bool pressed = ImGui::InvisibleButton(id, ImVec2(260.0f * scale, 22.0f * scale));
+  constexpr float kHeight = 34.0f;
+  const ImVec2 size(width, kHeight * scale);
+  const bool pressed = ImGui::InvisibleButton(id, size);
   const bool hovered = ImGui::IsItemHovered();
-  const bool focused = ImGui::IsItemFocused();
-  if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-  ImDrawList* draw = ImGui::GetWindowDrawList();
-  const ImVec2 center(min.x + 8.0f * scale, min.y + 11.0f * scale);
-  draw->AddCircleFilled(center, 7.0f * scale,
-                        WithAlpha(selected ? kAccentColor : IM_COL32(58, 58, 62, 255), alpha), 20);
-  draw->AddCircle(center, 7.0f * scale,
-                  WithAlpha(selected ? IM_COL32(45, 155, 255, 255)
-                                     : (hovered || focused ? IM_COL32(170, 170, 175, 255)
-                                                           : IM_COL32(108, 108, 112, 255)),
-                            alpha),
-                  20, std::max(1.0f, scale));
-  if (selected) {
-    draw->AddCircleFilled(center, 2.6f * scale, WithAlpha(IM_COL32_WHITE, alpha), 14);
+  int hovered_segment = -1;
+  if (hovered) {
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    hovered_segment = std::clamp(static_cast<int>((ImGui::GetIO().MousePos.x - min.x) /
+                                                  (size.x * 0.5f)),
+                                 0, 1);
+    if (pressed) *selected = hovered_segment;
   }
-  draw->AddText(font, 15.0f * scale, ImVec2(min.x + 24.0f * scale, min.y + 1.0f * scale),
-                WithAlpha(kPrimaryTextColor, alpha), label);
+  ImDrawList* draw = ImGui::GetWindowDrawList();
+  const float segment_width = size.x * 0.5f;
+  const float animated_segment = Animate(ImGui::GetID(id), static_cast<float>(*selected), 18.0f);
+  draw->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y),
+                      WithAlpha(IM_COL32(48, 48, 53, 255), alpha), 7.0f * scale);
+  const ImVec2 active_min(min.x + segment_width * animated_segment + 2.0f * scale,
+                          min.y + 2.0f * scale);
+  const ImVec2 active_max(active_min.x + segment_width - 4.0f * scale, min.y + size.y - 2.0f * scale);
+  draw->AddRectFilled(active_min, active_max, WithAlpha(kAccentColor, alpha), 5.0f * scale);
+  draw->AddRect(min, ImVec2(min.x + size.x, min.y + size.y),
+                WithAlpha(IM_COL32(105, 105, 112, 255), alpha), 7.0f * scale, 0,
+                std::max(1.0f, scale));
+  for (int index = 0; index < 2; ++index) {
+    const ImVec2 text_size = font->CalcTextSizeA(14.0f * scale, FLT_MAX, 0.0f, labels[index]);
+    const float text_x = min.x + segment_width * static_cast<float>(index) +
+                         (segment_width - text_size.x) * 0.5f;
+    draw->AddText(font, 14.0f * scale, ImVec2(text_x, min.y + (size.y - text_size.y) * 0.5f),
+                  WithAlpha(*selected == index ? IM_COL32_WHITE : kSecondaryTextColor, alpha),
+                  labels[index]);
+  }
   return pressed;
 }
 
@@ -374,12 +403,11 @@ bool SettingsWindow::ActivateExistingInstance(DWORD timeout_ms) {
 
 bool SettingsWindow::Initialize(
     HINSTANCE instance, ToggleCallback toggle_callback, SpeedCallback speed_callback,
-    LinkCallback link_callback, AdaptiveDurationCallback adaptive_duration_callback,
+    LinkCallback link_callback,
     FullscreenBehaviorCallback fullscreen_behavior_callback,
-    PowerBehaviorCallback power_behavior_callback, EasingCallback easing_callback,
+    BatterySaverCallback battery_saver_callback, EasingCallback easing_callback,
     AnimationStyleCallback animation_style_callback, StrengthCallback strength_callback,
     FadeCallback fade_callback, TargetIndicatorCallback target_indicator_callback,
-    WindowsAnimationPreferenceCallback windows_animation_preference_callback,
     CloseBehaviorCallback close_behavior_callback, StartupCallback startup_callback,
     ExclusionCallback exclusion_callback, PauseCallback pause_callback,
     HotkeyUpdateCallback hotkey_update_callback, HotkeyActionCallback hotkey_action_callback,
@@ -388,15 +416,13 @@ bool SettingsWindow::Initialize(
   toggle_callback_ = std::move(toggle_callback);
   speed_callback_ = std::move(speed_callback);
   link_callback_ = std::move(link_callback);
-  adaptive_duration_callback_ = std::move(adaptive_duration_callback);
   fullscreen_behavior_callback_ = std::move(fullscreen_behavior_callback);
-  power_behavior_callback_ = std::move(power_behavior_callback);
+  battery_saver_callback_ = std::move(battery_saver_callback);
   easing_callback_ = std::move(easing_callback);
   animation_style_callback_ = std::move(animation_style_callback);
   strength_callback_ = std::move(strength_callback);
   fade_callback_ = std::move(fade_callback);
   target_indicator_callback_ = std::move(target_indicator_callback);
-  windows_animation_preference_callback_ = std::move(windows_animation_preference_callback);
   close_behavior_callback_ = std::move(close_behavior_callback);
   startup_callback_ = std::move(startup_callback);
   exclusion_callback_ = std::move(exclusion_callback);
@@ -699,16 +725,14 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
       enabled_changed ||
       std::abs(minimize_duration_seconds_ - settings.minimize_duration) > 0.0001f ||
       std::abs(restore_duration_seconds_ - settings.restore_duration) > 0.0001f ||
-      link_speeds_ != settings.link_speeds || adaptive_duration_ != settings.adaptive_duration ||
+      link_speeds_ != settings.link_speeds ||
       disable_animations_fullscreen_ != settings.disable_animations_fullscreen ||
-      reduce_effects_on_battery_ != settings.reduce_effects_on_battery ||
       disable_effects_battery_saver_ != settings.disable_effects_battery_saver ||
       minimize_easing_ != settings.minimize_easing || restore_easing_ != settings.restore_easing ||
       animation_style_ != settings.animation_style ||
       std::abs(genie_strength_ - settings.genie_strength) > 0.0001f ||
       fade_strength_ != settings.fade_strength ||
       show_target_indicator_ != settings.show_target_indicator ||
-      follow_windows_animation_preference_ != settings.follow_windows_animation_preference ||
       close_behavior_ != settings.close_behavior || run_at_startup_ != settings.run_at_startup ||
       start_minimized_ != settings.start_minimized ||
       excluded_applications_ != settings.excluded_applications || hotkeys_ != settings.hotkeys;
@@ -716,9 +740,7 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
   minimize_duration_seconds_ = settings.minimize_duration;
   restore_duration_seconds_ = settings.restore_duration;
   link_speeds_ = settings.link_speeds;
-  adaptive_duration_ = settings.adaptive_duration;
   disable_animations_fullscreen_ = settings.disable_animations_fullscreen;
-  reduce_effects_on_battery_ = settings.reduce_effects_on_battery;
   disable_effects_battery_saver_ = settings.disable_effects_battery_saver;
   minimize_easing_ = settings.minimize_easing;
   restore_easing_ = settings.restore_easing;
@@ -726,7 +748,6 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
   genie_strength_ = settings.genie_strength;
   fade_strength_ = settings.fade_strength;
   show_target_indicator_ = settings.show_target_indicator;
-  follow_windows_animation_preference_ = settings.follow_windows_animation_preference;
   close_behavior_ = settings.close_behavior;
   run_at_startup_ = settings.run_at_startup;
   start_minimized_ = settings.start_minimized;
@@ -1245,19 +1266,13 @@ void SettingsWindow::RenderContents() {
                   point(px(settings_ui::Metrics::kContentInset), px(177.0f) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "Closing settings");
     ImGui::SetCursorPos(ImVec2(px(settings_ui::Metrics::kContentInset), px(202.0f) + y_offset));
-    if (RadioChoice("##close_exit", "Exit Genie Effect", close_behavior_ == "exit", font_body_,
-                    scale, content_alpha)) {
+    int close_behavior_segment = close_behavior_ == "tray" ? 1 : 0;
+    const float close_selector_width = size.x - px(settings_ui::Metrics::kContentInset * 2.0f);
+    if (SegmentSelector("##close_behavior", {"Exit Genie Effect", "Minimize to system tray"},
+                        &close_behavior_segment, close_selector_width, font_body_, scale,
+                        content_alpha)) {
       const std::string previous_close_behavior = close_behavior_;
-      close_behavior_ = "exit";
-      const bool saved = !close_behavior_callback_ || close_behavior_callback_(close_behavior_);
-      if (!saved) close_behavior_ = previous_close_behavior;
-      RecordSaveResult(saved);
-    }
-    ImGui::SetCursorPos(ImVec2(px(settings_ui::Metrics::kContentInset), px(232.0f) + y_offset));
-    if (RadioChoice("##close_tray", "Minimize to system tray", close_behavior_ == "tray",
-                    font_body_, scale, content_alpha)) {
-      const std::string previous_close_behavior = close_behavior_;
-      close_behavior_ = "tray";
+      close_behavior_ = close_behavior_segment == 1 ? "tray" : "exit";
       const bool saved = !close_behavior_callback_ || close_behavior_callback_(close_behavior_);
       if (!saved) close_behavior_ = previous_close_behavior;
       RecordSaveResult(saved);
@@ -1324,47 +1339,20 @@ void SettingsWindow::RenderContents() {
     // Row 2: Minimize Duration (y = 92)
     draw->AddText(font_body_, px(kLabelTextSize),
                   point(px(settings_ui::Metrics::kContentInset), px(92.0f) + y_offset),
-                  WithAlpha(kSecondaryTextColor, content_alpha), "Minimize Duration");
+                  WithAlpha(kPrimaryTextColor, content_alpha), "Minimize Duration");
 
     // Value text on the right
     const std::string min_duration_text = std::format("{:.2f}s", minimize_duration_seconds_);
-    const ImVec2 min_duration_size =
-        font_small_->CalcTextSizeA(px(kValueTextSize), FLT_MAX, 0.0f, min_duration_text.c_str());
     const ImVec2 min_value_pos(
-        size.x - px(settings_ui::Metrics::kContentInset) - min_duration_size.x,
+        size.x - px(settings_ui::Metrics::kContentInset) - px(52.0f),
         px(92.0f) + y_offset);
-    if (numeric_edit_field_ == 0) {
-      ImGui::SetCursorPos(ImVec2(size.x - px(110.0f), px(86.0f) + y_offset));
-      ImGui::SetNextItemWidth(px(68.0f));
-      ImGui::SetKeyboardFocusHere();
-      const bool apply = ImGui::InputFloat("##min_duration_input", &numeric_edit_value_, 0, 0,
-                                           "%.2f", ImGuiInputTextFlags_EnterReturnsTrue);
-      if (apply) {
-        const float value = std::clamp(numeric_edit_value_, kMinimumAnimationDurationSeconds,
-                                       kMaximumAnimationDurationSeconds);
-        minimize_duration_seconds_ = value;
-        if (link_speeds_) restore_duration_seconds_ = value;
-        RecordSaveResult(!speed_callback_ || speed_callback_(minimize_duration_seconds_,
-                                                             restore_duration_seconds_, true));
-        numeric_edit_field_ = -1;
-      } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-        numeric_edit_field_ = -1;
-      }
-    } else {
-      draw->AddText(font_small_, px(kValueTextSize), point(min_value_pos.x, min_value_pos.y),
-                    WithAlpha(kSecondaryTextColor, content_alpha), min_duration_text.c_str());
-      ImGui::SetCursorPos(min_value_pos);
-      ImGui::InvisibleButton("##edit_min_duration", ImVec2(min_duration_size.x, px(20.0f)));
-      if (ImGui::IsItemClicked()) {
-        numeric_edit_field_ = 0;
-        numeric_edit_value_ = minimize_duration_seconds_;
-      }
-    }
+    draw->AddText(font_small_, px(kValueTextSize), point(min_value_pos.x, min_value_pos.y),
+                  WithAlpha(kSecondaryTextColor, content_alpha), min_duration_text.c_str());
 
     // Slider (Right-aligned next to value text)
-    const float slider_w = px(120.0f);
-    ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) -
-                                   min_duration_size.x - slider_w - px(8.0f),
+    const float slider_w = px(220.0f);
+    ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) - px(52.0f) -
+                                   slider_w - px(8.0f),
                                px(92.0f) + y_offset));
     float updated_min_duration = minimize_duration_seconds_;
     const bool minimize_slider_active =
@@ -1407,47 +1395,19 @@ void SettingsWindow::RenderContents() {
     // Row 3: Restore Duration (y = 132)
     draw->AddText(font_body_, px(kLabelTextSize),
                   point(px(settings_ui::Metrics::kContentInset), px(132.0f) + y_offset),
-                  WithAlpha(kSecondaryTextColor, content_alpha), "Restore Duration");
+                  WithAlpha(kPrimaryTextColor, content_alpha), "Restore Duration");
 
     // Value text on the right
     const std::string restore_duration_text = std::format("{:.2f}s", restore_duration_seconds_);
-    const ImVec2 restore_duration_size = font_small_->CalcTextSizeA(
-        px(kValueTextSize), FLT_MAX, 0.0f, restore_duration_text.c_str());
     const ImVec2 restore_value_pos(
-        size.x - px(settings_ui::Metrics::kContentInset) - restore_duration_size.x,
+        size.x - px(settings_ui::Metrics::kContentInset) - px(52.0f),
         px(132.0f) + y_offset);
-    if (numeric_edit_field_ == 1) {
-      ImGui::SetCursorPos(ImVec2(size.x - px(110.0f), px(126.0f) + y_offset));
-      ImGui::SetNextItemWidth(px(68.0f));
-      ImGui::SetKeyboardFocusHere();
-      const bool apply = ImGui::InputFloat("##restore_duration_input", &numeric_edit_value_, 0, 0,
-                                           "%.2f", ImGuiInputTextFlags_EnterReturnsTrue);
-      if (apply) {
-        const float value = std::clamp(numeric_edit_value_, kMinimumAnimationDurationSeconds,
-                                       kMaximumAnimationDurationSeconds);
-        restore_duration_seconds_ = value;
-        if (link_speeds_) minimize_duration_seconds_ = value;
-        RecordSaveResult(!speed_callback_ || speed_callback_(minimize_duration_seconds_,
-                                                             restore_duration_seconds_, true));
-        numeric_edit_field_ = -1;
-      } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-        numeric_edit_field_ = -1;
-      }
-    } else {
-      draw->AddText(font_small_, px(kValueTextSize),
-                    point(restore_value_pos.x, restore_value_pos.y),
-                    WithAlpha(kSecondaryTextColor, content_alpha), restore_duration_text.c_str());
-      ImGui::SetCursorPos(restore_value_pos);
-      ImGui::InvisibleButton("##edit_restore_duration", ImVec2(restore_duration_size.x, px(20.0f)));
-      if (ImGui::IsItemClicked()) {
-        numeric_edit_field_ = 1;
-        numeric_edit_value_ = restore_duration_seconds_;
-      }
-    }
+    draw->AddText(font_small_, px(kValueTextSize), point(restore_value_pos.x, restore_value_pos.y),
+                  WithAlpha(kSecondaryTextColor, content_alpha), restore_duration_text.c_str());
 
     // Slider (Right-aligned next to value text)
-    ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) -
-                                   restore_duration_size.x - slider_w - px(8.0f),
+    ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) - px(52.0f) -
+                                   slider_w - px(8.0f),
                                px(132.0f) + y_offset));
     float updated_restore_duration = restore_duration_seconds_;
     const bool restore_slider_active =
@@ -1479,15 +1439,18 @@ void SettingsWindow::RenderContents() {
 
     draw->AddText(font_body_, px(kLabelTextSize),
                   point(px(settings_ui::Metrics::kContentInset), px(174.0f) + y_offset),
-                  WithAlpha(kSecondaryTextColor, content_alpha), "Presets");
+                  WithAlpha(kPrimaryTextColor, content_alpha), "Presets");
     constexpr std::array presets = {
         std::tuple{"Snappy", 0.30f, 0.25f},
         std::tuple{"Balanced", 0.55f, 0.45f},
         std::tuple{"Smooth", 0.80f, 0.70f},
         std::tuple{"Cinematic", 1.20f, 1.00f},
     };
-    const float preset_width = px(78.0f);
-    const float preset_gap = px(6.0f);
+    const float preset_gap = px(8.0f);
+    const float preset_available_width = size.x - px(settings_ui::Metrics::kContentInset * 2.0f);
+    const float preset_width =
+        (preset_available_width - preset_gap * static_cast<float>(presets.size() - 1)) /
+        static_cast<float>(presets.size());
     float preset_x = px(settings_ui::Metrics::kContentInset);
     for (size_t i = 0; i < presets.size(); ++i) {
       const auto& [label, minimize, restore] = presets[i];
@@ -1539,21 +1502,6 @@ void SettingsWindow::RenderContents() {
     draw->AddText(font_medium_, px(kSectionTitleTextSize),
                   point(px(settings_ui::Metrics::kContentInset), px(374.0f) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "Motion");
-    draw->AddText(font_body_, px(kLabelTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(406.0f) + y_offset),
-                  WithAlpha(kPrimaryTextColor, content_alpha),
-                  "Adapt duration to animation distance");
-    ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) - px(38.0f),
-                               px(403.0f) + y_offset));
-    const bool previous_adaptive_duration = adaptive_duration_;
-    if (Toggle("##adaptive_duration", &adaptive_duration_, scale, content_alpha)) {
-      const bool saved =
-          !adaptive_duration_callback_ || adaptive_duration_callback_(adaptive_duration_);
-      if (!saved) adaptive_duration_ = previous_adaptive_duration;
-      RecordSaveResult(saved);
-    }
-    DelayedTooltip("Short trips finish faster; the selected duration remains the maximum.", scale);
-
     constexpr std::array easing_names = {
         "Linear", "Ease In", "Ease Out", "Ease In Out", "Cubic", "Back", "Elastic",
     };
@@ -1621,34 +1569,12 @@ void SettingsWindow::RenderContents() {
                   WithAlpha(kPrimaryTextColor, content_alpha), "Genie Strength");
     const std::string strength_text = std::format("{:.0f}%", genie_strength_ * 100.0f);
     const ImVec2 strength_value_pos(size.x - px(90.0f), px(634.0f) + y_offset);
-    if (numeric_edit_field_ == 2) {
-      ImGui::SetCursorPos(ImVec2(size.x - px(82.0f), px(628.0f) + y_offset));
-      ImGui::SetNextItemWidth(px(64.0f));
-      ImGui::SetKeyboardFocusHere();
-      const bool apply = ImGui::InputFloat("##strength_input", &numeric_edit_value_, 0, 0, "%.2f",
-                                           ImGuiInputTextFlags_EnterReturnsTrue);
-      if (apply) {
-        genie_strength_ = std::clamp(numeric_edit_value_, 0.25f, 1.0f);
-        RecordSaveResult(!strength_callback_ || strength_callback_(genie_strength_, true));
-        numeric_edit_field_ = -1;
-      } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-        numeric_edit_field_ = -1;
-      }
-    } else {
-      draw->AddText(font_small_, px(kValueTextSize),
-                    point(strength_value_pos.x, strength_value_pos.y),
-                    WithAlpha(kSecondaryTextColor, content_alpha), strength_text.c_str());
-      ImGui::SetCursorPos(strength_value_pos);
-      ImGui::InvisibleButton("##edit_strength", ImVec2(px(52.0f), px(20.0f)));
-      if (ImGui::IsItemClicked()) {
-        numeric_edit_field_ = 2;
-        numeric_edit_value_ = genie_strength_;
-      }
-    }
-    ImGui::SetCursorPos(ImVec2(size.x - px(314.0f), px(630.0f) + y_offset));
+    draw->AddText(font_small_, px(kValueTextSize), point(strength_value_pos.x, strength_value_pos.y),
+                  WithAlpha(kSecondaryTextColor, content_alpha), strength_text.c_str());
+    ImGui::SetCursorPos(ImVec2(size.x - px(354.0f), px(625.0f) + y_offset));
     float proposed_strength = genie_strength_;
     const bool strength_active = Slider("##genie_strength", &proposed_strength, 0.25f, 1.0f,
-                                        px(200.0f), scale, content_alpha, 1.0f, 0.01f);
+                                         px(240.0f), scale, content_alpha, 1.0f, 0.01f);
     DelayedTooltip("Controls how strongly the window bends toward its taskbar target.", scale);
     if (strength_active && std::abs(proposed_strength - genie_strength_) > 0.0001f) {
       genie_strength_ = proposed_strength;
@@ -1906,13 +1832,23 @@ void SettingsWindow::RenderContents() {
   }
 
   if (selected_page_ == Page::kWindowsIntegration) {
+    // Card geometry follows content so additional settings do not require retuning panel offsets.
+    constexpr float card_top = 76.0f;
+    constexpr float card_gap = 20.0f;
+    constexpr float title_offset = 6.0f;
+    constexpr float setting_offset = 40.0f;
+    constexpr float card_bottom_padding = 28.0f;
+    const float windows_card_bottom = card_top + setting_offset + 28.0f + card_bottom_padding;
+    const float power_card_top = windows_card_bottom + card_gap;
+    const float power_card_bottom = power_card_top + setting_offset + card_bottom_padding;
+    page_content_bottom = power_card_bottom;
     settings_ui::DrawCard(
-        draw, point(px(settings_ui::Metrics::kPageInset), px(76.0f) + y_offset),
-        point(size.x - px(settings_ui::Metrics::kPageInset), px(226.0f) + y_offset), scale,
+        draw, point(px(settings_ui::Metrics::kPageInset), px(card_top) + y_offset),
+        point(size.x - px(settings_ui::Metrics::kPageInset), px(windows_card_bottom) + y_offset), scale,
         content_alpha);
     settings_ui::DrawCard(
-        draw, point(px(settings_ui::Metrics::kPageInset), px(246.0f) + y_offset),
-        point(size.x - px(settings_ui::Metrics::kPageInset), px(364.0f) + y_offset), scale,
+        draw, point(px(settings_ui::Metrics::kPageInset), px(power_card_top) + y_offset),
+        point(size.x - px(settings_ui::Metrics::kPageInset), px(power_card_bottom) + y_offset), scale,
         content_alpha);
     draw->AddText(font_title_, px(kPageTitleTextSize),
                   point(px(settings_ui::Metrics::kPageInset), px(20.0f) + y_offset),
@@ -1921,14 +1857,14 @@ void SettingsWindow::RenderContents() {
                   point(px(settings_ui::Metrics::kPageInset), px(51.0f) + y_offset),
                   WithAlpha(kSecondaryTextColor, content_alpha), "System behavior and power usage");
     draw->AddText(font_medium_, px(kSectionTitleTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(82.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(card_top + title_offset) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "Windows behavior");
     draw->AddText(font_body_, px(kLabelTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(116.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(card_top + setting_offset) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha),
                   "Disable animations while a fullscreen application is active");
     ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) - px(38.0f),
-                               px(113.0f) + y_offset));
+                                px(card_top + setting_offset - 3.0f) + y_offset));
     const bool previous_fullscreen_behavior = disable_animations_fullscreen_;
     if (Toggle("##disable_fullscreen_animations", &disable_animations_fullscreen_, scale,
                content_alpha)) {
@@ -1939,51 +1875,21 @@ void SettingsWindow::RenderContents() {
     }
     DelayedTooltip("Uses normal Windows behavior while a true fullscreen app is active.", scale);
     draw->AddText(font_small_, px(kHelperTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(145.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(card_top + setting_offset + 29.0f) + y_offset),
                   WithAlpha(kSecondaryTextColor, content_alpha),
                   "Normal maximized windows continue to use Genie animations.");
 
-    draw->AddText(font_body_, px(kLabelTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(190.0f) + y_offset),
-                  WithAlpha(kPrimaryTextColor, content_alpha),
-                  "Follow the Windows animation preference");
-    ImGui::SetCursorPos(ImVec2(size.x - px(80.0f), px(187.0f) + y_offset));
-    bool proposed_follow = follow_windows_animation_preference_;
-    if (Toggle("##follow_windows_animations", &proposed_follow, scale, content_alpha)) {
-      const bool saved = !windows_animation_preference_callback_ ||
-                         windows_animation_preference_callback_(proposed_follow);
-      if (saved) follow_windows_animation_preference_ = proposed_follow;
-      RecordSaveResult(saved);
-    }
-
     draw->AddText(font_medium_, px(kSectionTitleTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(262.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(power_card_top + title_offset) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "Power");
     draw->AddText(font_body_, px(kLabelTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(296.0f) + y_offset),
-                  WithAlpha(kPrimaryTextColor, content_alpha), "Reduce effects on battery");
-    ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) - px(38.0f),
-                               px(293.0f) + y_offset));
-    bool proposed_reduce_on_battery = reduce_effects_on_battery_;
-    if (Toggle("##reduce_on_battery", &proposed_reduce_on_battery, scale, content_alpha)) {
-      const bool saved =
-          !power_behavior_callback_ ||
-          power_behavior_callback_(proposed_reduce_on_battery, disable_effects_battery_saver_);
-      if (saved) reduce_effects_on_battery_ = proposed_reduce_on_battery;
-      RecordSaveResult(saved);
-    }
-    DelayedTooltip("Reduces capture and rendering work while running on battery.", scale);
-
-    draw->AddText(font_body_, px(kLabelTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(342.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(power_card_top + setting_offset) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "Disable effects in battery saver");
     ImGui::SetCursorPos(ImVec2(size.x - px(settings_ui::Metrics::kContentInset) - px(38.0f),
-                               px(339.0f) + y_offset));
+                                px(power_card_top + setting_offset - 3.0f) + y_offset));
     bool proposed_disable_in_saver = disable_effects_battery_saver_;
     if (Toggle("##disable_in_battery_saver", &proposed_disable_in_saver, scale, content_alpha)) {
-      const bool saved =
-          !power_behavior_callback_ ||
-          power_behavior_callback_(reduce_effects_on_battery_, proposed_disable_in_saver);
+      const bool saved = !battery_saver_callback_ || battery_saver_callback_(proposed_disable_in_saver);
       if (saved) disable_effects_battery_saver_ = proposed_disable_in_saver;
       RecordSaveResult(saved);
     }
@@ -1992,32 +1898,12 @@ void SettingsWindow::RenderContents() {
   if (selected_page_ == Page::kDiagnostics) {
     const ULONGLONG now = GetTickCount64();
     if (diagnostics_callback_ != nullptr &&
-        (diagnostics_.status.empty() || now - last_diagnostics_refresh_ms_ >= 500)) {
+        (diagnostics_.effect.empty() || now - last_diagnostics_refresh_ms_ >= 500)) {
       diagnostics_ = diagnostics_callback_();
       last_diagnostics_refresh_ms_ = now;
     }
-    settings_ui::DrawCard(
-        draw, point(px(settings_ui::Metrics::kPageInset), px(64.0f) + y_offset),
-        point(size.x - px(settings_ui::Metrics::kPageInset), px(382.0f) + y_offset), scale,
-        content_alpha);
-    settings_ui::DrawCard(
-        draw, point(px(settings_ui::Metrics::kPageInset), px(402.0f) + y_offset),
-        point(size.x - px(settings_ui::Metrics::kPageInset), px(530.0f) + y_offset), scale,
-        content_alpha);
-    settings_ui::DrawCard(
-        draw, point(px(settings_ui::Metrics::kPageInset), px(550.0f) + y_offset),
-        point(size.x - px(settings_ui::Metrics::kPageInset), px(706.0f) + y_offset), scale,
-        content_alpha);
-    draw->AddText(font_title_, px(kPageTitleTextSize),
-                  point(px(settings_ui::Metrics::kPageInset), px(20.0f) + y_offset),
-                  WithAlpha(kPrimaryTextColor, content_alpha), "Diagnostics & Repair");
-    draw->AddText(font_medium_, px(kSectionTitleTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(76.0f) + y_offset),
-                  WithAlpha(kPrimaryTextColor, content_alpha), "Runtime");
     const std::array runtime_rows = {
-        std::pair{"Status", &diagnostics_.status},
         std::pair{"Effect", &diagnostics_.effect},
-        std::pair{"Pause state", &diagnostics_.pause},
         std::pair{"Hook", &diagnostics_.hook},
         std::pair{"Renderer", &diagnostics_.renderer},
         std::pair{"D3D Device", &diagnostics_.d3d_device},
@@ -2026,11 +1912,53 @@ void SettingsWindow::RenderContents() {
         std::pair{"Display refresh", &diagnostics_.display_refresh},
         std::pair{"Window monitor", &diagnostics_.window_monitor},
         std::pair{"Taskbar detected", &diagnostics_.taskbar},
-        std::pair{"Safe Mode", &diagnostics_.safe_mode},
         std::pair{"Startup repair", &diagnostics_.startup_repair},
     };
+    const std::array system_rows = {
+        std::pair{"Windows", &diagnostics_.windows_version},
+        std::pair{"Graphics adapter", &diagnostics_.graphics_adapter},
+        std::pair{"Displays", &diagnostics_.monitor_configuration},
+        std::pair{"Log folder size", &diagnostics_.log_folder_size},
+    };
+    constexpr std::array actions = {
+        std::pair{"Copy Report", DiagnosticsAction::kCopy},
+        std::pair{"Open Logs", DiagnosticsAction::kOpenLogFolder},
+        std::pair{"Repair Windows", DiagnosticsAction::kRepairWindows},
+        std::pair{"Restart Renderer", DiagnosticsAction::kRestartRenderer},
+    };
+    constexpr float card_gap = 20.0f;
+    constexpr float row_height = 20.0f;
+    constexpr float runtime_card_top = 64.0f;
+    constexpr float runtime_title_y = runtime_card_top + 12.0f;
+    constexpr float runtime_rows_top = runtime_card_top + 40.0f;
+    const float runtime_rows_bottom = runtime_rows_top + runtime_rows.size() * row_height;
+    const float system_title_y = runtime_rows_bottom + 18.0f;
+    const float system_rows_top = system_title_y + 30.0f;
+    const float runtime_card_bottom = system_rows_top + system_rows.size() * row_height + 18.0f;
+    const float actions_card_top = runtime_card_bottom + card_gap;
+    constexpr float action_title_offset = 12.0f;
+    constexpr float action_first_row_offset = 40.0f;
+    constexpr float action_row_height = 38.0f;
+    const float action_rows = static_cast<float>((actions.size() + 1) / 2);
+    const float actions_card_bottom =
+        actions_card_top + action_first_row_offset + action_rows * action_row_height + 18.0f;
+    page_content_bottom = actions_card_bottom;
+    settings_ui::DrawCard(
+        draw, point(px(settings_ui::Metrics::kPageInset), px(runtime_card_top) + y_offset),
+        point(size.x - px(settings_ui::Metrics::kPageInset), px(runtime_card_bottom) + y_offset), scale,
+        content_alpha);
+    settings_ui::DrawCard(
+        draw, point(px(settings_ui::Metrics::kPageInset), px(actions_card_top) + y_offset),
+        point(size.x - px(settings_ui::Metrics::kPageInset), px(actions_card_bottom) + y_offset), scale,
+        content_alpha);
+    draw->AddText(font_title_, px(kPageTitleTextSize),
+                  point(px(settings_ui::Metrics::kPageInset), px(20.0f) + y_offset),
+                  WithAlpha(kPrimaryTextColor, content_alpha), "Diagnostics & Repair");
+    draw->AddText(font_medium_, px(kSectionTitleTextSize),
+                  point(px(settings_ui::Metrics::kContentInset), px(runtime_title_y) + y_offset),
+                  WithAlpha(kPrimaryTextColor, content_alpha), "Runtime");
     for (size_t index = 0; index < runtime_rows.size(); ++index) {
-      const float row_y = 104.0f + static_cast<float>(index) * 20.0f;
+      const float row_y = runtime_rows_top + static_cast<float>(index) * row_height;
       draw->AddText(font_small_, px(kValueTextSize),
                     point(px(settings_ui::Metrics::kContentInset), px(row_y) + y_offset),
                     WithAlpha(kSecondaryTextColor, content_alpha), runtime_rows[index].first);
@@ -2038,18 +1966,11 @@ void SettingsWindow::RenderContents() {
                     WithAlpha(kPrimaryTextColor, content_alpha),
                     runtime_rows[index].second->c_str());
     }
-
     draw->AddText(font_medium_, px(kSectionTitleTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(414.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(system_title_y) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "System");
-    const std::array system_rows = {
-        std::pair{"Windows", &diagnostics_.windows_version},
-        std::pair{"Graphics adapter", &diagnostics_.graphics_adapter},
-        std::pair{"Displays", &diagnostics_.monitor_configuration},
-        std::pair{"Log folder size", &diagnostics_.log_folder_size},
-    };
     for (size_t index = 0; index < system_rows.size(); ++index) {
-      const float row_y = 444.0f + static_cast<float>(index) * 20.0f;
+      const float row_y = system_rows_top + static_cast<float>(index) * row_height;
       draw->AddText(font_small_, px(kValueTextSize),
                     point(px(settings_ui::Metrics::kContentInset), px(row_y) + y_offset),
                     WithAlpha(kSecondaryTextColor, content_alpha), system_rows[index].first);
@@ -2057,14 +1978,8 @@ void SettingsWindow::RenderContents() {
                     WithAlpha(kPrimaryTextColor, content_alpha),
                     system_rows[index].second->c_str());
     }
-    constexpr std::array actions = {
-        std::pair{"Copy Report", DiagnosticsAction::kCopy},
-        std::pair{"Open Logs", DiagnosticsAction::kOpenLogFolder},
-        std::pair{"Repair Windows", DiagnosticsAction::kRepairWindows},
-        std::pair{"Restart Renderer", DiagnosticsAction::kRestartRenderer},
-    };
     draw->AddText(font_medium_, px(kSectionTitleTextSize),
-                  point(px(settings_ui::Metrics::kContentInset), px(562.0f) + y_offset),
+                  point(px(settings_ui::Metrics::kContentInset), px(actions_card_top + action_title_offset) + y_offset),
                   WithAlpha(kPrimaryTextColor, content_alpha), "Actions");
     const float action_gap = px(8.0f);
     const float action_width =
@@ -2072,7 +1987,8 @@ void SettingsWindow::RenderContents() {
     for (size_t index = 0; index < actions.size(); ++index) {
       const float button_x = px(settings_ui::Metrics::kContentInset) +
                              static_cast<float>(index % 2) * (action_width + action_gap);
-      const float button_y = px(590.0f + static_cast<float>(index / 2) * 38.0f) + y_offset;
+      const float button_y =
+          px(actions_card_top + action_first_row_offset + static_cast<float>(index / 2) * action_row_height) + y_offset;
       ImGui::SetCursorPos(ImVec2(button_x, button_y));
       const std::string id = std::format("##diagnostics_action_{}", index);
       if (CompactButton(id.c_str(), actions[index].first, ImVec2(action_width, px(30.0f)),
@@ -2083,23 +1999,9 @@ void SettingsWindow::RenderContents() {
         last_diagnostics_refresh_ms_ = 0;
       }
     }
-    if (diagnostics_.safe_mode == "On") {
-      ImGui::SetCursorPos(ImVec2(px(settings_ui::Metrics::kContentInset), px(666.0f) + y_offset));
-      if (CompactButton("##exit_safe_mode", "Start Normally", ImVec2(action_width, px(28.0f)),
-                        font_small_, scale, content_alpha)) {
-        const bool succeeded = diagnostics_action_callback_ &&
-                               diagnostics_action_callback_(DiagnosticsAction::kExitSafeMode);
-        diagnostics_feedback_ =
-            succeeded ? "Normal animation runtime started" : "Could not leave Safe Mode";
-        last_diagnostics_refresh_ms_ = 0;
-      }
-    }
     if (!diagnostics_feedback_.empty()) {
-      const float feedback_x =
-          diagnostics_.safe_mode == "On"
-              ? px(settings_ui::Metrics::kContentInset) + action_width + action_gap
-              : px(settings_ui::Metrics::kContentInset);
-      draw->AddText(font_small_, px(kHelperTextSize), point(feedback_x, px(672.0f) + y_offset),
+      draw->AddText(font_small_, px(kHelperTextSize),
+                    point(px(settings_ui::Metrics::kContentInset), px(actions_card_bottom - 16.0f) + y_offset),
                     WithAlpha(kSecondaryTextColor, content_alpha), diagnostics_feedback_.c_str());
     }
   }

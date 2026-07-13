@@ -555,9 +555,8 @@ bool Application::Initialize(HINSTANCE instance) {
             return SetAnimationDurations(min_dur, rest_dur, save);
           },
           [this](bool linked) { return SetLinkSpeeds(linked); },
-          [this](bool enabled) { return SetAdaptiveDuration(enabled); },
           [this](bool enabled) { return SetDisableAnimationsFullscreen(enabled); },
-          [this](bool reduce, bool disable) { return SetPowerBehavior(reduce, disable); },
+          [this](bool enabled) { return SetDisableEffectsBatterySaver(enabled); },
           [this](const std::string& minimize, const std::string& restore) {
             return SetEasing(minimize, restore);
           },
@@ -565,7 +564,6 @@ bool Application::Initialize(HINSTANCE instance) {
           [this](float strength, bool save) { return SetGenieStrength(strength, save); },
           [this](const std::string& strength) { return SetFadeStrength(strength); },
           [this](bool enabled) { return SetTargetIndicator(enabled); },
-          [this](bool enabled) { return SetFollowWindowsAnimationPreference(enabled); },
           [this](const std::string& behavior) { return SetCloseBehavior(behavior); },
           [this](bool run_at_startup, bool start_minimized) {
             return SetStartupOptions(run_at_startup, start_minimized);
@@ -768,7 +766,6 @@ int Application::Run() {
     UpdateTemporaryPause();
     UpdateFullscreenSuppression();
     UpdatePowerState();
-    UpdateWindowsAnimationPreference();
     CheckAnimationTimeouts();
 
     while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -781,7 +778,6 @@ int Application::Run() {
           runs_[i].animation_monitor = nullptr;
         }
       }
-      if (message.message == WM_SETTINGCHANGE) UpdateWindowsAnimationPreference(true);
       TranslateMessage(&message);
       DispatchMessageW(&message);
     }
@@ -861,8 +857,7 @@ int Application::Run() {
           slot.live_animation_capture_enabled = false;
         } else {
           const ULONGLONG now_ms = GetTickCount64();
-          const ULONGLONG refresh_interval_ms =
-              settings_.reduce_effects_on_battery && running_on_battery_ ? 33 : 16;
+          constexpr ULONGLONG refresh_interval_ms = 16;
           if (now_ms - slot.last_animation_texture_refresh_ms >= refresh_interval_ms) {
             slot.last_animation_texture_refresh_ms = now_ms;
             if (!desktop_capture_->RefreshCapturedTexture(
@@ -1218,7 +1213,7 @@ bool Application::IsTemporarilyPaused() const {
 
 bool Application::IsEffectActive() const {
   return !safe_mode_ && is_enabled_ && !IsTemporarilyPaused() && !fullscreen_suppressed_ &&
-         !battery_saver_suppressed_ && !windows_animations_suppressed_;
+         !battery_saver_suppressed_;
 }
 
 bool Application::IsFullscreenApplicationActive() const {
@@ -1287,20 +1282,6 @@ void Application::UpdatePowerState(bool force) {
                            std::to_wstring(saver_active));
   }
   if (suppression_changed) RefreshEffectRuntimeState();
-}
-
-void Application::UpdateWindowsAnimationPreference(bool force) {
-  const ULONGLONG now = GetTickCount64();
-  if (!force && now - last_windows_animation_check_ms_ < 1000) return;
-  last_windows_animation_check_ms_ = now;
-  BOOL animations_enabled = TRUE;
-  if (!SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animations_enabled, 0)) return;
-  const bool suppressed = settings_.follow_windows_animation_preference && !animations_enabled;
-  if (windows_animations_suppressed_ == suppressed) return;
-  windows_animations_suppressed_ = suppressed;
-  LogDebug(L"Windows", suppressed ? L"System animations disabled; Genie suspended"
-                                  : L"System animation preference allows Genie");
-  RefreshEffectRuntimeState();
 }
 
 void Application::DisableEffectRuntime() {
@@ -1471,11 +1452,7 @@ void Application::ExecuteHotkeyAction(HotkeyAction action) {
 
 DiagnosticsSnapshot Application::BuildDiagnosticsSnapshot() const {
   DiagnosticsSnapshot snapshot;
-  snapshot.status = "Running";
   snapshot.effect = IsEffectActive() ? "Enabled" : "Paused";
-  snapshot.pause = IsTemporarilyPaused()
-                       ? (paused_until_restart_ ? "Until next restart" : "Timed pause")
-                       : "Not paused";
   snapshot.hook = cbt_hook_ != nullptr ? "Installed" : "Not installed";
   snapshot.renderer = animation_renderer_recovery_pending_ ? "Recovering" : "Healthy";
   snapshot.d3d_device =
@@ -1486,7 +1463,6 @@ DiagnosticsSnapshot Application::BuildDiagnosticsSnapshot() const {
   }
   snapshot.active_animations = std::to_string(active_animations);
   snapshot.watchdog = "Per-window cleanup enabled";
-  snapshot.safe_mode = safe_mode_ ? "On" : "Off";
   snapshot.startup_repair = startup_repair_status_;
   snapshot.log_folder_size = std::format("{:.2f} MB", GenieLogFolderSize() / (1024.0 * 1024.0));
   snapshot.version = std::string("Development build ") + __DATE__ + " " + __TIME__;
@@ -1575,9 +1551,7 @@ DiagnosticsSnapshot Application::BuildDiagnosticsSnapshot() const {
          << "Version: " << snapshot.version << "\r\n"
          << "Windows: " << snapshot.windows_version << "\r\n"
          << "Graphics adapter: " << snapshot.graphics_adapter << "\r\n"
-         << "Status: " << snapshot.status << "\r\n"
          << "Effect: " << snapshot.effect << "\r\n"
-         << "Pause state: " << snapshot.pause << "\r\n"
          << "Hook: " << snapshot.hook << "\r\n"
          << "Renderer: " << snapshot.renderer << "\r\n"
          << "D3D Device: " << snapshot.d3d_device << "\r\n"
@@ -1587,7 +1561,6 @@ DiagnosticsSnapshot Application::BuildDiagnosticsSnapshot() const {
          << "Window monitor: " << snapshot.window_monitor << "\r\n"
          << "Taskbar: " << snapshot.taskbar << "\r\n"
          << "Monitors: " << snapshot.monitor_configuration << "\r\n"
-         << "Safe Mode: " << snapshot.safe_mode << "\r\n"
          << "Startup repair: " << snapshot.startup_repair << "\r\n";
   snapshot.report = report.str();
   return snapshot;
@@ -1681,18 +1654,6 @@ bool Application::SetLinkSpeeds(bool linked) {
   return true;
 }
 
-bool Application::SetAdaptiveDuration(bool enabled) {
-  AppSettings proposed = settings_;
-  proposed.adaptive_duration = enabled;
-  if (!SaveSettings(proposed)) {
-    LogDebug(L"Settings", L"Failed to persist adaptive duration state");
-    return false;
-  }
-  settings_ = std::move(proposed);
-  settings_window_.UpdateState(settings_);
-  return true;
-}
-
 bool Application::SetDisableAnimationsFullscreen(bool enabled) {
   AppSettings proposed = settings_;
   proposed.disable_animations_fullscreen = enabled;
@@ -1706,10 +1667,9 @@ bool Application::SetDisableAnimationsFullscreen(bool enabled) {
   return true;
 }
 
-bool Application::SetPowerBehavior(bool reduce_on_battery, bool disable_in_saver) {
+bool Application::SetDisableEffectsBatterySaver(bool enabled) {
   AppSettings proposed = settings_;
-  proposed.reduce_effects_on_battery = reduce_on_battery;
-  proposed.disable_effects_battery_saver = disable_in_saver;
+  proposed.disable_effects_battery_saver = enabled;
   if (!SaveSettings(proposed)) {
     LogDebug(L"Settings", L"Failed to persist battery behavior");
     return false;
@@ -1746,7 +1706,10 @@ bool Application::SetAnimationStyle(const std::string& style) {
   }
   AppSettings proposed = settings_;
   proposed.animation_style = style;
-  if (style == "Soft") {
+  if (style == "Classic Genie") {
+    proposed.minimize_easing = "Ease In Out";
+    proposed.restore_easing = "Ease In Out";
+  } else if (style == "Soft") {
     proposed.minimize_easing = "Ease In Out";
     proposed.restore_easing = "Ease In Out";
   } else if (style == "Snappy") {
@@ -1791,38 +1754,11 @@ bool Application::SetTargetIndicator(bool enabled) {
   return true;
 }
 
-bool Application::SetFollowWindowsAnimationPreference(bool enabled) {
-  AppSettings proposed = settings_;
-  proposed.follow_windows_animation_preference = enabled;
-  if (!SaveSettings(proposed)) return false;
-  settings_ = std::move(proposed);
-  settings_window_.UpdateState(settings_);
-  UpdateWindowsAnimationPreference(true);
-  return true;
-}
-
 float Application::CalculateAnimationDuration(float base_duration, const RECT& source,
-                                              const animation::RectF& target) const {
-  if (!settings_.adaptive_duration) return base_duration;
-
-  RECT source_copy = source;
-  const HMONITOR monitor = MonitorFromRect(&source_copy, MONITOR_DEFAULTTONEAREST);
-  MONITORINFO monitor_info{};
-  monitor_info.cbSize = sizeof(monitor_info);
-  if (monitor == nullptr || !GetMonitorInfoW(monitor, &monitor_info)) return base_duration;
-
-  const float source_x = static_cast<float>(source.left + source.right) * 0.5f;
-  const float source_y = static_cast<float>(source.top + source.bottom) * 0.5f;
-  const float distance = std::hypot(source_x - target.CenterX(), source_y - target.CenterY());
-  const float monitor_width =
-      static_cast<float>(monitor_info.rcMonitor.right - monitor_info.rcMonitor.left);
-  const float monitor_height =
-      static_cast<float>(monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top);
-  const float reference_distance = std::max(1.0f, std::hypot(monitor_width, monitor_height));
-  const float distance_ratio = std::clamp(distance / reference_distance, 0.0f, 1.0f);
-  const float duration_scale = 0.35f + 0.65f * distance_ratio;
-  const float lower_limit = std::min(base_duration, 0.18f);
-  return std::clamp(base_duration * duration_scale, lower_limit, base_duration);
+                                               const animation::RectF& target) const {
+  (void)source;
+  (void)target;
+  return base_duration;
 }
 
 bool Application::SetCloseBehavior(const std::string& close_behavior) {

@@ -124,18 +124,13 @@ public:
         value_valid = ParseBoolean(&value);
         if (value_valid) {
           if (key == "linkSpeeds") settings->link_speeds = value;
-          if (key == "adaptiveDuration") settings->adaptive_duration = value;
           if (key == "disableAnimationsFullscreen") {
             settings->disable_animations_fullscreen = value;
           }
-          if (key == "reduceEffectsOnBattery") settings->reduce_effects_on_battery = value;
           if (key == "disableEffectsBatterySaver") {
             settings->disable_effects_battery_saver = value;
           }
           if (key == "showTargetIndicator") settings->show_target_indicator = value;
-          if (key == "followWindowsAnimationPreference") {
-            settings->follow_windows_animation_preference = value;
-          }
           if (key == "startMinimized") settings->start_minimized = value;
           if (key == "runAtStartup") settings->run_at_startup = value;
         }
@@ -504,6 +499,10 @@ AppSettings LoadSettings() {
     binding.modifiers &= kSupportedHotkeyModifiers;
     if (binding.virtual_key == 0) binding.modifiers = 0;
   }
+  if (loaded.animation_style == "Classic Genie") {
+    loaded.minimize_easing = "Ease In Out";
+    loaded.restore_easing = "Ease In Out";
+  }
   return loaded;
 }
 
@@ -526,10 +525,8 @@ bool SaveSettings(const AppSettings& settings) {
          << "  \"minimizeDuration\": " << settings.minimize_duration << ",\n"
          << "  \"restoreDuration\": " << settings.restore_duration << ",\n"
          << "  \"linkSpeeds\": " << settings.link_speeds << ",\n"
-         << "  \"adaptiveDuration\": " << settings.adaptive_duration << ",\n"
          << "  \"disableAnimationsFullscreen\": "
          << settings.disable_animations_fullscreen << ",\n"
-         << "  \"reduceEffectsOnBattery\": " << settings.reduce_effects_on_battery << ",\n"
          << "  \"disableEffectsBatterySaver\": " << settings.disable_effects_battery_saver
          << ",\n"
          << "  \"minimizeEasing\": \"" << EscapeJsonString(settings.minimize_easing)
@@ -541,8 +538,6 @@ bool SaveSettings(const AppSettings& settings) {
          << "  \"genieStrength\": " << settings.genie_strength << ",\n"
          << "  \"fadeStrength\": \"" << EscapeJsonString(settings.fade_strength) << "\",\n"
          << "  \"showTargetIndicator\": " << settings.show_target_indicator << ",\n"
-         << "  \"followWindowsAnimationPreference\": "
-         << settings.follow_windows_animation_preference << ",\n"
          << "  \"closeBehavior\": \"" << EscapeJsonString(settings.close_behavior) << "\",\n"
          << "  \"startMinimized\": " << settings.start_minimized << ",\n"
          << "  \"runAtStartup\": " << settings.run_at_startup << ",\n";

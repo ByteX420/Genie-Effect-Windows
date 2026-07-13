@@ -37,9 +37,7 @@ enum class DiagnosticsAction {
 };
 
 struct DiagnosticsSnapshot {
-  std::string status;
   std::string effect;
-  std::string pause;
   std::string hook;
   std::string renderer;
   std::string d3d_device;
@@ -48,7 +46,6 @@ struct DiagnosticsSnapshot {
   std::string display_refresh;
   std::string window_monitor;
   std::string taskbar;
-  std::string safe_mode;
   std::string startup_repair;
   std::string version;
   std::string windows_version;
@@ -64,15 +61,13 @@ public:
   using SpeedCallback =
       std::function<bool(float minimize_duration, float restore_duration, bool save)>;
   using LinkCallback = std::function<bool(bool)>;
-  using AdaptiveDurationCallback = std::function<bool(bool)>;
   using FullscreenBehaviorCallback = std::function<bool(bool)>;
-  using PowerBehaviorCallback = std::function<bool(bool, bool)>;
+  using BatterySaverCallback = std::function<bool(bool)>;
   using EasingCallback = std::function<bool(const std::string&, const std::string&)>;
   using AnimationStyleCallback = std::function<bool(const std::string&)>;
   using StrengthCallback = std::function<bool(float, bool)>;
   using FadeCallback = std::function<bool(const std::string&)>;
   using TargetIndicatorCallback = std::function<bool(bool)>;
-  using WindowsAnimationPreferenceCallback = std::function<bool(bool)>;
   using CloseBehaviorCallback = std::function<bool(const std::string&)>;
   using StartupCallback = std::function<bool(bool run_at_startup, bool start_minimized)>;
   using ExclusionCallback = std::function<bool(const std::string&, bool exclude)>;
@@ -90,14 +85,13 @@ public:
   SettingsWindow& operator=(const SettingsWindow&) = delete;
 
   bool Initialize(HINSTANCE instance, ToggleCallback toggle_callback, SpeedCallback speed_callback,
-                  LinkCallback link_callback, AdaptiveDurationCallback adaptive_duration_callback,
+                  LinkCallback link_callback,
                   FullscreenBehaviorCallback fullscreen_behavior_callback,
-                  PowerBehaviorCallback power_behavior_callback, EasingCallback easing_callback,
+                  BatterySaverCallback battery_saver_callback, EasingCallback easing_callback,
                   AnimationStyleCallback animation_style_callback,
                   StrengthCallback strength_callback, FadeCallback fade_callback,
-                  TargetIndicatorCallback target_indicator_callback,
-                  WindowsAnimationPreferenceCallback windows_animation_preference_callback,
-                  CloseBehaviorCallback close_behavior_callback, StartupCallback startup_callback,
+                  TargetIndicatorCallback target_indicator_callback, CloseBehaviorCallback close_behavior_callback,
+                  StartupCallback startup_callback,
                   ExclusionCallback exclusion_callback, PauseCallback pause_callback,
                   HotkeyUpdateCallback hotkey_update_callback,
                   HotkeyActionCallback hotkey_action_callback,
@@ -162,15 +156,13 @@ private:
   ToggleCallback toggle_callback_;
   SpeedCallback speed_callback_;
   LinkCallback link_callback_;
-  AdaptiveDurationCallback adaptive_duration_callback_;
   FullscreenBehaviorCallback fullscreen_behavior_callback_;
-  PowerBehaviorCallback power_behavior_callback_;
+  BatterySaverCallback battery_saver_callback_;
   EasingCallback easing_callback_;
   AnimationStyleCallback animation_style_callback_;
   StrengthCallback strength_callback_;
   FadeCallback fade_callback_;
   TargetIndicatorCallback target_indicator_callback_;
-  WindowsAnimationPreferenceCallback windows_animation_preference_callback_;
   CloseBehaviorCallback close_behavior_callback_;
   StartupCallback startup_callback_;
   ExclusionCallback exclusion_callback_;
@@ -194,9 +186,7 @@ private:
   float minimize_duration_seconds_ = 0.70f;
   float restore_duration_seconds_ = 0.70f;
   bool link_speeds_ = false;
-  bool adaptive_duration_ = false;
   bool disable_animations_fullscreen_ = false;
-  bool reduce_effects_on_battery_ = false;
   bool disable_effects_battery_saver_ = false;
   std::string minimize_easing_ = "Linear";
   std::string restore_easing_ = "Linear";
@@ -204,7 +194,6 @@ private:
   float genie_strength_ = 1.0f;
   std::string fade_strength_ = "Subtle";
   bool show_target_indicator_ = false;
-  bool follow_windows_animation_preference_ = false;
   bool strength_slider_active_ = false;
   bool strength_slider_dirty_ = false;
   std::string close_behavior_ = "exit";
@@ -225,8 +214,6 @@ private:
   bool minimize_slider_dirty_ = false;
   bool restore_slider_active_ = false;
   bool restore_slider_dirty_ = false;
-  int numeric_edit_field_ = -1;
-  float numeric_edit_value_ = 0.0f;
   bool preview_active_ = false;
   HWND preview_window_ = nullptr;
   int preview_phase_ = 0;
