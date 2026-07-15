@@ -1,15 +1,21 @@
 #pragma once
 
 #include "imgui.h"
+#include "menu/motion/motion_context.hpp"
 
 namespace genie::app::settings_ui {
+
+struct MotionContext {
+  ::ui::motion::MotionSystem& system;
+  const ::ui::motion::MotionTokens& tokens;
+};
 
 // Production subset of the ImGuiBase Sequoia settings design. The editor,
 // layout-export and demo-host state intentionally stay in the design project.
 struct Metrics final {
   static constexpr float kWindowWidth = 738.0f;
   static constexpr float kWindowHeight = 556.0f;
-  static constexpr float kWindowRounding = 12.0f;
+  static constexpr float kWindowRounding = 0.0f;
   static constexpr float kTitlebarHeight = 54.0f;
   static constexpr float kSidebarWidth = 220.0f;
   static constexpr float kSidebarMargin = 12.5f;
@@ -30,32 +36,38 @@ struct Metrics final {
   static constexpr float kMainInset = kPageInset;
   static constexpr float kMainTop = 68.0f;
   static constexpr float kCardWidth = 603.0f;
-  static constexpr float kCardRounding = 8.0f;
+  static constexpr float kCardRounding = 0.0f;
   static constexpr float kCardSpacing = kGroupSpacing;
   static constexpr float kRowHeight = 57.0f;
 };
 
-inline constexpr ImU32 kMainBackground = IM_COL32(30, 30, 32, 255);
-inline constexpr ImU32 kSidebarBackground = IM_COL32(40, 42, 40, 255);
-inline constexpr ImU32 kCardBackground = IM_COL32(44, 44, 46, 255);
-inline constexpr ImU32 kActiveItem = IM_COL32(10, 132, 255, 255);
-inline constexpr ImU32 kText = IM_COL32(245, 245, 247, 255);
-inline constexpr ImU32 kMutedText = IM_COL32(160, 160, 165, 255);
-inline constexpr ImU32 kBorder = IM_COL32(110, 110, 116, 60);
-inline constexpr ImU32 kSeparator = IM_COL32(110, 110, 116, 92);
-inline constexpr ImU32 kAppleRed = IM_COL32(255, 95, 87, 255);
-inline constexpr ImU32 kAppleYellow = IM_COL32(254, 188, 46, 255);
-inline constexpr ImU32 kAppleGreen = IM_COL32(40, 200, 64, 255);
+//  beta palette. Alpha is applied by the caller so transitions remain
+// consistent across panels and custom draw-list content.
+inline constexpr ImU32 kMainBackground = IM_COL32(10, 10, 10, 255);
+inline constexpr ImU32 kSidebarBackground = IM_COL32(12, 12, 12, 255);
+inline constexpr ImU32 kCardBackground = IM_COL32(17, 17, 17, 255);
+inline constexpr ImU32 kPanelHeader = IM_COL32(21, 21, 21, 255);
+inline constexpr ImU32 kActiveItem = IM_COL32(99, 102, 241, 255);
+inline constexpr ImU32 kText = IM_COL32(238, 238, 238, 255);
+inline constexpr ImU32 kMutedText = IM_COL32(85, 85, 85, 255);
+inline constexpr ImU32 kBorder = IM_COL32(42, 42, 42, 255);
+inline constexpr ImU32 kSeparator = IM_COL32(42, 42, 42, 255);
 
-enum class Icon {
-  kGeneral,
-  kAnimation,
-  kApplications,
-  kWindows,
-  kHotkeys,
-  kDiagnostics,
-  kAbout,
-};
+inline ImU32 WithAlpha(ImU32 color, float alpha) {
+  alpha = alpha < 0.0f ? 0.0f : (alpha > 1.0f ? 1.0f : alpha);
+  const auto value = static_cast<ImU32>(
+      alpha * 255.0f + 0.5f);
+  return (color & 0x00ffffffu) | (value << 24u);
+}
+
+inline ImU32 Blend(ImU32 from, ImU32 to, float amount) {
+  amount = amount < 0.0f ? 0.0f : (amount > 1.0f ? 1.0f : amount);
+  const ImVec4 a = ImGui::ColorConvertU32ToFloat4(from);
+  const ImVec4 b = ImGui::ColorConvertU32ToFloat4(to);
+  return ImGui::ColorConvertFloat4ToU32(
+      ImVec4(a.x + (b.x - a.x) * amount, a.y + (b.y - a.y) * amount,
+             a.z + (b.z - a.z) * amount, a.w + (b.w - a.w) * amount));
+}
 
 enum class TrafficLightAction {
   kNone,
@@ -65,17 +77,14 @@ enum class TrafficLightAction {
 };
 
 void ApplyStyle(float scale);
-float Animate(ImGuiID id, float target, float speed = 15.0f);
 void DrawGradientShadow(ImDrawList* draw, ImVec2 min, ImVec2 max, float radius, float alpha,
                         float scale);
-void DrawAppMark(ImDrawList* draw, ImVec2 center, float radius, float scale);
-void DrawSidebarIcon(ImDrawList* draw, Icon icon, ImVec2 center, float radius, float scale,
-                     float alpha = 1.0f);
-void DrawSearchIcon(ImDrawList* draw, ImVec2 center, float scale, float alpha = 1.0f);
 void DrawCard(ImDrawList* draw, ImVec2 min, ImVec2 max, float scale, float alpha = 1.0f);
 void DrawSeparator(ImDrawList* draw, ImVec2 min, ImVec2 max, float alpha = 1.0f);
-TrafficLightAction DrawTrafficLights(ImVec2 window_origin, float scale, float alpha = 1.0f);
-bool SidebarItem(const char* id, const char* label, Icon icon, bool selected, ImVec2 position,
-                 ImVec2 size, ImFont* font, float scale, float alpha = 1.0f);
+TrafficLightAction DrawTrafficLights(const MotionContext& motion,
+                                     ImVec2 window_origin, float scale, float alpha = 1.0f);
+bool SidebarItem(const MotionContext& motion, const char* id, const char* label,
+                 bool selected, ImVec2 position, ImVec2 size, ImFont* font, float scale,
+                 float alpha = 1.0f);
 
 }  // namespace genie::app::settings_ui

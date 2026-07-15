@@ -51,6 +51,9 @@
     <ClCompile Include="src\app\settings_ui_theme.cpp">
       <Filter>src\app</Filter>
     </ClCompile>
+    <ClCompile Include="src\app\settings_ui_widgets.cpp">
+      <Filter>src\app</Filter>
+    </ClCompile>
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <Filter>third_party\imgui</Filter>
     </ClCompile>
@@ -93,9 +96,15 @@
     <ClCompile Include="src\rendering\overlay_window.cpp">
       <Filter>src\rendering</Filter>
     </ClCompile>
+    <ClCompile Include="src\menu\motion\motion.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\pch.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pch.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\common\debug_log.hpp">
@@ -122,6 +131,9 @@
     <ClInclude Include="src\app\settings_ui_theme.hpp">
       <Filter>src\app</Filter>
     </ClInclude>
+    <ClInclude Include="src\app\settings_ui_widgets.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
     <ClInclude Include="src\app\resource.hpp">
       <Filter>src\app</Filter>
     </ClInclude>
@@ -145,6 +157,21 @@
     </ClInclude>
     <ClInclude Include="src\rendering\overlay_window.hpp">
       <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\menu\motion\motion.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\menu\motion\motion_context.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\menu\motion\motion_tokens.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\menu\theme.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imgui_extra.h">
+      <Filter>third_party\imgui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

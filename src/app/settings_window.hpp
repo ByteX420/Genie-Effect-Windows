@@ -108,7 +108,6 @@ public:
   void ForceRender();
   [[nodiscard]] static bool ActivateExistingInstance(DWORD timeout_ms);
   [[nodiscard]] HWND hwnd() const { return hwnd_; }
-  [[nodiscard]] bool tray_icon_available() const { return tray_icon_added_; }
   [[nodiscard]] bool WantsContinuousRendering() const;
 
 private:
@@ -137,8 +136,10 @@ private:
   void RebuildFonts(UINT dpi);
   void ApplyWindowShape(int width, int height);
   void UpdateDpi(UINT dpi);
+  void UpdateReducedMotion();
   void UpdateTrayTooltip();
   bool AddTrayIcon();
+  void RemoveTrayIcon();
   void FlushPendingSpeedSave();
   void RecordSaveResult(bool saved);
   void HandleCloseRequest();

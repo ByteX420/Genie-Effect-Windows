@@ -584,7 +584,7 @@ bool Application::Initialize(HINSTANCE instance) {
   settings_window_.UpdatePauseState(false, false);
   if (safe_mode_) settings_window_.ShowDiagnosticsPage();
   settings_window_.Show(safe_mode_ || !settings_.start_minimized ||
-                        !settings_window_.tray_icon_available());
+                        settings_.close_behavior != "tray");
   UpdateFullscreenSuppression(true);
   UpdatePowerState(true);
   RefreshEffectRuntimeState();

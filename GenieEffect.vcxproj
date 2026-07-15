@@ -53,7 +53,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -129,6 +129,7 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClCompile Include="src\app\settings_store.cpp" />
     <ClCompile Include="src\app\startup_manager.cpp" />
     <ClCompile Include="src\app\settings_ui_theme.cpp" />
+    <ClCompile Include="src\app\settings_ui_widgets.cpp" />
     <ClCompile Include="src\app\settings_window.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -162,9 +163,15 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClCompile Include="src\rendering\d3d_device.cpp" />
     <ClCompile Include="src\rendering\desktop_capture.cpp" />
     <ClCompile Include="src\rendering\overlay_window.cpp" />
+    <ClCompile Include="src\menu\motion\motion.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ObjectFileName>$(IntDir)menu_motion.obj</ObjectFileName>
+      <ProgramDataBaseFileName>$(IntDir)menu_motion.pdb</ProgramDataBaseFileName>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\pch.hpp" />
+    <ClInclude Include="src\pch.h" />
     <ClInclude Include="src\common\debug_log.hpp" />
     <ClInclude Include="src\animation\geometry.hpp" />
     <ClInclude Include="src\animation\genie_mesh.hpp" />
@@ -173,6 +180,7 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClInclude Include="src\app\startup_manager.hpp" />
     <ClInclude Include="src\app\resource.hpp" />
     <ClInclude Include="src\app\settings_ui_theme.hpp" />
+    <ClInclude Include="src\app\settings_ui_widgets.hpp" />
     <ClInclude Include="src\app\settings_window.hpp" />
     <ClInclude Include="src\platform\native_animation_blocker.hpp" />
     <ClInclude Include="src\platform\taskbar_target_provider.hpp" />
@@ -181,6 +189,11 @@ if exist "$(IntDir)GenieEffect.ilk" move /y "$(IntDir)GenieEffect.ilk" "$(IntDir
     <ClInclude Include="src\rendering\d3d_device.hpp" />
     <ClInclude Include="src\rendering\desktop_capture.hpp" />
     <ClInclude Include="src\rendering\overlay_window.hpp" />
+    <ClInclude Include="src\menu\motion\motion.hpp" />
+    <ClInclude Include="src\menu\motion\motion_context.hpp" />
+    <ClInclude Include="src\menu\motion\motion_tokens.hpp" />
+    <ClInclude Include="src\menu\theme.hpp" />
+    <ClInclude Include="third_party\imgui\imgui_extra.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="GenieEffect.rc" />

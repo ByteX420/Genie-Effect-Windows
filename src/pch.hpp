@@ -1,5 +1,11 @@
 #pragma once
 
+// The  fork enables FreeType in imconfig.h. This application keeps its
+// existing embedded-font atlas and therefore selects ImGui's built-in stb
+// builder without modifying the imported vendor configuration file.
+#include "imconfig.h"
+#undef IMGUI_ENABLE_FREETYPE
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
