@@ -223,7 +223,7 @@ bool SettingsWindow::AddTrayIcon() {
   tray_icon.uID = kTrayIconId;
   tray_icon.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
   tray_icon.uCallbackMessage = kTrayMessage;
-  tray_icon.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+  tray_icon.hIcon = LoadIconW(nullptr, reinterpret_cast<LPCWSTR>(IDI_APPLICATION));
   const wchar_t* tooltip = L"Genie Effect \u2014 Enabled";
   if (temporarily_paused_) {
     tooltip = paused_until_restart_ ? L"Genie Effect \u2014 Paused until restart"
@@ -285,7 +285,8 @@ struct EmbeddedResource {
 
 EmbeddedResource LoadEmbeddedResource(int resource_id) {
   const HINSTANCE instance = GetModuleHandleW(nullptr);
-  HRSRC resource = FindResourceW(instance, MAKEINTRESOURCEW(resource_id), RT_RCDATA);
+  HRSRC resource =
+      FindResourceW(instance, MAKEINTRESOURCEW(resource_id), reinterpret_cast<LPCWSTR>(RT_RCDATA));
   if (resource == nullptr) return {};
   HGLOBAL loaded = LoadResource(instance, resource);
   if (loaded == nullptr) return {};
@@ -388,7 +389,7 @@ void SettingsWindow::StartAnimationPreview() {
   window_class.cbSize = sizeof(window_class);
   window_class.lpfnWndProc = PreviewWindowProc;
   window_class.hInstance = instance;
-  window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  window_class.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
   window_class.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
   window_class.lpszClassName = kPreviewWindowClass;
   if (RegisterClassExW(&window_class) == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
@@ -650,7 +651,7 @@ bool SettingsWindow::CreateRenderWindow(HINSTANCE instance) {
   window_class.style = CS_CLASSDC;
   window_class.lpfnWndProc = WindowProc;
   window_class.hInstance = instance;
-  window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  window_class.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
   window_class.lpszClassName = kSettingsWindowClass;
   RegisterClassExW(&window_class);
 

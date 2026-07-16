@@ -144,7 +144,8 @@ struct EmbeddedResource {
 
 EmbeddedResource LoadEmbeddedResource(int resource_id) {
   const HINSTANCE instance = GetModuleHandleW(nullptr);
-  HRSRC resource = FindResourceW(instance, MAKEINTRESOURCEW(resource_id), RT_RCDATA);
+  HRSRC resource =
+      FindResourceW(instance, MAKEINTRESOURCEW(resource_id), reinterpret_cast<LPCWSTR>(RT_RCDATA));
   if (resource == nullptr) return {};
   HGLOBAL loaded = LoadResource(instance, resource);
   if (loaded == nullptr) return {};

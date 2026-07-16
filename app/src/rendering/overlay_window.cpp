@@ -491,7 +491,8 @@ bool OverlayWindow::RegisterWindowClass(HINSTANCE instance) {
   window_class.style = CS_HREDRAW | CS_VREDRAW;
   window_class.lpfnWndProc = &OverlayWindow::WindowProc;
   window_class.hInstance = instance;
-  window_class.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  // MultiByte builds: IDC_* are LPSTR; cast for *W APIs (integer resource IDs).
+  window_class.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
   window_class.lpszClassName = kOverlayWindowClassName;
 
   if (RegisterClassExW(&window_class) == 0) {
