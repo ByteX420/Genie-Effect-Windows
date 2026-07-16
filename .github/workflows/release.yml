@@ -1,0 +1,166 @@
+# Build Release x64 and publish/update a GitHub Release when the product version changes.
+#
+# Security model (no personal tokens in the repo):
+# - Uses only the job-scoped GITHUB_TOKEN (auto-injected by Actions).
+# - Never logs tokens; never stores PATs/secrets in source.
+# - Minimal permission: contents: write (create tags + release assets only).
+# - Runs only on push to `stable` (path-filtered) or manual dispatch — not on PRs/forks.
+# - Fork PRs cannot publish releases with write access to this repo.
+#
+# How to cut a release:
+# 1. Bump GENIE_* version macros in app/GenieEffect.rc
+# 2. Merge to `stable` and push
+# 3. This workflow builds, zips, and creates/updates tag vX.Y.Z + Release asset
+
+name: Release
+
+on:
+  push:
+    branches: [stable]
+    paths:
+      - "app/GenieEffect.rc"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+    inputs:
+      force_version:
+        description: "Optional override (e.g. 1.0.1). Leave empty to read from GenieEffect.rc"
+        required: false
+        default: ""
+
+# Least privilege for release publishing
+permissions:
+  contents: write
+
+concurrency:
+  group: release-stable
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build + GitHub Release
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need full history only if we ever diff; shallow is fine for build
+          fetch-depth: 1
+
+      - name: Read product version
+        id: version
+        shell: pwsh
+        run: |
+          $override = "${{ github.event.inputs.force_version }}"
+          if ($override -and $override.Trim().Length -gt 0) {
+            $ver = $override.Trim().TrimStart('v', 'V')
+          } else {
+            $rc = Get-Content -Raw "app/GenieEffect.rc"
+            $m = [regex]::Match($rc, 'GENIE_PRODUCT_VERSION_STR\s+"([^"\\]+)')
+            if (-not $m.Success) {
+              throw "Could not parse GENIE_PRODUCT_VERSION_STR from app/GenieEffect.rc"
+            }
+            $ver = $m.Groups[1].Value.Trim()
+          }
+          if ($ver -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+            throw "Version '$ver' is not X.Y.Z (or X.Y.Z.W)"
+          }
+          $tag = "v$ver"
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Product version: $ver  (tag $tag)"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Resolve PlatformToolset
+        id: toolset
+        shell: pwsh
+        run: |
+          # Prefer v145 (VS 2026 / 18), fall back to v143 (VS 2022) on older images.
+          $candidates = @("v145", "v143", "v142")
+          $chosen = $null
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $install = & $vswhere -latest -products * `
+              -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+              -property installationPath
+            if ($install) {
+              foreach ($ts in $candidates) {
+                $props = Get-ChildItem -Path $install -Recurse -Filter "Microsoft.Cpp.$ts.x64.props" `
+                  -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($props) { $chosen = $ts; break }
+              }
+            }
+          }
+          if (-not $chosen) { $chosen = "v145" }
+          "name=$chosen" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Using PlatformToolset=$chosen"
+
+      - name: Build Release x64
+        shell: pwsh
+        run: |
+          $toolset = "${{ steps.toolset.outputs.name }}"
+          Write-Host "MSBuild PlatformToolset=$toolset"
+          msbuild GenieEffect.slnx `
+            /restore `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:PlatformToolset=$toolset `
+            /m `
+            /v:minimal `
+            /nologo
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $bin = "build\bin\x64\Release"
+          if (-not (Test-Path "$bin\GenieEffect.exe")) { throw "Missing GenieEffect.exe" }
+          if (-not (Test-Path "$bin\GenieHookPost.dll")) { throw "Missing GenieHookPost.dll" }
+          Get-ChildItem $bin -File | Format-Table Name, Length
+
+      - name: Package ZIP
+        id: package
+        shell: pwsh
+        run: |
+          $bin = "build\bin\x64\Release"
+          $out = "build\dist"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $zipName = "GenieEffect-windows-x64.zip"
+          $zip = Join-Path $out $zipName
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path "$bin\GenieEffect.exe", "$bin\GenieHookPost.dll" -DestinationPath $zip -Force
+          $item = Get-Item $zip
+          "path=$($item.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Packaged $($item.FullName) ($([math]::Round($item.Length/1MB, 2)) MB)"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Genie Effect ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          # Create if missing; replace assets if the same tag is re-published (e.g. rebuild)
+          files: ${{ steps.package.outputs.path }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            ## Genie Effect ${{ steps.version.outputs.tag }}
+
+            Automated **stable** release build (Windows x64).
+
+            ### Install
+            1. Download **GenieEffect-windows-x64.zip**
+            2. Extract (keep both files in the same folder)
+            3. Run `GenieEffect.exe`
+            4. Optional: run as Administrator for elevated windows
+
+            ### Package
+            - `GenieEffect.exe`
+            - `GenieHookPost.dll`
+
+            Product version: **${{ steps.version.outputs.version }}**  
+            Commit: `${{ github.sha }}`
+        env:
+          # Built-in token only — never a personal access token from the repo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

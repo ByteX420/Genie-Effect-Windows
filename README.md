@@ -215,6 +215,53 @@ See [`docs/architecture.md`](docs/architecture.md) for the public-API boundary a
 
 ---
 
+## Automated releases (GitHub Actions)
+
+When the **product version** in `app/GenieEffect.rc` changes on the **`stable`** branch, GitHub Actions:
+
+1. Builds **Release | x64**
+2. Packs `GenieEffect.exe` + `GenieHookPost.dll` into `GenieEffect-windows-x64.zip`
+3. Creates or updates the GitHub Release for tag `vX.Y.Z` and uploads the ZIP
+
+Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
+
+### Cut a new release
+
+1. On `dev` (or a branch), bump the version macros in `app/GenieEffect.rc`:
+
+   ```c
+   #define GENIE_FILE_VERSION      1,0,1,0
+   #define GENIE_PRODUCT_VERSION   1,0,1,0
+   #define GENIE_FILE_VERSION_STR  "1.0.1\0"
+   #define GENIE_PRODUCT_VERSION_STR "1.0.1\0"
+   ```
+
+2. Merge into **`stable`** and push:
+
+   ```powershell
+   git checkout stable
+   git merge dev
+   git push origin stable
+   ```
+
+3. Actions runs automatically (because `GenieEffect.rc` changed). Check the **Actions** tab, then **Releases**.
+
+Manual run: **Actions → Release → Run workflow** (optional version override).
+
+### Security (no leaked tokens)
+
+| What | How |
+| --- | --- |
+| Auth | Built-in **`GITHUB_TOKEN` only** — never a personal access token in the repo |
+| Permissions | Workflow requests only `contents: write` (tags + release assets) |
+| Triggers | Push to **`stable`** (version/`rc` paths) or manual dispatch — **not** on pull requests |
+| Forks | Fork PRs cannot publish releases to this repository |
+| Secrets in code | None required for this workflow |
+
+You do **not** put your GitHub password, PAT, or SSH key into the project. The token exists only for that job run and is scoped by GitHub.
+
+---
+
 ## Contributing
 
 Contributions are welcome. A good PR:
