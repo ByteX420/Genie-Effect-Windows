@@ -707,6 +707,9 @@ bool Application::Initialize(HINSTANCE instance) {
           [this](const std::string& minimize, const std::string& restore) {
             return SetEasing(minimize, restore);
           },
+          [this](bool is_minimize, animation::CubicBezier bezier, bool save) {
+            return SetCustomEasingBezier(is_minimize, bezier, save);
+          },
           [this](const std::string& style) { return SetAnimationStyle(style); },
           [this](float strength, bool save) { return SetGenieStrength(strength, save); },
           [this](const std::string& strength) { return SetFadeStrength(strength); },
@@ -1843,9 +1846,9 @@ bool Application::SetDisableEffectsBatterySaver(bool enabled) {
 
 bool Application::SetEasing(const std::string& minimize_easing, const std::string& restore_easing) {
   constexpr std::array names = {
-      std::string_view{"Linear"},      std::string_view{"Ease In"}, std::string_view{"Ease Out"},
-      std::string_view{"Ease In Out"}, std::string_view{"Cubic"},   std::string_view{"Back"},
-      std::string_view{"Elastic"},
+      std::string_view{"Linear"},      std::string_view{"Ease In"},  std::string_view{"Ease Out"},
+      std::string_view{"Ease In Out"}, std::string_view{"Cubic"},    std::string_view{"Back"},
+      std::string_view{"Elastic"},     std::string_view{"Custom"},
   };
   const auto valid = [&names](std::string_view value) {
     return std::find(names.begin(), names.end(), value) != names.end();
@@ -1856,6 +1859,22 @@ bool Application::SetEasing(const std::string& minimize_easing, const std::strin
   proposed.restore_easing = restore_easing;
   if (!SaveSettings(proposed)) return false;
   settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
+bool Application::SetCustomEasingBezier(bool is_minimize, animation::CubicBezier bezier,
+                                        bool save) {
+  bezier.ClampHandles();
+  if (is_minimize)
+    settings_.minimize_custom_bezier = bezier;
+  else
+    settings_.restore_custom_bezier = bezier;
+  if (!save) {
+    settings_window_.UpdateState(settings_);
+    return true;
+  }
+  if (!SaveSettings(settings_)) return false;
   settings_window_.UpdateState(settings_);
   return true;
 }
@@ -2253,7 +2272,8 @@ bool Application::OnMinimizeStart(HWND window) {
       CalculateAnimationDuration(minimize_duration_seconds_, source_bounds, target.rect) *
       AnimationStyleDurationScale(settings_.animation_style);
   slot.overlay.SetAnimationDuration(animation_duration);
-  slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.minimize_easing));
+  slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.minimize_easing),
+                                  settings_.minimize_custom_bezier);
   slot.overlay.SetAnimationStyle(AnimationStyleFromName(settings_.animation_style));
   slot.overlay.SetGenieStrength(std::clamp(settings_.genie_strength, 0.0f, 1.0f));
   slot.overlay.SetFadeStrength(settings_.fade_strength == "Strong"   ? 0.55f
@@ -2662,7 +2682,8 @@ bool Application::OnRestoreAttempt(HWND window) {
                                  current_snapshot.target.rect) *
       AnimationStyleDurationScale(settings_.animation_style);
   slot.overlay.SetAnimationDuration(animation_duration);
-  slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.restore_easing));
+  slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.restore_easing),
+                                  settings_.restore_custom_bezier);
   slot.overlay.SetAnimationStyle(AnimationStyleFromName(settings_.animation_style));
   slot.overlay.SetGenieStrength(std::clamp(settings_.genie_strength, 0.0f, 1.0f));
   slot.overlay.SetFadeStrength(settings_.fade_strength == "Strong"   ? 0.55f

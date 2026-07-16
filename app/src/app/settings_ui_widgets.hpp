@@ -3,6 +3,7 @@
 #include <array>
 #include <span>
 
+#include "animation/easing.hpp"
 #include "app/settings_ui_theme.hpp"
 
 namespace genie::app::settings_ui {
@@ -21,5 +22,11 @@ bool CompactButton(const MotionContext& motion, const char* id, const char* labe
 bool SegmentSelector(const MotionContext& motion, const char* id,
                      const std::array<const char*, 2>& labels, int* selected, float width,
                      ImFont* font, float scale, float alpha);
+
+// Editable cubic-bezier easing graph. Returns true while the user is actively dragging a handle.
+// `changed` is set when handles moved this frame. Save on the transition from active→inactive.
+bool EasingGraphEditor(const MotionContext& motion, const char* id,
+                       animation::CubicBezier* bezier, const ImVec2& size, float scale, float alpha,
+                       bool* changed, ImFont* caption_font = nullptr);
 
 }  // namespace genie::app::settings_ui

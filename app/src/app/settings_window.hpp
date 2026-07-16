@@ -64,6 +64,8 @@ public:
   using FullscreenBehaviorCallback = std::function<bool(bool)>;
   using BatterySaverCallback = std::function<bool(bool)>;
   using EasingCallback = std::function<bool(const std::string&, const std::string&)>;
+  using CustomBezierCallback =
+      std::function<bool(bool is_minimize, animation::CubicBezier bezier, bool save)>;
   using AnimationStyleCallback = std::function<bool(const std::string&)>;
   using StrengthCallback = std::function<bool(float, bool)>;
   using FadeCallback = std::function<bool(const std::string&)>;
@@ -88,6 +90,7 @@ public:
                   LinkCallback link_callback,
                   FullscreenBehaviorCallback fullscreen_behavior_callback,
                   BatterySaverCallback battery_saver_callback, EasingCallback easing_callback,
+                  CustomBezierCallback custom_bezier_callback,
                   AnimationStyleCallback animation_style_callback,
                   StrengthCallback strength_callback, FadeCallback fade_callback,
                   TargetIndicatorCallback target_indicator_callback,
@@ -160,6 +163,7 @@ private:
   FullscreenBehaviorCallback fullscreen_behavior_callback_;
   BatterySaverCallback battery_saver_callback_;
   EasingCallback easing_callback_;
+  CustomBezierCallback custom_bezier_callback_;
   AnimationStyleCallback animation_style_callback_;
   StrengthCallback strength_callback_;
   FadeCallback fade_callback_;
@@ -191,6 +195,12 @@ private:
   bool disable_effects_battery_saver_ = false;
   std::string minimize_easing_ = "Linear";
   std::string restore_easing_ = "Linear";
+  animation::CubicBezier minimize_custom_bezier_ = animation::CubicBezier::EaseInOut();
+  animation::CubicBezier restore_custom_bezier_ = animation::CubicBezier::EaseInOut();
+  bool minimize_bezier_dirty_ = false;
+  bool restore_bezier_dirty_ = false;
+  bool minimize_bezier_active_ = false;
+  bool restore_bezier_active_ = false;
   std::string animation_style_ = "Gienie classic";
   float genie_strength_ = 1.0f;
   std::string fade_strength_ = "Subtle";

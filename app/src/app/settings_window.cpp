@@ -157,19 +157,21 @@ bool SettingsWindow::Initialize(
     HINSTANCE instance, ToggleCallback toggle_callback, SpeedCallback speed_callback,
     LinkCallback link_callback, FullscreenBehaviorCallback fullscreen_behavior_callback,
     BatterySaverCallback battery_saver_callback, EasingCallback easing_callback,
-    AnimationStyleCallback animation_style_callback, StrengthCallback strength_callback,
-    FadeCallback fade_callback, TargetIndicatorCallback target_indicator_callback,
-    CloseBehaviorCallback close_behavior_callback, StartupCallback startup_callback,
-    ExclusionCallback exclusion_callback, PauseCallback pause_callback,
-    HotkeyUpdateCallback hotkey_update_callback, HotkeyActionCallback hotkey_action_callback,
-    DiagnosticsCallback diagnostics_callback, DiagnosticsActionCallback diagnostics_action_callback,
-    HealCallback heal_callback, ExitCallback exit_callback) {
+    CustomBezierCallback custom_bezier_callback, AnimationStyleCallback animation_style_callback,
+    StrengthCallback strength_callback, FadeCallback fade_callback,
+    TargetIndicatorCallback target_indicator_callback, CloseBehaviorCallback close_behavior_callback,
+    StartupCallback startup_callback, ExclusionCallback exclusion_callback,
+    PauseCallback pause_callback, HotkeyUpdateCallback hotkey_update_callback,
+    HotkeyActionCallback hotkey_action_callback, DiagnosticsCallback diagnostics_callback,
+    DiagnosticsActionCallback diagnostics_action_callback, HealCallback heal_callback,
+    ExitCallback exit_callback) {
   toggle_callback_ = std::move(toggle_callback);
   speed_callback_ = std::move(speed_callback);
   link_callback_ = std::move(link_callback);
   fullscreen_behavior_callback_ = std::move(fullscreen_behavior_callback);
   battery_saver_callback_ = std::move(battery_saver_callback);
   easing_callback_ = std::move(easing_callback);
+  custom_bezier_callback_ = std::move(custom_bezier_callback);
   animation_style_callback_ = std::move(animation_style_callback);
   strength_callback_ = std::move(strength_callback);
   fade_callback_ = std::move(fade_callback);
@@ -511,6 +513,8 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
       disable_animations_fullscreen_ != settings.disable_animations_fullscreen ||
       disable_effects_battery_saver_ != settings.disable_effects_battery_saver ||
       minimize_easing_ != settings.minimize_easing || restore_easing_ != settings.restore_easing ||
+      minimize_custom_bezier_ != settings.minimize_custom_bezier ||
+      restore_custom_bezier_ != settings.restore_custom_bezier ||
       animation_style_ != settings.animation_style ||
       std::abs(genie_strength_ - settings.genie_strength) > 0.0001f ||
       fade_strength_ != settings.fade_strength ||
@@ -526,6 +530,8 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
   disable_effects_battery_saver_ = settings.disable_effects_battery_saver;
   minimize_easing_ = settings.minimize_easing;
   restore_easing_ = settings.restore_easing;
+  minimize_custom_bezier_ = settings.minimize_custom_bezier;
+  restore_custom_bezier_ = settings.restore_custom_bezier;
   animation_style_ = settings.animation_style;
   genie_strength_ = settings.genie_strength;
   fade_strength_ = settings.fade_strength;
@@ -1344,7 +1350,7 @@ void SettingsWindow::RenderContents() {
     layout.SectionCaption(font_small_, kCaptionTextSize, "STYLE");
     layout.BeginGroup();
     constexpr std::array easing_names = {
-        "Linear", "Ease In", "Ease Out", "Ease In Out", "Cubic", "Back", "Elastic",
+        "Linear", "Ease In", "Ease Out", "Ease In Out", "Cubic", "Back", "Elastic", "Custom",
     };
     constexpr std::array style_names = {
         "Gienie classic",
@@ -1353,6 +1359,7 @@ void SettingsWindow::RenderContents() {
     };
     // Same preferred width as duration sliders so the right edge lines up across groups.
     const float combo_w = layout.ControlMaxWidth(340.0f);
+    const float graph_h = px(168.0f);
 
     const auto combo_row = [&](const char* id, const char* title, int* index,
                                std::span<const char* const> items, auto on_change) {
@@ -1368,6 +1375,54 @@ void SettingsWindow::RenderContents() {
       layout.EndRow();
     };
 
+    const auto easing_block = [&](const char* combo_id, const char* graph_id, const char* title,
+                                  std::string* easing_name, animation::CubicBezier* bezier,
+                                  bool* bezier_dirty, bool is_minimize) {
+      int easing_index = selected_index(easing_names, *easing_name);
+      combo_row(combo_id, title, &easing_index, easing_names, [&] {
+        const std::string previous = *easing_name;
+        *easing_name = easing_names[easing_index];
+        const bool saved =
+            !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
+        if (!saved) *easing_name = previous;
+        RecordSaveResult(saved);
+      });
+      if (*easing_name != "Custom") return;
+
+      // Full-width stack under the combo: editable cubic-bezier graph.
+      layout.BeginStackRow(0.0f, 168.0f + 8.0f);
+      {
+        const float graph_w = layout.content_width();
+        const ImVec2 cursor = layout.ToScreen(layout.content_left(), layout.StackControlY());
+        // SetCursor expects layout-local coords (ToScreen already applied origin/scroll).
+        layout.SetCursor(layout.content_left(), layout.StackControlY());
+        (void)cursor;
+        bool graph_changed = false;
+        const bool graph_active =
+            settings_ui::EasingGraphEditor(widget_motion, graph_id, bezier,
+                                           ImVec2(graph_w, graph_h), scale, content_alpha,
+                                           &graph_changed, font_small_);
+        DelayedTooltip(
+            "Drag the two handles to shape the easing curve. Hold Shift for finer steps.", scale);
+        if (graph_changed) {
+          *bezier_dirty = true;
+          if (custom_bezier_callback_) {
+            custom_bezier_callback_(is_minimize, *bezier, false);
+          }
+          ForceRender();
+        }
+        bool& was_active = is_minimize ? minimize_bezier_active_ : restore_bezier_active_;
+        if (was_active && !graph_active && *bezier_dirty) {
+          const bool saved =
+              !custom_bezier_callback_ || custom_bezier_callback_(is_minimize, *bezier, true);
+          RecordSaveResult(saved);
+          if (saved) *bezier_dirty = false;
+        }
+        was_active = graph_active;
+      }
+      layout.EndRow();
+    };
+
     {
       int style_index = selected_index(style_names, animation_style_);
       combo_row("##animation_style", "Animation", &style_index, style_names, [&] {
@@ -1379,26 +1434,10 @@ void SettingsWindow::RenderContents() {
         RecordSaveResult(saved);
       });
     }
-    {
-      int easing_index = selected_index(easing_names, minimize_easing_);
-      combo_row("##minimize_easing", "Minimize easing", &easing_index, easing_names, [&] {
-        const std::string previous = minimize_easing_;
-        minimize_easing_ = easing_names[easing_index];
-        const bool saved = !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
-        if (!saved) minimize_easing_ = previous;
-        RecordSaveResult(saved);
-      });
-    }
-    {
-      int easing_index = selected_index(easing_names, restore_easing_);
-      combo_row("##restore_easing", "Restore easing", &easing_index, easing_names, [&] {
-        const std::string previous = restore_easing_;
-        restore_easing_ = easing_names[easing_index];
-        const bool saved = !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
-        if (!saved) restore_easing_ = previous;
-        RecordSaveResult(saved);
-      });
-    }
+    easing_block("##minimize_easing", "##minimize_bezier_graph", "Minimize easing",
+                 &minimize_easing_, &minimize_custom_bezier_, &minimize_bezier_dirty_, true);
+    easing_block("##restore_easing", "##restore_bezier_graph", "Restore easing", &restore_easing_,
+                 &restore_custom_bezier_, &restore_bezier_dirty_, false);
     layout.EndGroup();
 
     layout.SectionCaption(font_small_, kCaptionTextSize, "LOOK");

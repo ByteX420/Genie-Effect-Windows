@@ -97,6 +97,7 @@ private:
   bool SetDisableAnimationsFullscreen(bool enabled);
   bool SetDisableEffectsBatterySaver(bool enabled);
   bool SetEasing(const std::string& minimize_easing, const std::string& restore_easing);
+  bool SetCustomEasingBezier(bool is_minimize, animation::CubicBezier bezier, bool save);
   bool SetAnimationStyle(const std::string& style);
   bool SetGenieStrength(float strength, bool save);
   bool SetFadeStrength(const std::string& strength);

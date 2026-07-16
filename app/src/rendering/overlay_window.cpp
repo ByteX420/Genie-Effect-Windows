@@ -253,6 +253,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   animation_state_.target_progress = std::clamp(target_progress, 0.0f, 1.0f);
   animation_state_.duration_seconds = animation_duration_seconds_;
   animation_state_.easing = animation_easing_;
+  animation_state_.custom_bezier = animation_custom_bezier_;
   animation_state_.style = animation_style_;
   animation_state_.genie_strength = genie_strength_;
   animation_state_.fade_strength = fade_strength_;
@@ -871,7 +872,8 @@ bool OverlayWindow::Render(float progress) {
   } else if (animation_state_.style == genie::animation::AnimationStyle::kCurvy) {
     eased_progress = std::clamp(progress, 0.0f, 1.0f);
   } else {
-    eased_progress = genie::animation::ApplyEasing(animation_state_.easing, progress);
+    eased_progress = genie::animation::ApplyEasing(animation_state_.easing, progress,
+                                                   animation_state_.custom_bezier);
   }
   if (!UpdateFrameConstants(eased_progress)) return false;
   mesh_generator_.SetStrength(animation_state_.genie_strength);

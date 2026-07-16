@@ -32,7 +32,12 @@ public:
   void SetAnimationDuration(float duration_seconds) {
     animation_duration_seconds_ = duration_seconds;
   }
-  void SetAnimationEasing(genie::animation::EasingCurve easing) { animation_easing_ = easing; }
+  void SetAnimationEasing(genie::animation::EasingCurve easing,
+                          genie::animation::CubicBezier custom = {}) {
+    animation_easing_ = easing;
+    animation_custom_bezier_ = custom;
+    animation_custom_bezier_.ClampHandles();
+  }
   void SetAnimationStyle(genie::animation::AnimationStyle style) { animation_style_ = style; }
   void SetGenieStrength(float strength) { genie_strength_ = strength; }
   void SetFadeStrength(float strength) { fade_strength_ = strength; }
@@ -73,6 +78,7 @@ private:
     float target_progress = 1.0f;
     float duration_seconds = 0.70f;
     genie::animation::EasingCurve easing = genie::animation::EasingCurve::kLinear;
+    genie::animation::CubicBezier custom_bezier = genie::animation::CubicBezier::EaseInOut();
     genie::animation::AnimationStyle style = genie::animation::AnimationStyle::kClassic;
     float genie_strength = 1.0f;
     float fade_strength = 0.0f;
@@ -132,6 +138,8 @@ private:
   RestoreCallback restore_callback_;
   float animation_duration_seconds_ = 0.70f;
   genie::animation::EasingCurve animation_easing_ = genie::animation::EasingCurve::kLinear;
+  genie::animation::CubicBezier animation_custom_bezier_ =
+      genie::animation::CubicBezier::EaseInOut();
   genie::animation::AnimationStyle animation_style_ = genie::animation::AnimationStyle::kClassic;
   float genie_strength_ = 1.0f;
   float fade_strength_ = 0.0f;

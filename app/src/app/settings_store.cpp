@@ -44,9 +44,9 @@ std::optional<HotkeyField> FindHotkeyField(std::string_view key) {
 
 bool IsValidEasingName(std::string_view value) {
   constexpr std::array names = {
-      std::string_view{"Linear"},      std::string_view{"Ease In"}, std::string_view{"Ease Out"},
-      std::string_view{"Ease In Out"}, std::string_view{"Cubic"},   std::string_view{"Back"},
-      std::string_view{"Elastic"},
+      std::string_view{"Linear"},      std::string_view{"Ease In"},  std::string_view{"Ease Out"},
+      std::string_view{"Ease In Out"}, std::string_view{"Cubic"},    std::string_view{"Back"},
+      std::string_view{"Elastic"},     std::string_view{"Custom"},
   };
   return std::find(names.begin(), names.end(), value) != names.end();
 }
@@ -148,6 +148,15 @@ public:
             settings->minimize_easing = std::move(value);
           else
             settings->restore_easing = std::move(value);
+        }
+      } else if (key == "minimizeCustomBezier" || key == "restoreCustomBezier") {
+        animation::CubicBezier bezier;
+        value_valid = ParseCubicBezier(&bezier);
+        if (value_valid) {
+          if (key == "minimizeCustomBezier")
+            settings->minimize_custom_bezier = bezier;
+          else
+            settings->restore_custom_bezier = bezier;
         }
       } else if (key == "animationStyle") {
         std::string value;
@@ -333,6 +342,35 @@ private:
       if (!Consume(',')) return false;
       SkipWhitespace();
     }
+  }
+
+  bool ParseFloatArray(std::vector<float>* output, size_t expected = 0) {
+    if (!Consume('[')) return false;
+    SkipWhitespace();
+    output->clear();
+    if (Consume(']')) return expected == 0;
+    while (true) {
+      double value = 0.0;
+      if (!ParseNumber(&value) || !std::isfinite(value)) return false;
+      output->push_back(static_cast<float>(value));
+      SkipWhitespace();
+      if (Consume(']')) {
+        return expected == 0 || output->size() == expected;
+      }
+      if (!Consume(',')) return false;
+      SkipWhitespace();
+    }
+  }
+
+  bool ParseCubicBezier(animation::CubicBezier* output) {
+    std::vector<float> values;
+    if (!ParseFloatArray(&values, 4) || values.size() != 4) return false;
+    output->x1 = values[0];
+    output->y1 = values[1];
+    output->x2 = values[2];
+    output->y2 = values[3];
+    output->ClampHandles();
+    return true;
   }
 
   bool SkipValue(size_t depth = 0) {
@@ -535,13 +573,11 @@ AppSettings LoadSettings() {
   if (loaded.animation_style == "Classic Genie") {
     loaded.animation_style = "Gienie classic";
   }
-  if (loaded.animation_style == "Gienie classic") {
-    loaded.minimize_easing = "Ease In Out";
-    loaded.restore_easing = "Ease In Out";
-  } else {
-    loaded.minimize_easing = "Linear";
-    loaded.restore_easing = "Linear";
-  }
+  // Preserve saved easing names (including Custom) and clamp custom handles.
+  if (!IsValidEasingName(loaded.minimize_easing)) loaded.minimize_easing = "Ease In Out";
+  if (!IsValidEasingName(loaded.restore_easing)) loaded.restore_easing = "Ease In Out";
+  loaded.minimize_custom_bezier.ClampHandles();
+  loaded.restore_custom_bezier.ClampHandles();
   return loaded;
 }
 
@@ -568,6 +604,12 @@ bool SaveSettings(const AppSettings& settings) {
          << "  \"disableEffectsBatterySaver\": " << settings.disable_effects_battery_saver << ",\n"
          << "  \"minimizeEasing\": \"" << EscapeJsonString(settings.minimize_easing) << "\",\n"
          << "  \"restoreEasing\": \"" << EscapeJsonString(settings.restore_easing) << "\",\n"
+         << "  \"minimizeCustomBezier\": [" << settings.minimize_custom_bezier.x1 << ", "
+         << settings.minimize_custom_bezier.y1 << ", " << settings.minimize_custom_bezier.x2
+         << ", " << settings.minimize_custom_bezier.y2 << "],\n"
+         << "  \"restoreCustomBezier\": [" << settings.restore_custom_bezier.x1 << ", "
+         << settings.restore_custom_bezier.y1 << ", " << settings.restore_custom_bezier.x2 << ", "
+         << settings.restore_custom_bezier.y2 << "],\n"
          << "  \"animationStyle\": \"" << EscapeJsonString(settings.animation_style) << "\",\n"
          << "  \"genieStrength\": " << settings.genie_strength << ",\n"
          << "  \"fadeStrength\": \"" << EscapeJsonString(settings.fade_strength) << "\",\n"

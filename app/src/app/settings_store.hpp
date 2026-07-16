@@ -7,6 +7,8 @@
 #include <string_view>
 #include <vector>
 
+#include "animation/easing.hpp"
+
 namespace genie::app {
 
 inline constexpr float kDefaultMinimizeDuration = 0.70f;
@@ -35,6 +37,9 @@ struct AppSettings {
   bool disable_effects_battery_saver = false;
   std::string minimize_easing = "Ease In Out";
   std::string restore_easing = "Ease In Out";
+  // Used when minimize_easing / restore_easing is "Custom".
+  animation::CubicBezier minimize_custom_bezier = animation::CubicBezier::EaseInOut();
+  animation::CubicBezier restore_custom_bezier = animation::CubicBezier::EaseInOut();
   std::string animation_style = "Gienie classic";
   float genie_strength = 1.0f;
   std::string fade_strength = "Subtle";
