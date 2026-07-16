@@ -23,3 +23,7 @@ Release/
 *.log
 *.exe
 *.dll
+
+# Visual Studio resource editor binary cache
+*.aps
+
