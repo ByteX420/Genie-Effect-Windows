@@ -1065,10 +1065,11 @@ void SettingsWindow::RenderContents() {
 
   ImGui::SetCursorPos(ImVec2(sidebar_width, 0.0f));
   ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-  // Full remaining width so the scrollbar sits on the window edge (no dead gutter strip).
+  // Full remaining width — custom overlay scrollbar (not ImGui's edge strip) so the grab
+  // stays inside the DWM-rounded shell and does not square off the window corners.
   const float page_width = window_size.x - sidebar_width;
   ImGui::BeginChild("##settings_page", ImVec2(page_width, window_size.y), ImGuiChildFlags_None,
-                    ImGuiWindowFlags_None);
+                    ImGuiWindowFlags_NoScrollbar);
   content_alpha *= WindowMotion::System().value(::ui::motion::MotionKey("page", "content", "alpha"),
                                                 1.0f, WindowMotion::Tokens().tabFade, 0.0f);
   const ImVec2 page_offset = WindowMotion::System().vec2(
@@ -1963,7 +1964,9 @@ void SettingsWindow::RenderContents() {
   const float scroll_y = ImGui::GetScrollY();
   const float scroll_max = ImGui::GetScrollMaxY();
   const float fade_height = px(settings_ui::Metrics::kScrollFadeHeight);
-  const float fade_right = origin.x + size.x;
+  // Keep fades clear of the overlay scrollbar strip on the right edge.
+  const float scrollbar_reserve = px(10.0f);
+  const float fade_right = origin.x + size.x - scrollbar_reserve;
   if (scroll_y > 0.5f) {
     draw->AddRectFilledMultiColor(origin, ImVec2(fade_right, origin.y + fade_height),
                                   WithAlpha(settings_ui::kMainBackground, content_alpha),
@@ -1978,6 +1981,88 @@ void SettingsWindow::RenderContents() {
                                   WithAlpha(settings_ui::kMainBackground, 0.0f),
                                   WithAlpha(settings_ui::kMainBackground, content_alpha),
                                   WithAlpha(settings_ui::kMainBackground, content_alpha));
+  }
+
+  // Overlay scrollbar: inset by shell rounding so it follows the rounded window, not a
+  // full-height square strip that fights DWM corner radius.
+  if (scroll_max > 0.5f && content_alpha > 0.02f) {
+    const float bar_w = px(5.0f);
+    const float edge_pad = px(4.0f);
+    // Match outer shell radius so the thumb never enters the curved corner zone.
+    const float y_inset = shell_round + px(2.0f);
+    const float track_x = origin.x + size.x - edge_pad - bar_w;
+    const float track_top = origin.y + y_inset;
+    const float track_bot = origin.y + size.y - y_inset;
+    const float track_h = std::max(1.0f, track_bot - track_top);
+    const float view_h = size.y;
+    const float content_h = view_h + scroll_max;
+    const float grab_h =
+        std::clamp(track_h * (view_h / std::max(content_h, 1.0f)), px(28.0f), track_h);
+    const float grab_travel = std::max(0.0f, track_h - grab_h);
+    const float grab_t = scroll_max > 0.0f ? std::clamp(scroll_y / scroll_max, 0.0f, 1.0f) : 0.0f;
+    const float grab_y = track_top + grab_travel * grab_t;
+
+    const ImVec2 track_min(track_x, track_top);
+    const ImVec2 track_max(track_x + bar_w, track_bot);
+    const ImVec2 grab_min(track_x, grab_y);
+    const ImVec2 grab_max(track_x + bar_w, grab_y + grab_h);
+
+    // Hit target slightly wider than the visual thumb for easier grabbing.
+    const ImVec2 hit_min(track_x - px(4.0f), track_top);
+    const ImVec2 hit_max(track_x + bar_w + px(2.0f), track_bot);
+    const bool track_hovered = ImGui::IsMouseHoveringRect(hit_min, hit_max, false);
+    const bool grab_hovered = ImGui::IsMouseHoveringRect(grab_min, grab_max, false);
+
+    ImGuiStorage* storage = ImGui::GetStateStorage();
+    const ImGuiID drag_id = ImGui::GetID("##page_scrollbar_drag");
+    const ImGuiID grab_off_id = ImGui::GetID("##page_scrollbar_grab_off");
+    bool dragging = storage->GetBool(drag_id, false);
+    float grab_off = storage->GetFloat(grab_off_id, 0.0f);
+    const ImGuiIO& io = ImGui::GetIO();
+
+    if (track_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+      if (!grab_hovered && grab_travel > 0.0f) {
+        const float click_t =
+            std::clamp((io.MousePos.y - track_top - grab_h * 0.5f) / grab_travel, 0.0f, 1.0f);
+        ImGui::SetScrollY(click_t * scroll_max);
+      }
+      // Recompute grab after possible jump so drag offset stays correct.
+      const float gy =
+          track_top +
+          grab_travel * (scroll_max > 0.0f
+                             ? std::clamp(ImGui::GetScrollY() / scroll_max, 0.0f, 1.0f)
+                             : 0.0f);
+      grab_off = io.MousePos.y - gy;
+      dragging = true;
+    }
+    if (dragging) {
+      if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        dragging = false;
+      } else if (grab_travel > 0.0f) {
+        const float new_t =
+            std::clamp((io.MousePos.y - grab_off - track_top) / grab_travel, 0.0f, 1.0f);
+        ImGui::SetScrollY(new_t * scroll_max);
+      }
+    }
+    storage->SetBool(drag_id, dragging);
+    storage->SetFloat(grab_off_id, grab_off);
+
+    if (track_hovered || dragging) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
+    // Fresh grab rect after possible SetScrollY this frame.
+    const float live_scroll = ImGui::GetScrollY();
+    const float live_t =
+        scroll_max > 0.0f ? std::clamp(live_scroll / scroll_max, 0.0f, 1.0f) : 0.0f;
+    const float live_grab_y = track_top + grab_travel * live_t;
+    const ImVec2 live_grab_min(track_x, live_grab_y);
+    const ImVec2 live_grab_max(track_x + bar_w, live_grab_y + grab_h);
+
+    const float hover_amt = (grab_hovered || dragging || track_hovered) ? 1.0f : 0.0f;
+    const float grab_alpha = (0.16f + 0.14f * hover_amt) * content_alpha;
+    // FG list: above page content + scroll fades; still clipped by the HWND/DWM round.
+    ImDrawList* fg = ImGui::GetForegroundDrawList();
+    fg->AddRectFilled(live_grab_min, live_grab_max,
+                      ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, grab_alpha)), bar_w * 0.5f);
   }
 
   ImGui::EndChild();
