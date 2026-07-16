@@ -28,11 +28,12 @@ isolated behind `platform/native_animation_blocker.*` and
 
 ## Folder layout
 
-- `src/app`: application orchestration and message loop.
-- `src/animation`: platform-independent Genie mesh math.
-- `src/platform`: Win32, DWM, shell taskbar, and event monitoring.
-- `src/rendering`: Direct3D 11, DXGI capture, DirectComposition overlay.
-- `shaders`: HLSL reference shader source.
+- `app/src/app`: application orchestration and message loop.
+- `app/src/animation`: platform-independent Genie mesh math.
+- `app/src/platform`: Win32, DWM, shell taskbar, and event monitoring.
+- `app/src/rendering`: Direct3D 11, DXGI capture, DirectComposition overlay.
+- `app/shaders`: HLSL reference shader source.
+- `hook`: the separate CBT hook DLL project.
 
 ## Custom taskbar target
 

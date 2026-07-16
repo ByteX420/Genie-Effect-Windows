@@ -1,0 +1,50 @@
+#include <winver.h>
+#include "src/app/resource.hpp"
+
+// Product version embedded in the PE — About/Build reads this at runtime.
+#define GENIE_FILE_VERSION      1,0,0,0
+#define GENIE_PRODUCT_VERSION   1,0,0,0
+#define GENIE_FILE_VERSION_STR  "1.0.0\0"
+#define GENIE_PRODUCT_VERSION_STR "1.0.0\0"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION    GENIE_FILE_VERSION
+PRODUCTVERSION GENIE_PRODUCT_VERSION
+FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+FILEFLAGS      VS_FF_DEBUG
+#else
+FILEFLAGS      0x0L
+#endif
+FILEOS         VOS_NT_WINDOWS32
+FILETYPE       VFT_APP
+FILESUBTYPE    VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName",      "Genie Effect\0"
+      VALUE "FileDescription",  "Genie Effect\0"
+      VALUE "FileVersion",      GENIE_FILE_VERSION_STR
+      VALUE "InternalName",     "GenieEffect\0"
+      VALUE "LegalCopyright",   "\0"
+      VALUE "OriginalFilename", "GenieEffect.exe\0"
+      VALUE "ProductName",      "Genie Effect\0"
+      VALUE "ProductVersion",   GENIE_PRODUCT_VERSION_STR
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END
+
+IDR_UI_FONT_REGULAR RCDATA "assets\\fonts\\Inter-Regular.ttf"
+IDR_UI_FONT_SEMIBOLD RCDATA "assets\\fonts\\Inter-SemiBold.ttf"
+IDR_UI_FONT_BOLD RCDATA "assets\\fonts\\Inter-Bold.ttf"
+IDR_UI_FONT_LICENSE RCDATA "assets\\fonts\\OFL.txt"
+
+#ifdef GENIE_EMBED_RELEASE_HOOK
+IDR_GENIE_HOOK RCDATA "..\\build\\bin\\x64\\Release\\GenieHookPost.dll"
+#endif

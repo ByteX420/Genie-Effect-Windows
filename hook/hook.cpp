@@ -1,7 +1,7 @@
 #include <string>
 #include <windows.h>
 
-#include "../src/common/debug_log.hpp"
+#include "../app/src/common/debug_log.hpp"
 
 namespace {
 

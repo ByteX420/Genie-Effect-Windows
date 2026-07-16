@@ -1,4 +1,0 @@
-#include "src/app/resource.hpp"
-
-IDR_SFPRO_REGULAR RCDATA "assets\\fonts\\SF-Pro-Text-Regular.otf"
-IDR_SFPRO_BOLD RCDATA "assets\\fonts\\SF-Pro-Text-Bold.otf"

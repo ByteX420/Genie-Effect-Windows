@@ -13,21 +13,21 @@ GenieEffect is a Windows desktop prototype that replaces the native minimize and
 Open `GenieEffect.slnx` in Visual Studio or build from a Developer PowerShell:
 
 ```powershell
-MSBuild.exe GenieEffect.vcxproj /p:Configuration=Release /p:Platform=x64 /m
+MSBuild.exe GenieEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 ```
 
 The app project builds the hook DLL first. Build outputs are written to:
 
 ```text
-build\x64\Debug\
-build\x64\Release\
+build\bin\x64\Debug\
+build\bin\x64\Release\
 ```
 
 Intermediate files are written to:
 
 ```text
-obj\App\x64\<Configuration>\
-obj\Hook\x64\<Configuration>\
+build\obj\App\x64\<Configuration>\
+build\obj\Hook\x64\<Configuration>\
 ```
 
 ## Runtime Notes

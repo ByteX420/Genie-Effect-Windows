@@ -3,8 +3,7 @@
     <Platform Name="x64" />
   </Configurations>
   <Properties>
-    <Property Name="StartupProject" Value="GenieEffect.vcxproj" />
+    <Property Name="StartupProject" Value="app/GenieEffect.vcxproj" />
   </Properties>
-  <Project Path="GenieEffect.vcxproj" Id="778ab494-05e4-417f-b10a-bd4d620b0c00" />
-  <Project Path="hook/GenieHook.vcxproj" Id="c1a09494-05e4-417f-b10a-bd4d620b0c00" />
+  <Project Path="app/GenieEffect.vcxproj" Id="778ab494-05e4-417f-b10a-bd4d620b0c00" />
 </Solution>

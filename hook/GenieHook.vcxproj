@@ -64,26 +64,16 @@
       <ProgramDataBaseFile>$(IntDir)$(TargetName).pdb</ProgramDataBaseFile>
       <AdditionalDependencies>user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"</Command>
+      <Message>Stopping a running GenieEffect instance before rebuilding the hook...</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
-    <PreBuildEvent>
-      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
-if exist "$(OutDir)" del "$(OutDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
-if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
-if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.pdb" move /y "$(IntDir)GenieHookPost.pdb" "$(IntDir)GenieHookPost.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.iobj" del /q "$(IntDir)GenieHookPost.iobj" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.ipdb" del /q "$(IntDir)GenieHookPost.ipdb" &gt;nul 2&gt;nul
-if exist "$(IntDir)hook.obj" del /q "$(IntDir)hook.obj" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.ilk" move /y "$(IntDir)GenieHookPost.ilk" "$(IntDir)GenieHookPost.ilk.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
-      <Message>Stopping running Genie processes and renaming locked hook DLL/PDB files...</Message>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
@@ -103,20 +93,6 @@ if exist "$(IntDir)GenieHookPost.ilk" move /y "$(IntDir)GenieHookPost.ilk" "$(In
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
-    <PreBuildEvent>
-      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"
-if exist "$(OutDir)" del "$(OutDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
-if exist "$(IntDir)" del "$(IntDir)*.old" &gt;nul 2&gt;nul || ver &gt;nul
-if exist "$(OutDir)GenieHookPost.dll" move /y "$(OutDir)GenieHookPost.dll" "$(OutDir)GenieHookPost.dll.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.pdb" move /y "$(IntDir)GenieHookPost.pdb" "$(IntDir)GenieHookPost.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)vc145.pdb" move /y "$(IntDir)vc145.pdb" "$(IntDir)vc145.pdb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)vc145.idb" move /y "$(IntDir)vc145.idb" "$(IntDir)vc145.idb.%RANDOM%.old" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.iobj" del /q "$(IntDir)GenieHookPost.iobj" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.ipdb" del /q "$(IntDir)GenieHookPost.ipdb" &gt;nul 2&gt;nul
-if exist "$(IntDir)hook.obj" del /q "$(IntDir)hook.obj" &gt;nul 2&gt;nul
-if exist "$(IntDir)GenieHookPost.ilk" move /y "$(IntDir)GenieHookPost.ilk" "$(IntDir)GenieHookPost.ilk.%RANDOM%.old" &gt;nul 2&gt;nul</Command>
-      <Message>Stopping running Genie processes and renaming locked hook DLL/PDB files...</Message>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="hook.cpp" />
