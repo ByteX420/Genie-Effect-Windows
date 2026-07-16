@@ -56,9 +56,9 @@ constexpr int kHotkeyBaseId = 4100;
 constexpr ImU32 kPrimaryTextColor = settings_ui::kText;
 constexpr ImU32 kSecondaryTextColor = settings_ui::kMutedText;
 // Inter type scale (SIL OFL 1.1). Integer px sizes only — half-pixels blur glyphs.
-constexpr float kSmallFontSize = 13.0f;        // helpers, values, captions
-constexpr float kBodyFontSize = 15.0f;         // labels, buttons, nav
-constexpr float kTitleFontSize = 22.0f;        // page titles
+constexpr float kSmallFontSize = 13.0f;  // helpers, values, captions
+constexpr float kBodyFontSize = 15.0f;   // labels, buttons, nav
+constexpr float kTitleFontSize = 22.0f;  // page titles
 constexpr float kPageTitleTextSize = 22.0f;
 constexpr float kPageSubtitleTextSize = 13.0f;
 constexpr float kSectionTitleTextSize = 15.0f;  // hero row titles (semibold)
@@ -814,7 +814,8 @@ void SettingsWindow::RebuildFonts(UINT dpi) {
   font_body_ = add_embedded(regular_resource, bake_size(kBodyFontSize));
   font_medium_ = add_embedded(semibold_resource, bake_size(kSectionTitleTextSize));
   font_title_ = add_embedded(bold_resource, bake_size(kTitleFontSize));
-  if (font_title_ == nullptr) font_title_ = add_embedded(semibold_resource, bake_size(kTitleFontSize));
+  if (font_title_ == nullptr)
+    font_title_ = add_embedded(semibold_resource, bake_size(kTitleFontSize));
 
   // Last-resort: load from the app assets folder if RC embedding failed.
   if (font_body_ == nullptr || font_small_ == nullptr || font_medium_ == nullptr ||
@@ -973,16 +974,16 @@ void SettingsWindow::RenderContents() {
 
   // Brand under traffic lights — same left inset as nav.
   {
-    const float brand_reveal = WindowMotion::System().value(
-        ::ui::motion::MotionKey("shell", "brand", "reveal"), 1.0f,
-        WindowMotion::Tokens().panelEnterFade, 0.0f);
+    const float brand_reveal =
+        WindowMotion::System().value(::ui::motion::MotionKey("shell", "brand", "reveal"), 1.0f,
+                                     WindowMotion::Tokens().panelEnterFade, 0.0f);
     const float brand_shift = (1.0f - brand_reveal) * px(6.0f);
-    const ImVec2 brand =
-        window_point(px(settings_ui::Metrics::kSidebarMargin),
-                     px(settings_ui::Metrics::kSidebarBrandY) + brand_shift);
+    const ImVec2 brand = window_point(px(settings_ui::Metrics::kSidebarMargin),
+                                      px(settings_ui::Metrics::kSidebarBrandY) + brand_shift);
     draw->AddText(font_small_, font_small_->FontSize,
                   ImVec2(std::floor(brand.x + 0.5f), std::floor(brand.y + 0.5f)),
-                  WithAlpha(settings_ui::kMutedText, content_alpha * brand_reveal * 0.85f), "GENIE");
+                  WithAlpha(settings_ui::kMutedText, content_alpha * brand_reveal * 0.85f),
+                  "GENIE");
   }
 
   struct PageEntry {
@@ -1033,24 +1034,22 @@ void SettingsWindow::RenderContents() {
   // Status chip: same left column as nav/ampel; bottom inset mirrors traffic-light top edge.
   {
     const char* status = temporarily_paused_ ? "Paused" : (is_enabled_ ? "On" : "Off");
-    const ImU32 status_color = temporarily_paused_   ? IM_COL32(220, 170, 90, 255)
-                               : is_enabled_         ? IM_COL32(120, 200, 140, 255)
-                                                     : settings_ui::kMutedText;
-    const float status_reveal = WindowMotion::System().value(
-        ::ui::motion::MotionKey("shell", "status", "reveal"), 1.0f,
-        WindowMotion::Tokens().fadeMedium, 0.0f);
+    const ImU32 status_color = temporarily_paused_ ? IM_COL32(220, 170, 90, 255)
+                               : is_enabled_       ? IM_COL32(120, 200, 140, 255)
+                                                   : settings_ui::kMutedText;
+    const float status_reveal =
+        WindowMotion::System().value(::ui::motion::MotionKey("shell", "status", "reveal"), 1.0f,
+                                     WindowMotion::Tokens().fadeMedium, 0.0f);
     ImFont* status_font = font_small_ ? font_small_ : ImGui::GetFont();
     const float status_sz = status_font->FontSize;
-    const ImVec2 status_text_size =
-        status_font->CalcTextSizeA(status_sz, FLT_MAX, 0.0f, status);
+    const ImVec2 status_text_size = status_font->CalcTextSizeA(status_sz, FLT_MAX, 0.0f, status);
     const float chip_pad_x = px(8.0f);
     const float chip_pad_y = px(4.0f);
     const float chip_h = status_sz + chip_pad_y * 2.0f;
     const float chip_w = status_text_size.x + chip_pad_x * 2.0f;
     // Ampel top-edge inset ≈ kSidebarMargin; pin chip to the matching bottom inset.
-    const float chip_y =
-        window_size.y - px(settings_ui::Metrics::kSidebarStatusBottom) - chip_h +
-        (1.0f - status_reveal) * px(6.0f);
+    const float chip_y = window_size.y - px(settings_ui::Metrics::kSidebarStatusBottom) - chip_h +
+                         (1.0f - status_reveal) * px(6.0f);
     const ImVec2 chip_min = window_point(nav_x, chip_y);
     const ImVec2 chip_max(chip_min.x + chip_w, chip_min.y + chip_h);
     const float chip_round = chip_h * 0.5f;
@@ -1252,8 +1251,8 @@ void SettingsWindow::RenderContents() {
       };
       const float gap = px(8.0f);
       const float row_w = layout.content_width();
-      const float btn_w =
-          (row_w - gap * static_cast<float>(presets.size() - 1)) / static_cast<float>(presets.size());
+      const float btn_w = (row_w - gap * static_cast<float>(presets.size() - 1)) /
+                          static_cast<float>(presets.size());
       float bx = layout.content_left();
       const float by = layout.StackControlY();
       for (size_t i = 0; i < presets.size(); ++i) {
@@ -1263,7 +1262,7 @@ void SettingsWindow::RenderContents() {
         const bool active = std::abs(minimize_duration_seconds_ - minimize) < 0.0001f &&
                             std::abs(restore_duration_seconds_ - restore) < 0.0001f;
         // Active preset uses SemiBold; idle uses Regular.
-      if (CompactButton(widget_motion, id.c_str(), label, ImVec2(btn_w, btn_h),
+        if (CompactButton(widget_motion, id.c_str(), label, ImVec2(btn_w, btn_h),
                           active ? font_medium_ : font_body_, scale, content_alpha, active)) {
           minimize_duration_seconds_ = minimize;
           restore_duration_seconds_ = restore;
@@ -1288,10 +1287,9 @@ void SettingsWindow::RenderContents() {
       const ImVec2 cursor = layout.ControlCursor(slider_w, slider_h);
       layout.SetCursor(cursor.x, cursor.y);
       float updated = *duration;
-      const bool active =
-          Slider(widget_motion, id, "", &updated, kMinimumAnimationDurationSeconds,
-                 kMaximumAnimationDurationSeconds, slider_w, scale, content_alpha, font_small_,
-                 0.01f);
+      const bool active = Slider(widget_motion, id, "", &updated, kMinimumAnimationDurationSeconds,
+                                 kMaximumAnimationDurationSeconds, slider_w, scale, content_alpha,
+                                 font_small_, 0.01f);
       if (active && std::abs(updated - *duration) > 0.0001f) {
         float delta = updated - *duration;
         if (link_speeds_) {
@@ -1375,7 +1373,8 @@ void SettingsWindow::RenderContents() {
       combo_row("##animation_style", "Animation", &style_index, style_names, [&] {
         const std::string previous = animation_style_;
         animation_style_ = style_names[style_index];
-        const bool saved = !animation_style_callback_ || animation_style_callback_(animation_style_);
+        const bool saved =
+            !animation_style_callback_ || animation_style_callback_(animation_style_);
         if (!saved) animation_style_ = previous;
         RecordSaveResult(saved);
       });
@@ -1385,8 +1384,7 @@ void SettingsWindow::RenderContents() {
       combo_row("##minimize_easing", "Minimize easing", &easing_index, easing_names, [&] {
         const std::string previous = minimize_easing_;
         minimize_easing_ = easing_names[easing_index];
-        const bool saved =
-            !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
+        const bool saved = !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
         if (!saved) minimize_easing_ = previous;
         RecordSaveResult(saved);
       });
@@ -1396,8 +1394,7 @@ void SettingsWindow::RenderContents() {
       combo_row("##restore_easing", "Restore easing", &easing_index, easing_names, [&] {
         const std::string previous = restore_easing_;
         restore_easing_ = easing_names[easing_index];
-        const bool saved =
-            !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
+        const bool saved = !easing_callback_ || easing_callback_(minimize_easing_, restore_easing_);
         if (!saved) restore_easing_ = previous;
         RecordSaveResult(saved);
       });
@@ -1462,8 +1459,7 @@ void SettingsWindow::RenderContents() {
       const ImVec2 cursor = layout.ControlCursor(toggle_w, toggle_h);
       layout.SetCursor(cursor.x, cursor.y);
       if (Toggle(widget_motion, "##target_indicator", &proposed, scale, content_alpha)) {
-        const bool saved =
-            !target_indicator_callback_ || target_indicator_callback_(proposed);
+        const bool saved = !target_indicator_callback_ || target_indicator_callback_(proposed);
         if (saved) show_target_indicator_ = proposed;
         RecordSaveResult(saved);
       }
@@ -1613,7 +1609,8 @@ void SettingsWindow::RenderContents() {
         const ImVec2 p = layout.ToScreen(layout.content_left(), layout.y());
         draw->AddText(font_small_, font_small_->FontSize,
                       ImVec2(std::floor(p.x + 0.5f), std::floor(p.y + 0.5f)),
-                      WithAlpha(IM_COL32(235, 120, 120, 255), content_alpha), visible_error.c_str());
+                      WithAlpha(IM_COL32(235, 120, 120, 255), content_alpha),
+                      visible_error.c_str());
       }
       layout.Gap(22.0f);
     }
@@ -1684,9 +1681,8 @@ void SettingsWindow::RenderContents() {
       const float total = change_w + gap + disable_w;
       layout.ReserveControl(total);
       layout.RowTitle(font_body_, kLabelTextSize, labels[index], kPrimaryTextColor);
-      const std::string binding_text = editing_hotkey_ == static_cast<int>(index)
-                                           ? "Press keys…"
-                                           : HotkeyText(hotkeys_[index]);
+      const std::string binding_text =
+          editing_hotkey_ == static_cast<int>(index) ? "Press keys…" : HotkeyText(hotkeys_[index]);
       const ImU32 binding_color = hotkey_available_[index] || hotkeys_[index].virtual_key == 0
                                       ? kSecondaryTextColor
                                       : IM_COL32(235, 120, 120, 255);
@@ -1795,15 +1791,13 @@ void SettingsWindow::RenderContents() {
       const ImVec2 cursor = layout.ControlCursor(action_w, btn_h);
       layout.SetCursor(cursor.x, cursor.y);
       const std::string id = std::format("##diagnostics_action_{}", index);
-      const char* button_label =
-          action == DiagnosticsAction::kCopy             ? "Copy"
-          : action == DiagnosticsAction::kOpenLogFolder  ? "Open"
-          : action == DiagnosticsAction::kRepairWindows  ? "Repair"
-                                                         : "Restart";
+      const char* button_label = action == DiagnosticsAction::kCopy            ? "Copy"
+                                 : action == DiagnosticsAction::kOpenLogFolder ? "Open"
+                                 : action == DiagnosticsAction::kRepairWindows ? "Repair"
+                                                                               : "Restart";
       if (CompactButton(widget_motion, id.c_str(), button_label, ImVec2(action_w, btn_h),
                         font_body_, scale, content_alpha)) {
-        const bool succeeded =
-            diagnostics_action_callback_ && diagnostics_action_callback_(action);
+        const bool succeeded = diagnostics_action_callback_ && diagnostics_action_callback_(action);
         diagnostics_feedback_ = succeeded ? "Done" : "Failed";
         last_diagnostics_refresh_ms_ = 0;
       }
@@ -1837,8 +1831,7 @@ void SettingsWindow::RenderContents() {
                  "Product info and open-source licenses");
 
     // Row title is "Build" — show the product version string as-is (no "Version " prefix).
-    const std::string version_text =
-        diagnostics_.version.empty() ? "—" : diagnostics_.version;
+    const std::string version_text = diagnostics_.version.empty() ? "—" : diagnostics_.version;
 
     layout.SectionCaption(font_small_, kCaptionTextSize, "PRODUCT");
     layout.BeginGroup();
@@ -1879,10 +1872,9 @@ void SettingsWindow::RenderContents() {
       const ImVec2 license_size(std::min(px(560.0f), viewport->WorkSize.x - px(48.0f)),
                                 std::min(px(460.0f), viewport->WorkSize.y - px(48.0f)));
       ImGui::SetNextWindowSize(license_size, ImGuiCond_Appearing);
-      ImGui::SetNextWindowPos(
-          ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
-                 viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
-          ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f,
+                                     viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+                              ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(22.0f), px(20.0f)));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, px(settings_ui::Metrics::kCardRounding));
@@ -1928,9 +1920,8 @@ void SettingsWindow::RenderContents() {
           ImGui::PushStyleColor(ImGuiCol_Text, colors::textDim);
           if (font_small_) ImGui::PushFont(font_small_);
           ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
-          ImGui::TextUnformatted(license.empty()
-                                     ? "The embedded font license could not be loaded."
-                                     : license.c_str());
+          ImGui::TextUnformatted(license.empty() ? "The embedded font license could not be loaded."
+                                                 : license.c_str());
           ImGui::PopTextWrapPos();
           if (font_small_) ImGui::PopFont();
           ImGui::PopStyleColor();
@@ -2029,9 +2020,8 @@ void SettingsWindow::RenderContents() {
       // Recompute grab after possible jump so drag offset stays correct.
       const float gy =
           track_top +
-          grab_travel * (scroll_max > 0.0f
-                             ? std::clamp(ImGui::GetScrollY() / scroll_max, 0.0f, 1.0f)
-                             : 0.0f);
+          grab_travel *
+              (scroll_max > 0.0f ? std::clamp(ImGui::GetScrollY() / scroll_max, 0.0f, 1.0f) : 0.0f);
       grab_off = io.MousePos.y - gy;
       dragging = true;
     }
@@ -2076,9 +2066,8 @@ void SettingsWindow::RenderContents() {
     auto& motion = WindowMotion::System();
     const auto& tokens = WindowMotion::Tokens();
     const auto show_key = ::ui::motion::MotionKey("toast", "save", "show");
-    const float show =
-        motion.value(show_key, toast_live ? 1.0f : 0.0f,
-                     toast_live ? tokens.fadeFast : tokens.popupClose, 0.0f);
+    const float show = motion.value(show_key, toast_live ? 1.0f : 0.0f,
+                                    toast_live ? tokens.fadeFast : tokens.popupClose, 0.0f);
 
     if (!toast_live && show <= 0.02f) {
       if (!save_feedback_.empty()) {
@@ -2112,8 +2101,8 @@ void SettingsWindow::RenderContents() {
       fg->AddRectFilled(ImVec2(toast_min.x, toast_min.y + px(1.5f)),
                         ImVec2(toast_max.x, toast_max.y + px(1.5f)),
                         IM_COL32(0, 0, 0, static_cast<int>(70.0f * a)), rounding);
-      fg->AddRectFilled(toast_min, toast_max,
-                        IM_COL32(28, 28, 30, static_cast<int>(250.0f * a)), rounding);
+      fg->AddRectFilled(toast_min, toast_max, IM_COL32(28, 28, 30, static_cast<int>(250.0f * a)),
+                        rounding);
       fg->AddRect(toast_min, toast_max,
                   IM_COL32(is_error ? 90 : 52, is_error ? 40 : 52, is_error ? 42 : 55,
                            static_cast<int>(255.0f * a)),
@@ -2131,9 +2120,8 @@ void SettingsWindow::RenderContents() {
         text_x += icon_slot;
       }
 
-      const ImU32 text_col =
-          is_error ? IM_COL32(235, 140, 140, static_cast<int>(255.0f * a))
-                   : IM_COL32(220, 220, 224, static_cast<int>(255.0f * a));
+      const ImU32 text_col = is_error ? IM_COL32(235, 140, 140, static_cast<int>(255.0f * a))
+                                      : IM_COL32(220, 220, 224, static_cast<int>(255.0f * a));
       fg->AddText(toast_font, font_sz,
                   ImVec2(std::floor(text_x + 0.5f),
                          settings_ui::CenteredTextTop(toast_font, toast_min.y, toast_h)),

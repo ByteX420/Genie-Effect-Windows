@@ -52,8 +52,8 @@ bool ReferenceButton(const char* id, const char* label, const ImVec2& size, ImFo
                                       active ? 1.0f : 0.0f, tokens.selectSharp, 0.0f);
 
   // Quiet idle surface; selected reads as a solid lifted pill (not a faint tint).
-  const ImVec4 base = MixColor(ImVec4(0.10f, 0.10f, 0.11f, 1.0f),
-                               ImVec4(0.22f, 0.22f, 0.24f, 1.0f), selected);
+  const ImVec4 base =
+      MixColor(ImVec4(0.10f, 0.10f, 0.11f, 1.0f), ImVec4(0.22f, 0.22f, 0.24f, 1.0f), selected);
   const ImVec4 hovered_background =
       MixColor(base, ImVec4(0.15f, 0.15f, 0.16f, 1.0f), hover * (1.0f - selected * 0.5f));
   ImVec4 background = MixColor(hovered_background, ImVec4(0.18f, 0.18f, 0.19f, 1.0f), press);
@@ -70,9 +70,8 @@ bool ReferenceButton(const char* id, const char* label, const ImVec2& size, ImFo
       std::min(Metrics::kControlRounding * (size.y / 34.0f), size.y * 0.35f) * visual_scale;
   ImDrawList* draw = ImGui::GetWindowDrawList();
   draw->AddRectFilled(visual_min, visual_max, ImGui::GetColorU32(background), rounding);
-  ImVec4 border =
-      MixColor(ImVec4(0.20f, 0.20f, 0.22f, 1.0f), ImVec4(0.48f, 0.48f, 0.52f, 1.0f),
-               selected * 0.75f + hover * 0.25f * (1.0f - selected));
+  ImVec4 border = MixColor(ImVec4(0.20f, 0.20f, 0.22f, 1.0f), ImVec4(0.48f, 0.48f, 0.52f, 1.0f),
+                           selected * 0.75f + hover * 0.25f * (1.0f - selected));
   border.w *= alpha;
   draw->AddRect(visual_min, visual_max, ImGui::GetColorU32(border), rounding, 0,
                 std::max(1.0f, size.y / 30.0f));
@@ -87,8 +86,8 @@ bool ReferenceButton(const char* id, const char* label, const ImVec2& size, ImFo
   final_size *= visual_scale;
   text_size = font->CalcTextSizeA(final_size, FLT_MAX, 0.0f, label);
   // Selected / hover → full text. Idle stays clearly dim so the active pill stands out.
-  const float text_mix = std::clamp(selected * 1.0f + hover * 0.65f + (active ? 0.35f : 0.0f),
-                                    0.0f, 1.0f);
+  const float text_mix =
+      std::clamp(selected * 1.0f + hover * 0.65f + (active ? 0.35f : 0.0f), 0.0f, 1.0f);
   ImVec4 text_color = MixColor(colors::textDim, colors::text, text_mix);
   text_color.w *= alpha * (1.0f - 0.08f * press);
   draw->PushClipRect(visual_min, visual_max, true);
@@ -136,8 +135,9 @@ bool Toggle(const MotionContext& motion, const char* id, bool* value, float scal
   const float press = reference_motion.value(ReferenceMotionKey("menu.checkbox", id, "press"),
                                              pressed ? 1.0f : 0.0f, tokens.pressFast, 0.0f);
   // Snappy spring so the knob travel has weight; squash rides the same channel.
-  const float fill = reference_motion.value(ReferenceMotionKey("menu.checkbox", id, "fill"),
-                                            value && *value ? 1.0f : 0.0f, tokens.springSnappy, 0.0f);
+  const float fill =
+      reference_motion.value(ReferenceMotionKey("menu.checkbox", id, "fill"),
+                             value && *value ? 1.0f : 0.0f, tokens.springSnappy, 0.0f);
   const float t = std::clamp(fill, 0.0f, 1.0f);
   // Peak squash mid-travel (sin), stronger press squish while held.
   const float mid = std::sin(3.14159265f * t);
@@ -148,16 +148,17 @@ bool Toggle(const MotionContext& motion, const char* id, bool* value, float scal
   ImVec4 track_off(0.16f, 0.16f, 0.17f, alpha);
   ImVec4 track_on(0.48f, 0.48f, 0.52f, alpha);
   ImVec4 track_color = MixColor(track_off, track_on, t);
-  track_color = MixColor(track_color,
-                         MixColor(ImVec4(0.22f, 0.22f, 0.24f, alpha),
-                                  ImVec4(0.56f, 0.56f, 0.60f, alpha), t),
-                         hover * 0.5f);
+  track_color =
+      MixColor(track_color,
+               MixColor(ImVec4(0.22f, 0.22f, 0.24f, alpha), ImVec4(0.56f, 0.56f, 0.60f, alpha), t),
+               hover * 0.5f);
 
   ImDrawList* draw = ImGui::GetWindowDrawList();
   draw->AddRectFilled(track_min, track_max, ImGui::GetColorU32(track_color), track_rounding);
   // Soft rim keeps the pill edged against dark cards.
   {
-    ImVec4 rim = MixColor(ImVec4(0.28f, 0.28f, 0.30f, alpha), ImVec4(0.62f, 0.62f, 0.66f, alpha), t);
+    ImVec4 rim =
+        MixColor(ImVec4(0.28f, 0.28f, 0.30f, alpha), ImVec4(0.62f, 0.62f, 0.66f, alpha), t);
     rim.w *= 0.9f + 0.1f * hover;
     draw->AddRect(track_min, track_max, ImGui::GetColorU32(rim), track_rounding, 0,
                   std::max(1.0f, scale));
@@ -222,9 +223,9 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
                 minimum * display_multiplier, display_suffix);
   std::snprintf(probe_hi, sizeof(probe_hi), "%.*f%s", display_precision,
                 maximum * display_multiplier, display_suffix);
-  const float probe_w = std::max(
-      label_font->CalcTextSizeA(value_font_sz, FLT_MAX, 0.0f, probe_lo).x,
-      label_font->CalcTextSizeA(value_font_sz, FLT_MAX, 0.0f, probe_hi).x);
+  const float probe_w =
+      std::max(label_font->CalcTextSizeA(value_font_sz, FLT_MAX, 0.0f, probe_lo).x,
+               label_font->CalcTextSizeA(value_font_sz, FLT_MAX, 0.0f, probe_hi).x);
   const float value_chip_w = std::max(36.0f * scale, probe_w + 8.0f * scale);
   const float value_gap = 6.0f * scale;
   const float track_end = origin.x + width - value_chip_w - value_gap;
@@ -396,15 +397,13 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
   draw->AddRectFilled(ImVec2(pearl_min.x + 1.2f * scale, pearl_min.y + 1.0f * scale),
                       ImVec2(pearl_max.x - 1.2f * scale, track_y),
                       ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.18f * alpha)), pearl_r * 0.75f);
-  draw->AddRect(pearl_min, pearl_max,
-                ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 0.16f * alpha)), pearl_r, 0,
-                std::max(1.0f, scale));
+  draw->AddRect(pearl_min, pearl_max, ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 0.0f, 0.16f * alpha)),
+                pearl_r, 0, std::max(1.0f, scale));
 
   char display[32]{};
   std::snprintf(display, sizeof(display), "%.*f%s", display_precision, *value * display_multiplier,
                 display_suffix);
-  const ImVec2 display_size =
-      label_font->CalcTextSizeA(value_font_sz, FLT_MAX, 0.0f, display);
+  const ImVec2 display_size = label_font->CalcTextSizeA(value_font_sz, FLT_MAX, 0.0f, display);
   const bool value_hovered = ImGui::IsMouseHoveringRect(value_box_min, value_box_max, false);
   const float value_hover =
       reference_motion.value(ReferenceMotionKey("menu.slider", id, "value-box"),
@@ -412,14 +411,13 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
   const float box_rounding = 3.0f * scale;
   if (value_hover > 0.01f || *mode > 0) {
     const float chip_a = std::max(value_hover, *mode > 0 ? 1.0f : 0.0f);
-    draw->AddRectFilled(
-        value_box_min, value_box_max,
-        ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.06f * chip_a * alpha)), box_rounding);
+    draw->AddRectFilled(value_box_min, value_box_max,
+                        ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.06f * chip_a * alpha)),
+                        box_rounding);
   }
 
   if (*mode == 0) {
-    const ImVec4 value_color =
-        MixColor(colors::textDim, colors::text, 0.35f + 0.65f * value_hover);
+    const ImVec4 value_color = MixColor(colors::textDim, colors::text, 0.35f + 0.65f * value_hover);
     // Horizontally + vertically centered — full baked size, no scale-down clip.
     const float text_x =
         std::floor(value_box_min.x + (value_box_width - display_size.x) * 0.5f + 0.5f);
@@ -507,9 +505,8 @@ bool Combo(const MotionContext& motion_context, const char* id, const char* labe
 
   // Hover paint only while fully closed — open/closing uses open_amount tint only.
   const float hover_target = session_active ? 0.0f : (hovered ? 1.0f : 0.0f);
-  const float frame_hover =
-      motion.value(ReferenceMotionKey("menu.combo", id, "frame-hover"), hover_target,
-                   tokens.hoverSoft, 0.0f);
+  const float frame_hover = motion.value(ReferenceMotionKey("menu.combo", id, "frame-hover"),
+                                         hover_target, tokens.hoverSoft, 0.0f);
   const float frame_press =
       motion.value(ReferenceMotionKey("menu.combo", id, "frame-press"),
                    item_active && !session_active ? 1.0f : 0.0f, tokens.pressFast, 0.0f);
@@ -573,7 +570,8 @@ bool Combo(const MotionContext& motion_context, const char* id, const char* labe
 
   if (!connected) {
     draw->AddRectFilled(frame_min, frame_max, frame_bg_u32, rounding, ImDrawFlags_RoundCornersAll);
-    draw->AddRect(frame_min, frame_max, frame_border_u32, rounding, ImDrawFlags_RoundCornersAll, th);
+    draw->AddRect(frame_min, frame_max, frame_border_u32, rounding, ImDrawFlags_RoundCornersAll,
+                  th);
   } else {
     // Field fill only — border comes from the unified outer stroke after the list is drawn.
     // Down: round top only. Up: round bottom only. Join side is flat against the list.
@@ -615,13 +613,10 @@ bool Combo(const MotionContext& motion_context, const char* id, const char* labe
       const ImU32 border_u32 = ImGui::GetColorU32(body_border);
 
       // Unified shell bounds (field + list). Outer silhouette is fully rounded; join is square.
-      const ImVec2 shell_min =
-          opens_upward ? popup_min : ImVec2(frame_min.x, frame_min.y);
-      const ImVec2 shell_max =
-          opens_upward ? ImVec2(frame_max.x, frame_max.y) : popup_max;
+      const ImVec2 shell_min = opens_upward ? popup_min : ImVec2(frame_min.x, frame_min.y);
+      const ImVec2 shell_max = opens_upward ? ImVec2(frame_max.x, frame_max.y) : popup_max;
       const float shell_h = shell_max.y - shell_min.y;
-      const float shell_r =
-          std::min(rounding, std::max(1.0f, shell_h * 0.5f - 0.5f));
+      const float shell_r = std::min(rounding, std::max(1.0f, shell_h * 0.5f - 0.5f));
 
       // List fill: round only the free end (matches outer stroke). Join side stays square.
       // Using shell_r (not 0) so outer corners aren't free triangles outside a rounded border.
@@ -716,13 +711,12 @@ bool Combo(const MotionContext& motion_context, const char* id, const char* labe
           popup_draw->PathLineTo(ImVec2(cc.x - s, cc.y));
           popup_draw->PathLineTo(ImVec2(cc.x - s * 0.25f, cc.y + s * 0.85f));
           popup_draw->PathLineTo(ImVec2(cc.x + s * 1.15f, cc.y - s * 0.85f));
-          popup_draw->PathStroke(
-              ImGui::GetColorU32(ImVec4(colors::text.x, colors::text.y, colors::text.z, check_alpha)),
-              0, 1.5f * scale);
+          popup_draw->PathStroke(ImGui::GetColorU32(ImVec4(colors::text.x, colors::text.y,
+                                                           colors::text.z, check_alpha)),
+                                 0, 1.5f * scale);
         }
 
-        const float text_x =
-            item_min.x + text_pad_left + (text_pad_check - text_pad_left) * indent;
+        const float text_x = item_min.x + text_pad_left + (text_pad_check - text_pad_left) * indent;
         ImVec4 item_color =
             MixColor(colors::textDim, colors::text, std::max(select_amt, item_hover * 0.85f));
         item_color.w *= alpha * row_reveal;
@@ -840,9 +834,8 @@ bool SegmentSelector(const MotionContext& motion, const char* id,
 
   ImVec4 pill_bg(0.18f, 0.18f, 0.20f, alpha);
   draw->AddRectFilled(pill_min, pill_max, ImGui::GetColorU32(pill_bg), pill_rounding);
-  draw->AddRect(pill_min, pill_max,
-                ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.08f * alpha)), pill_rounding, 0,
-                std::max(1.0f, scale));
+  draw->AddRect(pill_min, pill_max, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.08f * alpha)),
+                pill_rounding, 0, std::max(1.0f, scale));
 
   for (int index = 0; index < 2; ++index) {
     const ImVec2 segment_min(min.x + segment_width * static_cast<float>(index), min.y);
@@ -877,8 +870,7 @@ bool SegmentSelector(const MotionContext& motion, const char* id,
     text_color.w *= alpha;
 
     const ImVec2 text_size = font->CalcTextSizeA(font->FontSize, FLT_MAX, 0.0f, labels[index]);
-    const float text_x =
-        std::floor(segment_min.x + (segment_width - text_size.x) * 0.5f + 0.5f);
+    const float text_x = std::floor(segment_min.x + (segment_width - text_size.x) * 0.5f + 0.5f);
     const float text_y = CenteredTextTop(font, segment_min.y, height);
     draw->AddText(font, font->FontSize, ImVec2(text_x, text_y), ImGui::GetColorU32(text_color),
                   labels[index]);

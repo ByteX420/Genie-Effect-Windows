@@ -31,13 +31,20 @@ inline float ApplyEasing(EasingCurve curve, float value) {
   const float t = std::clamp(value, 0.0f, 1.0f);
   float eased = t;
   switch (curve) {
-    case EasingCurve::kLinear: eased = t; break;
-    case EasingCurve::kEaseIn: eased = t * t; break;
-    case EasingCurve::kEaseOut: eased = 1.0f - (1.0f - t) * (1.0f - t); break;
-    case EasingCurve::kEaseInOut: eased = t * t * (3.0f - 2.0f * t); break;
+    case EasingCurve::kLinear:
+      eased = t;
+      break;
+    case EasingCurve::kEaseIn:
+      eased = t * t;
+      break;
+    case EasingCurve::kEaseOut:
+      eased = 1.0f - (1.0f - t) * (1.0f - t);
+      break;
+    case EasingCurve::kEaseInOut:
+      eased = t * t * (3.0f - 2.0f * t);
+      break;
     case EasingCurve::kCubic:
-      eased = t < 0.5f ? 4.0f * t * t * t
-                       : 1.0f - std::pow(-2.0f * t + 2.0f, 3.0f) * 0.5f;
+      eased = t < 0.5f ? 4.0f * t * t * t : 1.0f - std::pow(-2.0f * t + 2.0f, 3.0f) * 0.5f;
       break;
     case EasingCurve::kBack: {
       constexpr float kOvershoot = 1.35f;
@@ -47,9 +54,8 @@ inline float ApplyEasing(EasingCurve curve, float value) {
     }
     case EasingCurve::kElastic:
       if (t != 0.0f && t != 1.0f) {
-        eased = std::pow(2.0f, -9.0f * t) *
-                    std::sin((t * 9.0f - 0.75f) * (2.0f * kPi / 3.0f)) +
-                1.0f;
+        eased =
+            std::pow(2.0f, -9.0f * t) * std::sin((t * 9.0f - 0.75f) * (2.0f * kPi / 3.0f)) + 1.0f;
       }
       break;
   }

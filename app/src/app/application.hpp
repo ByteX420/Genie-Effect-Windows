@@ -9,8 +9,8 @@
 #include <unordered_map>
 #include <windows.h>
 
-#include "app/settings_window.hpp"
 #include "app/settings_store.hpp"
+#include "app/settings_window.hpp"
 #include "platform/native_animation_blocker.hpp"
 #include "platform/taskbar_target_provider.hpp"
 #include "platform/window_event_monitor.hpp"

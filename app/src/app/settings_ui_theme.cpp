@@ -190,8 +190,8 @@ TrafficLightAction DrawTrafficLights(const MotionContext& motion, ImVec2 window_
         draw->Flags = old_flags;
       } else {
         draw->AddRect(ImVec2(center.x - 2.4f * scale, center.y - 2.4f * scale),
-                      ImVec2(center.x + 2.4f * scale, center.y + 2.4f * scale), icon, 1.0f * scale, 0,
-                      1.0f);
+                      ImVec2(center.x + 2.4f * scale, center.y + 2.4f * scale), icon, 1.0f * scale,
+                      0, 1.0f);
       }
     }
   }
@@ -203,8 +203,14 @@ TrafficLightAction DrawTrafficLights(const MotionContext& motion, ImVec2 window_
 
 PageLayout::PageLayout(ImDrawList* draw, ImVec2 origin, float page_width, float scale, float alpha,
                        float y_start, MotionContext* motion, const char* page_scope)
-    : draw_(draw), origin_(origin), page_width_(page_width), scale_(scale), alpha_(alpha),
-      y_(y_start), motion_(motion), page_scope_(page_scope ? page_scope : "page") {}
+    : draw_(draw),
+      origin_(origin),
+      page_width_(page_width),
+      scale_(scale),
+      alpha_(alpha),
+      y_(y_start),
+      motion_(motion),
+      page_scope_(page_scope ? page_scope : "page") {}
 
 float PageLayout::Reveal(const char* id, float delay, float from_offset_px) {
   if (!motion_) {
@@ -214,8 +220,8 @@ float PageLayout::Reveal(const char* id, float delay, float from_offset_px) {
   }
   const ::ui::motion::MotionSpec spec =
       ::ui::motion::MotionSpec::Timed(0.40f, ::ui::motion::MotionEasing::SmootherStep, delay);
-  const float reveal = motion_->system.value(
-      ::ui::motion::MotionKey("layout", page_scope_, id), 1.0f, spec, 0.0f);
+  const float reveal =
+      motion_->system.value(::ui::motion::MotionKey("layout", page_scope_, id), 1.0f, spec, 0.0f);
   local_alpha_ = std::clamp(reveal, 0.0f, 1.0f);
   motion_y_shift_ = (1.0f - local_alpha_) * from_offset_px * scale_;
   return local_alpha_;
@@ -254,8 +260,7 @@ void PageLayout::SectionCaption(ImFont* font, float size, const char* text) {
   Reveal(reveal_id.c_str(), 0.02f * static_cast<float>(reveal_serial_), 8.0f);
   const float font_size = font ? font->FontSize : 0.0f;
   const ImVec2 pos = ToScreen(group_left() + 4.0f * scale_, y_);
-  draw_->AddText(font, font_size,
-                 ImVec2(std::floor(pos.x + 0.5f), std::floor(pos.y + 0.5f)),
+  draw_->AddText(font, font_size, ImVec2(std::floor(pos.x + 0.5f), std::floor(pos.y + 0.5f)),
                  WithAlpha(kMutedText, alpha()), text);
   y_ += font_size + 7.0f * scale_;
   local_alpha_ = 1.0f;
@@ -416,8 +421,7 @@ void PageLayout::RowValue(ImFont* font, float size, const char* text, ImU32 colo
   (void)size;
   if (!font || !text) return;
   const float text_h = font->FontSize;
-  const float max_w =
-      reserved_control_w_ > 0.0f ? reserved_control_w_ : content_width() * 0.58f;
+  const float max_w = reserved_control_w_ > 0.0f ? reserved_control_w_ : content_width() * 0.58f;
   const ImVec2 measured = font->CalcTextSizeA(text_h, FLT_MAX, 0.0f, text);
   const float draw_w = std::min(measured.x, max_w);
   const float x = content_right() - draw_w;
@@ -472,12 +476,10 @@ bool SidebarItem(const MotionContext& motion, const char* id, const char* label,
   ImDrawList* draw = ImGui::GetWindowDrawList();
 
   const bool is_hot = hovered || focused;
-  const float hover =
-      motion.system.value(::ui::motion::MotionKey("sidebar-main", id, "hover"),
-                          is_hot ? 1.0f : 0.0f, motion.tokens.hoverFast, 0.0f);
-  const float select =
-      motion.system.value(::ui::motion::MotionKey("sidebar-main", id, "select"),
-                          selected ? 1.0f : 0.0f, motion.tokens.selectSharp, 0.0f);
+  const float hover = motion.system.value(::ui::motion::MotionKey("sidebar-main", id, "hover"),
+                                          is_hot ? 1.0f : 0.0f, motion.tokens.hoverFast, 0.0f);
+  const float select = motion.system.value(::ui::motion::MotionKey("sidebar-main", id, "select"),
+                                           selected ? 1.0f : 0.0f, motion.tokens.selectSharp, 0.0f);
   const float rounding = 8.0f * scale;
   // Paint hover only while this item is actually hot — residual motion on a previous
   // row must not leave a second pill lit when the pointer already moved on.

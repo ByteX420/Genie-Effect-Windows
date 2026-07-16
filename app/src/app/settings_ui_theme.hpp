@@ -96,8 +96,8 @@ inline ImU32 Blend(ImU32 from, ImU32 to, float amount) {
   const ImVec4 a = ImGui::ColorConvertU32ToFloat4(from);
   const ImVec4 b = ImGui::ColorConvertU32ToFloat4(to);
   return ImGui::ColorConvertFloat4ToU32(
-      ImVec4(a.x + (b.x - a.x) * amount, a.y + (b.y - a.y) * amount,
-             a.z + (b.z - a.z) * amount, a.w + (b.w - a.w) * amount));
+      ImVec4(a.x + (b.x - a.x) * amount, a.y + (b.y - a.y) * amount, a.z + (b.z - a.z) * amount,
+             a.w + (b.w - a.w) * amount));
 }
 
 // Vertical top for ImGui AddText so the glyph ink is optically centered in a box.
@@ -129,7 +129,7 @@ enum class TrafficLightAction {
 // Stack rows place a full-width control under the title.
 // When a MotionContext is provided, titles/groups/captions stagger-reveal.
 class PageLayout final {
- public:
+public:
   PageLayout(ImDrawList* draw, ImVec2 origin, float page_width, float scale, float alpha,
              float y_start, MotionContext* motion = nullptr, const char* page_scope = "page");
 
@@ -188,7 +188,7 @@ class PageLayout final {
   [[nodiscard]] ImVec2 ToScreen(float x, float y) const;
   void SetCursor(float x, float y) const;
 
- private:
+private:
   void DrawClippedText(ImFont* font, float size, float x, float y, float max_w, ImU32 color,
                        const char* text) const;
   float Reveal(const char* id, float delay, float from_offset_px);

@@ -28,9 +28,9 @@ std::wstring CurrentExecutablePath() {
 
 bool ConfigureRunAtStartup(bool enabled) {
   HKEY run_key = nullptr;
-  const LSTATUS open_status = RegCreateKeyExW(HKEY_CURRENT_USER, kRunKeyPath, 0, nullptr, 0,
-                                               KEY_QUERY_VALUE | KEY_SET_VALUE, nullptr, &run_key,
-                                               nullptr);
+  const LSTATUS open_status =
+      RegCreateKeyExW(HKEY_CURRENT_USER, kRunKeyPath, 0, nullptr, 0,
+                      KEY_QUERY_VALUE | KEY_SET_VALUE, nullptr, &run_key, nullptr);
   if (open_status != ERROR_SUCCESS) return false;
 
   LSTATUS status = ERROR_SUCCESS;

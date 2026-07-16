@@ -14,9 +14,9 @@ namespace {
 
 std::string WideToUtf8(std::wstring_view value) {
   if (value.empty()) return {};
-  const int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
-                                         static_cast<int>(value.size()), nullptr, 0, nullptr,
-                                         nullptr);
+  const int length =
+      WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
+                          static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
   if (length <= 0) return {};
   std::string result(static_cast<size_t>(length), '\0');
   if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(),
