@@ -191,6 +191,7 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
             float step, float display_multiplier, int display_precision,
             const char* display_suffix) {
   (void)motion;
+  (void)step; 
   if (!value || maximum <= minimum) return false;
   if (display_multiplier == 0.0f) display_multiplier = 1.0f;
   display_precision = std::clamp(display_precision, 0, 6);
@@ -239,35 +240,12 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
   ImGui::InvisibleButton("##slider", ImVec2(width - value_chip_w - value_gap, height));
   const bool hovered = ImGui::IsItemHovered();
   const bool slider_active = ImGui::IsItemActive();
-  const bool focused = ImGui::IsItemFocused();
   const bool open_value_editor = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
   const ImGuiIO& io = ImGui::GetIO();
-  const float modifier_scale = io.KeyShift ? 0.1f : (io.KeyCtrl ? 2.0f : 1.0f);
-  bool adjusted = false;
-  if (hovered && !slider_active && io.MouseWheel != 0.0f) {
-    *value += io.MouseWheel * step * modifier_scale;
-    adjusted = true;
-  }
-  if (focused) {
-    float direction = 0.0f;
-    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-      direction -= 1.0f;
-    }
-    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-      direction += 1.0f;
-    }
-    if (direction != 0.0f) {
-      *value += step * modifier_scale * direction;
-      adjusted = true;
-    }
-  }
-  if (slider_active && !adjusted) {
-    if (io.KeyShift || io.KeyCtrl) {
-      *value += (io.MouseDelta.x / (end - start)) * (maximum - minimum) * modifier_scale;
-    } else {
-      const float ratio = std::clamp((io.MousePos.x - start) / (end - start), 0.0f, 1.0f);
-      *value = minimum + (maximum - minimum) * ratio;
-    }
+  // Value changes only via left-click drag on the rail (no wheel / arrow keys).
+  if (slider_active && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    const float ratio = std::clamp((io.MousePos.x - start) / (end - start), 0.0f, 1.0f);
+    *value = minimum + (maximum - minimum) * ratio;
   }
 
   // Value box tall enough for full ascent/descent + caret (no clipping).
@@ -320,20 +298,6 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
             ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_NoHorizontalScroll);
     // Live-apply so the rail follows the typed number immediately.
     apply_parsed(input_buffer.data());
-    if (*mode == 2 && ImGui::IsItemActive()) {
-      float direction = 0.0f;
-      if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) || ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
-        direction -= 1.0f;
-      }
-      if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) || ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
-        direction += 1.0f;
-      }
-      if (direction != 0.0f) {
-        *value = std::clamp(*value + direction * step * modifier_scale, minimum, maximum);
-        std::snprintf(input_buffer.data(), input_buffer.size(), "%.*f", display_precision,
-                      *value * display_multiplier);
-      }
-    }
     if (submitted) {
       apply_parsed(input_buffer.data());
       *mode = 0;
@@ -357,7 +321,7 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
   const auto fill_key = ReferenceMotionKey("menu.slider", id, "fill");
   const float visual = std::clamp((*value - minimum) / (maximum - minimum), 0.0f, 1.0f);
   // Always spring the fill (same path for duration + strength). Snappy while scrubbing so the
-  // pearl still tracks the finger; soft spring when released, wheel-stepped, or set externally.
+  // pearl still tracks the pointer; soft spring when released or set externally.
   const ::ui::motion::MotionSpec& fill_spec =
       (slider_active || editing || *mode > 0) ? tokens.springSnappy : tokens.springSoft;
   const float animated = reference_motion.value(fill_key, visual, fill_spec, visual);
