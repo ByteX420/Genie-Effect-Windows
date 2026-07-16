@@ -125,37 +125,58 @@ TrafficLightAction DrawTrafficLights(const MotionContext& motion, ImVec2 window_
   const float spacing = 20.0f * scale;
   const ImVec2 base(window_origin.x + inset + half_size + 2.0f * scale,
                     window_origin.y + 18.0f * scale);
+  // Hit pad must leave a gap between targets (spacing - 2*(half+pad) > 0) so two lights
+  // cannot be under the cursor at once — was 5px and overlapped by ~2px.
+  const float hit_pad = 3.0f * scale;
+  const float hit_half = half_size + hit_pad;
+
+  ImVec2 centers[3]{};
   bool clicked[3]{};
+  bool pressed[3]{};
+  bool item_hovered[3]{};
+  for (int index = 0; index < 3; ++index) {
+    centers[index] = ImVec2(base.x + spacing * static_cast<float>(index), base.y);
+    const ImVec2 hit_min(centers[index].x - hit_half, centers[index].y - hit_half);
+    ImGui::SetCursorScreenPos(hit_min);
+    ImGui::InvisibleButton(ids[index], ImVec2(hit_half * 2.0f, hit_half * 2.0f));
+    // Allow hover even if a (legacy) popup is up — combo itself is non-modal now.
+    item_hovered[index] = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup |
+                                               ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    pressed[index] = ImGui::IsItemActive();
+    clicked[index] = ImGui::IsItemClicked();
+  }
+
+  // Exactly one light may own hover (later submitted items sit on top if anything overlaps).
+  int exclusive = -1;
+  for (int index = 0; index < 3; ++index) {
+    if (item_hovered[index]) exclusive = index;
+  }
+  if (exclusive >= 0) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+
   ImDrawList* draw = ImGui::GetWindowDrawList();
   for (int index = 0; index < 3; ++index) {
-    const ImVec2 center(base.x + spacing * static_cast<float>(index), base.y);
-    const float hit_pad = 5.0f * scale;
-    const ImVec2 hit_min(center.x - half_size - hit_pad, center.y - half_size - hit_pad);
-    ImGui::SetCursorScreenPos(hit_min);
-    ImGui::InvisibleButton(ids[index],
-                           ImVec2((half_size + hit_pad) * 2.0f, (half_size + hit_pad) * 2.0f));
-    // Allow hover even if a (legacy) popup is up — combo itself is non-modal now.
-    const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup |
-                                              ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    const bool pressed = ImGui::IsItemActive();
-    clicked[index] = ImGui::IsItemClicked();
-    if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    const bool is_hot = exclusive == index;
+    // Snap non-hot targets to 0 so exit/enter never leave two glyphs mid-fade.
     const float hover =
         motion.system.value(::ui::motion::MotionKey("window_controls", ids[index], "hover"),
-                            hovered ? 1.0f : 0.0f, motion.tokens.hoverFast);
+                            is_hot ? 1.0f : 0.0f, motion.tokens.hoverFast);
     const float press =
         motion.system.value(::ui::motion::MotionKey("window_controls", ids[index], "press"),
-                            pressed ? 1.0f : 0.0f, motion.tokens.pressFast);
+                            is_hot && pressed[index] ? 1.0f : 0.0f, motion.tokens.pressFast);
     const float grow = 1.0f + 0.08f * hover - 0.06f * press;
     const float r = half_size * grow;
+    const ImVec2 center = centers[index];
     // Quiet idle dots; only tint on hover (close → red, others → slight lift).
     const ImU32 idle = IM_COL32(58, 58, 62, 255);
     const ImU32 hover_col =
         index == 0 ? IM_COL32(200, 72, 72, 255)
                    : (index == 1 ? IM_COL32(200, 160, 70, 255) : IM_COL32(90, 170, 100, 255));
-    draw->AddCircleFilled(center, r, Alpha(Mix(idle, hover_col, hover), alpha), 24);
-    if (hover > 0.4f) {
-      // Glyphs only appear on hover — keeps the rail calm at rest.
+    // Only the exclusive hot light tints/grows — ignore residual motion on the others.
+    const float visual_hover = is_hot ? hover : 0.0f;
+    draw->AddCircleFilled(center, is_hot ? r : half_size,
+                          Alpha(Mix(idle, hover_col, visual_hover), alpha), 24);
+    if (is_hot && hover > 0.15f) {
+      // Glyph only on the single hot light — never on a fading neighbour.
       const ImU32 icon = Alpha(IM_COL32(30, 30, 32, 255), alpha * hover);
       if (index == 0) {
         const float icon_size = 10.0f * scale;
@@ -450,17 +471,21 @@ bool SidebarItem(const MotionContext& motion, const char* id, const char* label,
   if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
   ImDrawList* draw = ImGui::GetWindowDrawList();
 
+  const bool is_hot = hovered || focused;
   const float hover =
       motion.system.value(::ui::motion::MotionKey("sidebar-main", id, "hover"),
-                          hovered || focused ? 1.0f : 0.0f, motion.tokens.hoverFast, 0.0f);
+                          is_hot ? 1.0f : 0.0f, motion.tokens.hoverFast, 0.0f);
   const float select =
       motion.system.value(::ui::motion::MotionKey("sidebar-main", id, "select"),
                           selected ? 1.0f : 0.0f, motion.tokens.selectSharp, 0.0f);
   const float rounding = 8.0f * scale;
-  if (hover > 0.001f || select > 0.001f) {
+  // Paint hover only while this item is actually hot — residual motion on a previous
+  // row must not leave a second pill lit when the pointer already moved on.
+  const float visual_hover = is_hot ? hover : 0.0f;
+  if (visual_hover > 0.001f || select > 0.001f) {
     // Quieter pill — selected a bit stronger, hover barely there.
     // Selection is the pill + weight only (no sliding rail between items).
-    const float fill_alpha = 0.10f * select + 0.04f * hover * (1.0f - select);
+    const float fill_alpha = 0.10f * select + 0.04f * visual_hover * (1.0f - select);
     draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y),
                         ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, fill_alpha * alpha)), rounding);
   }
@@ -468,7 +493,7 @@ bool SidebarItem(const MotionContext& motion, const char* id, const char* label,
   // Weight rule: selected nav uses SemiBold (emphasis), idle uses Regular.
   ImFont* font = selected ? emphasis : regular;
   const float font_size = font->FontSize;
-  const ImVec4 text_target = selected || hovered || focused ? colors::text : colors::textDim;
+  const ImVec4 text_target = selected || is_hot ? colors::text : colors::textDim;
   ImVec4 text_color = motion.system.color(
       ::ui::motion::MotionKey("sidebar-main", id, "text"), text_target,
       selected ? motion.tokens.selectSharp : motion.tokens.hoverFast, colors::textDim);
