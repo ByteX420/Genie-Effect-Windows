@@ -10,7 +10,6 @@
 #include <windows.h>
 
 #include "app/message_loop.hpp"
-#include "app/session_state_store.hpp"
 #include "features/animation_configuration.hpp"
 #include "features/diagnostics_service.hpp"
 #include "features/effect_controller.hpp"
@@ -101,7 +100,6 @@ private:
   void RegisterConfiguredHotkeys();
   void UnregisterAllHotkeys();
   [[nodiscard]] features::DiagnosticsSnapshot BuildDiagnosticsSnapshot() const;
-  bool ExitSafeMode();
   [[nodiscard]] bool IsTemporarilyPaused() const;
   [[nodiscard]] bool IsEffectActive() const;
   void UpdateFullscreenSuppression(bool force = false);
@@ -140,9 +138,7 @@ private:
   unsigned int recent_missed_frames_ = 0;
   unsigned int recent_device_failures_ = 0;
   float last_capture_duration_ms_ = 0.0f;
-  bool safe_mode_ = false;
   bool device_recovery_test_pending_ = false;
-  bool session_started_ = false;
   std::string startup_repair_status_ = "Not checked";
   genie::settings::SettingsService settings_service_;
   genie::features::HotkeyController hotkey_controller_{settings_service_, hotkey_manager_};
@@ -159,7 +155,6 @@ private:
                                                    snapshot_cache_, runs_, minimize_feature_};
   genie::features::EffectController effect_controller_{effect_policy_, pause_controller_,
                                                        minimize_feature_, restore_feature_};
-  SessionStateStore session_state_store_;
   std::atomic<bool> shutting_down_{false};
   std::atomic<bool> cleaned_up_{false};
   ui::SettingsWindow settings_window_;

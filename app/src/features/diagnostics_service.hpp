@@ -48,7 +48,6 @@ enum class DiagnosticsAction {
   kOpenLogFolder,
   kRepairWindows,
   kRestartRenderer,
-  kExitSafeMode,
 };
 
 struct DiagnosticsActions {
@@ -56,7 +55,6 @@ struct DiagnosticsActions {
   std::function<std::string()> build_report;
   std::function<bool()> repair_windows;
   std::function<bool()> restart_renderer;
-  std::function<bool()> exit_safe_mode;
 };
 
 class DiagnosticsService final {

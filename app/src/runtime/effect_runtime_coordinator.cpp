@@ -356,7 +356,7 @@ void ApplicationRuntime::EnableEffectRuntime() {
 }
 
 void ApplicationRuntime::RefreshEffectRuntimeState() {
-  effect_policy_.Configure(settings_service_.Get(), safe_mode_);
+  effect_policy_.Configure(settings_service_.Get());
   const bool should_be_active = IsEffectActive();
   if (should_be_active != effect_runtime_active_) {
     if (should_be_active) {

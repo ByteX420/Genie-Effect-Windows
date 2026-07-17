@@ -33,14 +33,7 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
   device_recovery_test_pending_ = core::EnvironmentFlagEnabled("GENIE_TEST_DEVICE_RECOVERY");
 #endif
   (void)settings_service_.Load();
-  const std::string previous_session_state = session_state_store_.Read();
-  safe_mode_ = previous_session_state == "running" || previous_session_state == "safe";
-  if (safe_mode_) {
-    genie::core::LogDebug(L"Session",
-                          L"Unclean previous session detected; starting with hooks and renderer "
-                          L"disabled");
-  }
-  effect_policy_.Configure(settings_service_.Get(), safe_mode_);
+  effect_policy_.Configure(settings_service_.Get());
   if (settings_service_.Get().run_at_startup && !platform::windows::ConfigureRunAtStartup(true)) {
     genie::core::LogDebug(L"Startup",
                           L"Could not repair the per-user startup entry; disabling the option");
@@ -81,34 +74,31 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
     genie::core::LogDebug(L"App", L"Running as Administrator");
   }
 
-  if (!safe_mode_ && !CreateAnimationRenderer()) return false;
+  if (!CreateAnimationRenderer()) return false;
 
   if (!settings_window_.Initialize(instance, *this)) {
     return false;
   }
   settings_window_.UpdateState(settings_service_.Get());
   hotkey_controller_.SetWindow(settings_window_.hwnd());
-  if (!safe_mode_) RegisterConfiguredHotkeys();
+  RegisterConfiguredHotkeys();
   settings_window_.UpdatePauseState(false, false);
-  if (safe_mode_) settings_window_.ShowDiagnosticsPage();
-  settings_window_.Show(safe_mode_ || !settings_service_.Get().start_minimized ||
+  settings_window_.Show(!settings_service_.Get().start_minimized ||
                         settings_service_.Get().close_behavior != "tray");
   UpdateFullscreenSuppression(true);
   UpdatePowerState(true);
   RefreshEffectRuntimeState();
 
-  if (!safe_mode_) {
-    if (!effect_controller_.Start([this](HWND window) { return OnMinimizeStart(window); },
-                                  [this](HWND window) { return OnRestoreAttempt(window); },
-                                  [this](HWND window, DWORD event) {
-                                    effect_controller_.HandleWindowSeen(
-                                        window, event, GetOverlayWindow(),
-                                        renderer_recovery_.pending(), native_animation_blocker_,
-                                        desktop_capture_.get(),
-                                        [this](HWND target) { return OnRestoreAttempt(target); });
-                                  })) {
-      return false;
-    }
+  if (!effect_controller_.Start([this](HWND window) { return OnMinimizeStart(window); },
+                                [this](HWND window) { return OnRestoreAttempt(window); },
+                                [this](HWND window, DWORD event) {
+                                  effect_controller_.HandleWindowSeen(
+                                      window, event, GetOverlayWindow(),
+                                      renderer_recovery_.pending(), native_animation_blocker_,
+                                      desktop_capture_.get(),
+                                      [this](HWND target) { return OnRestoreAttempt(target); });
+                                })) {
+    return false;
   }
 
   std::wcout << L"Genie minimize monitor is running.\n";
@@ -117,10 +107,6 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
                 L"custom taskbar rectangle.\n";
   std::wcout << L"Close this console window to restore the previous Windows "
                 L"animation setting.\n";
-  session_started_ = true;
-  if (!session_state_store_.Write(safe_mode_ ? "safe" : "running")) {
-    genie::core::LogDebug(L"SafeMode", L"Failed to write the active session marker");
-  }
   return true;
 }
 

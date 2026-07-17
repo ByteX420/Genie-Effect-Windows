@@ -187,8 +187,6 @@ bool DiagnosticsService::Execute(DiagnosticsAction action,
       return actions.repair_windows && actions.repair_windows();
     case DiagnosticsAction::kRestartRenderer:
       return actions.restart_renderer && actions.restart_renderer();
-    case DiagnosticsAction::kExitSafeMode:
-      return actions.exit_safe_mode && actions.exit_safe_mode();
   }
   return false;
 }

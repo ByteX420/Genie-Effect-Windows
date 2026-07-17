@@ -8,10 +8,7 @@
 
 namespace genie::features {
 
-void EffectPolicy::Configure(const settings::AppSettings& settings, bool safe_mode) {
-  settings_ = settings;
-  safe_mode_ = safe_mode;
-}
+void EffectPolicy::Configure(const settings::AppSettings& settings) { settings_ = settings; }
 
 void EffectPolicy::SetEnabled(bool enabled) { settings_.enabled = enabled; }
 
@@ -31,7 +28,7 @@ bool EffectPolicy::SetPowerState(bool on_battery, bool battery_saver_active) {
 }
 
 bool EffectPolicy::IsActive(bool temporarily_paused) const {
-  return !safe_mode_ && settings_.enabled && !temporarily_paused && !fullscreen_suppressed_ &&
+  return settings_.enabled && !temporarily_paused && !fullscreen_suppressed_ &&
          !(settings_.disable_effects_battery_saver && battery_saver_active_);
 }
 

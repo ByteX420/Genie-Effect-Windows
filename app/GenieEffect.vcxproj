@@ -125,7 +125,6 @@
     <ClCompile Include="src\app\application.cpp" />
     <ClCompile Include="src\app\application_runtime.cpp" />
     <ClCompile Include="src\app\message_loop.cpp" />
-    <ClCompile Include="src\app\session_state_store.cpp" />
     <ClCompile Include="src\core\embedded_resource.cpp" />
     <ClCompile Include="src\core\environment.cpp" />
     <ClCompile Include="src\core\logger.cpp" />
@@ -242,7 +241,6 @@
     <ClInclude Include="src\app\application_runtime.hpp" />
     <ClInclude Include="src\app\message_loop.hpp" />
     <ClInclude Include="src\app\resource.hpp" />
-    <ClInclude Include="src\app\session_state_store.hpp" />
     <ClInclude Include="src\core\embedded_resource.hpp" />
     <ClInclude Include="src\core\environment.hpp" />
     <ClInclude Include="src\core\logger.hpp" />

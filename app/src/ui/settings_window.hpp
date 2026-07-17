@@ -44,7 +44,6 @@ public:
   void UpdateState(const genie::settings::AppSettings& settings);
   void UpdatePauseState(bool paused, bool until_restart);
   void SetHotkeyRegistrationStatus(genie::settings::HotkeyAction action, bool available);
-  void ShowDiagnosticsPage();
   void Render();
   void ForceRender();
   [[nodiscard]] HWND hwnd() const { return hwnd_; }

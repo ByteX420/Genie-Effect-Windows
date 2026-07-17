@@ -57,9 +57,9 @@ WinEvent/CBT observation
 ```
 
 `EffectPolicy` combines enabled state, temporary pause, fullscreen and
-battery-saver suppression, safe mode, and executable exclusions. Minimize and
-restore use explicit transaction contexts so partially completed work restores
-native window state.
+battery-saver suppression, and executable exclusions. Minimize and restore use
+explicit transaction contexts so partially completed work restores native window
+state.
 
 ## Rendering and recovery
 

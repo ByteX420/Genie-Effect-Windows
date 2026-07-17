@@ -46,9 +46,8 @@ The detailed ledgers are normative appendices:
   write-through replacement remain compatible.
 - Environment variables stay `GENIE_TASKBAR_RECT`, `GENIE_DEBUG_LOG`, `GENIE_TRACE`,
   `GENIE_LOG_SYNC`, and the Debug-only `GENIE_TEST_DEVICE_RECOVERY`.
-- Registry/mutex/session names stay `HKCU\...\Run\GenieEffect`,
-  `Local\GenieEffect.Windows.SingleInstance`, and `session.state` with
-  `running`/`safe`/`clean`.
+- Registry/mutex names stay `HKCU\...\Run\GenieEffect` and
+  `Local\GenieEffect.Windows.SingleInstance`.
 
 ## Structural corrections required by the inventory
 
@@ -60,7 +59,6 @@ These are confirmed source defects or incomplete ownership contracts, not behavi
 - success, cancel, timeout, destroyed HWND, Device Lost and shutdown must converge on one
   transaction cleanup path;
 - Window Property writes need complete rollback and unambiguous encode/decode handling;
-- Safe Mode must actually read and act on the existing session marker;
 - Desktop Duplication acquired frames, GDI objects, overlay regions/class brushes, hook handles and
   logger file handles need explicit RAII owners;
 - the two shader implementations must become one canonical, behavior-compatible source;
@@ -128,8 +126,7 @@ the final static gate re-runs the caller audit.
   process information, display information, taskbar location and AppContainer ACL adapters.
 - Added owning global-hotkey and single-instance adapters, plus focused fullscreen and power-status
   queries. Product-version, elevation and foreground operations no longer live in `Application`.
-- Connected the persisted session marker to Safe Mode; an unclean prior `running`/`safe` session
-  now starts without hook and animation renderer instead of ignoring the marker.
+- Session-marker Safe Mode was removed from the product path (no `session.state` / Exit Safe Mode).
 
 ### Phase 3 complete
 
@@ -152,7 +149,7 @@ the final static gate re-runs the caller audit.
 
 ### Phase 5 complete
 
-- Extracted `EffectPolicy`; enabled state, Safe Mode, timed/restart pause, fullscreen suppression,
+- Extracted `EffectPolicy`; enabled state, timed/restart pause, fullscreen suppression,
   battery-saver suppression, and executable exclusions no longer have independent truth in
   `Application`.
 - Extracted `WindowRecoveryService`; window healing and restoration re-entry state now have one

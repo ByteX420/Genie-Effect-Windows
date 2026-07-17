@@ -178,11 +178,6 @@ void SettingsWindow::SetHotkeyRegistrationStatus(genie::settings::HotkeyAction a
   ForceRender();
 }
 
-void SettingsWindow::ShowDiagnosticsPage() {
-  selected_page_ = Page::kDiagnostics;
-  ForceRender();
-}
-
 void SettingsWindow::FlushPendingSpeedSave() {
   const bool speeds_pending = minimize_slider_dirty_ || restore_slider_dirty_ ||
                               minimize_slider_active_ || restore_slider_active_;

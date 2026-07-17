@@ -115,39 +115,10 @@ bool ApplicationRuntime::ExecuteDiagnosticsAction(features::DiagnosticsAction ac
                       },
                   .restart_renderer =
                       [this] {
-                        if (safe_mode_) return false;
                         BeginAnimationRendererRecovery();
                         return !renderer_recovery_.pending() && d3d_device_ != nullptr;
                       },
-                  .exit_safe_mode = [this] { return ExitSafeMode(); },
               });
-}
-
-bool ApplicationRuntime::ExitSafeMode() {
-  if (!safe_mode_) return true;
-  if (!CreateAnimationRenderer()) return false;
-  if (!effect_controller_.Start([this](HWND window) { return OnMinimizeStart(window); },
-                                [this](HWND window) { return OnRestoreAttempt(window); },
-                                [this](HWND window, DWORD event) {
-                                  effect_controller_.HandleWindowSeen(
-                                      window, event, GetOverlayWindow(),
-                                      renderer_recovery_.pending(), native_animation_blocker_,
-                                      desktop_capture_.get(),
-                                      [this](HWND target) { return OnRestoreAttempt(target); });
-                                })) {
-    for (runtime::AnimationRun& slot : runs_) slot.overlay.Shutdown();
-    desktop_capture_.reset();
-    d3d_device_.reset();
-    return false;
-  }
-  safe_mode_ = false;
-  RegisterConfiguredHotkeys();
-  RefreshEffectRuntimeState();
-  if (!session_state_store_.Write("running")) {
-    genie::core::LogDebug(L"SafeMode",
-                          L"Failed to update the session marker after leaving Safe Mode");
-  }
-  return true;
 }
 
 bool ApplicationRuntime::SetAnimationDurations(float minimize_duration, float restore_duration,
@@ -166,7 +137,7 @@ bool ApplicationRuntime::SetLinkSpeeds(bool linked) {
 
 bool ApplicationRuntime::SetDisableAnimationsFullscreen(bool enabled) {
   const bool result = settings_mutations_.SetDisableAnimationsFullscreen(enabled, [this] {
-    effect_policy_.Configure(settings_service_.Get(), safe_mode_);
+    effect_policy_.Configure(settings_service_.Get());
     UpdateFullscreenSuppression(true);
   });
   settings_window_.UpdateState(settings_service_.Get());
@@ -175,7 +146,7 @@ bool ApplicationRuntime::SetDisableAnimationsFullscreen(bool enabled) {
 
 bool ApplicationRuntime::SetDisableEffectsBatterySaver(bool enabled) {
   const bool result = settings_mutations_.SetDisableEffectsBatterySaver(enabled, [this] {
-    effect_policy_.Configure(settings_service_.Get(), safe_mode_);
+    effect_policy_.Configure(settings_service_.Get());
     UpdatePowerState(true);
   });
   settings_window_.UpdateState(settings_service_.Get());
@@ -240,7 +211,7 @@ bool ApplicationRuntime::SetStartupOptions(bool run_at_startup, bool start_minim
 
 bool ApplicationRuntime::SetApplicationExcluded(const std::string& executable_name, bool excluded) {
   const bool result = settings_mutations_.SetApplicationExcluded(executable_name, excluded, [this] {
-    effect_policy_.Configure(settings_service_.Get(), safe_mode_);
+    effect_policy_.Configure(settings_service_.Get());
     effect_controller_.ApplyExclusionTransitionOverrides(GetOverlayWindow());
   });
   settings_window_.UpdateState(settings_service_.Get());

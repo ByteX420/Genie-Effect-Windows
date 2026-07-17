@@ -17,7 +17,7 @@ struct RenderingPressure {
 
 class EffectPolicy final {
 public:
-  void Configure(const settings::AppSettings& settings, bool safe_mode);
+  void Configure(const settings::AppSettings& settings);
 
   void SetEnabled(bool enabled);
   [[nodiscard]] bool SetFullscreenSuppressed(bool suppressed);
@@ -32,7 +32,6 @@ public:
 
 private:
   settings::AppSettings settings_;
-  bool safe_mode_ = false;
   bool fullscreen_suppressed_ = false;
   bool on_battery_ = false;
   bool battery_saver_active_ = false;

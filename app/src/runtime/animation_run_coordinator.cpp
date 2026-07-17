@@ -313,12 +313,6 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
   d3d_device_.reset();
   frame_scheduler_.EndFallbackTimerResolution();
   frame_scheduler_.Wake();
-  if (session_started_) {
-    if (!session_state_store_.Write("clean")) {
-      genie::core::LogDebug(L"SafeMode", L"Failed to write the clean session marker");
-    }
-    session_started_ = false;
-  }
   genie::core::LogDebug(L"App", L"CleanupAndRestoreAll completed");
 }
 
