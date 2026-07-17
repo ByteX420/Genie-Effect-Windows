@@ -133,6 +133,11 @@ float ApplyEasing(EasingCurve curve, float value, const CubicBezier& custom) {
                               : 1.0f - std::pow(-2.0f * progress + 2.0f, 3.0f) * 0.5f;
       break;
     case EasingCurve::kBack: {
+      // Exact endpoints avoid residual float noise after the overshoot polynomial.
+      if (progress == 0.0f || progress == 1.0f) {
+        eased = progress;
+        break;
+      }
       constexpr float kOvershoot = 1.35f;
       const float shifted = progress - 1.0f;
       eased = 1.0f + shifted * shifted * ((kOvershoot + 1.0f) * shifted + kOvershoot);
