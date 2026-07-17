@@ -169,8 +169,14 @@ jobs:
             Automated **stable** release build (Windows x64, MultiByte, LTCG /O2).
 
             ### Highlights
-            - **Custom cubic-bezier easing** for minimize & restore — editable graph under Motion when easing is set to Custom
-            - Settings UI polish, optimized Release toolchain, secure GitHub Actions shipping
+            - **Modular architecture rewrite** — first-party code split into focused layers (`app`, `features`, `runtime`, `rendering`, `platform`, `settings`, `ui`, `core`, `animation`) with clear ownership and dependency direction
+            - **Runtime state machine** — explicit animation runs and cleanup paths for minimize/restore, cancel, timeout, and device loss
+            - **Effect policy** — enable, pause, fullscreen, battery saver, and app exclusions in one place
+            - **Settings pipeline** — separate model, validation, serializer, repository, and service; UI talks through a single actions boundary
+            - **UI structure** — settings host, shell, tray, preview, and per-page sources (Effect, Motion, Apps, System, Hotkeys, Repair, About)
+            - **Automatic animation quality** — adaptive mesh density from load and display pressure
+            - **Motion polish** — custom cubic-bezier editor improvements; Back easing endpoints are exact at 0/1
+            - **Leaner product path** — session “safe mode” / `session.state` recovery path removed; normal start always wires hook and renderer
 
             ### Install
             1. Download **GenieEffect-windows-x64.zip**
