@@ -41,6 +41,8 @@ struct AppSettings {
   animation::CubicBezier minimize_custom_bezier = animation::CubicBezier::EaseInOut();
   animation::CubicBezier restore_custom_bezier = animation::CubicBezier::EaseInOut();
   std::string animation_style = "Gienie classic";
+  // "automatic", "best_quality", or "power_saving".
+  std::string quality_mode = "automatic";
   float genie_strength = 1.0f;
   std::string fade_strength = "Subtle";
   bool show_target_indicator = false;

@@ -164,6 +164,13 @@ public:
         if (value_valid && IsValidAnimationStyle(value)) {
           settings->animation_style = std::move(value);
         }
+      } else if (key == "qualityMode") {
+        std::string value;
+        value_valid = ParseString(&value);
+        if (value_valid &&
+            (value == "automatic" || value == "best_quality" || value == "power_saving")) {
+          settings->quality_mode = std::move(value);
+        }
       } else if (key == "excludedApplications") {
         std::vector<std::string> values;
         value_valid = ParseStringArray(&values);
@@ -611,6 +618,7 @@ bool SaveSettings(const AppSettings& settings) {
          << settings.restore_custom_bezier.y1 << ", " << settings.restore_custom_bezier.x2 << ", "
          << settings.restore_custom_bezier.y2 << "],\n"
          << "  \"animationStyle\": \"" << EscapeJsonString(settings.animation_style) << "\",\n"
+         << "  \"qualityMode\": \"" << EscapeJsonString(settings.quality_mode) << "\",\n"
          << "  \"genieStrength\": " << settings.genie_strength << ",\n"
          << "  \"fadeStrength\": \"" << EscapeJsonString(settings.fade_strength) << "\",\n"
          << "  \"showTargetIndicator\": " << settings.show_target_indicator << ",\n"

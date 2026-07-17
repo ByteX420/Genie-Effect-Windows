@@ -11,7 +11,6 @@ namespace {
 
 constexpr float kSlideAnimationEndFraction = 0.5f;
 constexpr float kTranslateAnimationStartFraction = 0.4f;
-constexpr int kLongGridSegmentCount = 50;
 constexpr float kCurvyInitialShapeFactor = 0.20f;
 constexpr float kCurvyStretchDurationFactor = 0.70f;
 
@@ -72,8 +71,8 @@ bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& tar
       direction == GenieDirection::kMinimize ? Clamp01(progress) : 1.0f - Clamp01(progress);
 
   const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
-  int rows = horizontal ? kLongGridSegmentCount : 1;
-  int columns = horizontal ? 1 : kLongGridSegmentCount;
+  int rows = horizontal ? long_grid_segment_count_ : 1;
+  int columns = horizontal ? 1 : long_grid_segment_count_;
   if (style == AnimationStyle::kSquash) {
     rows = 1;
     columns = 1;
@@ -128,8 +127,8 @@ bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& tar
 void GenieMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const RectF& target_rect,
                                                 GenieEdge edge, float progress) {
   const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
-  const int row_count = horizontal ? kLongGridSegmentCount : 1;
-  const int column_count = horizontal ? 1 : kLongGridSegmentCount;
+  const int row_count = horizontal ? long_grid_segment_count_ : 1;
+  const int column_count = horizontal ? 1 : long_grid_segment_count_;
   screen_positions_.resize(static_cast<std::size_t>((row_count + 1) * (column_count + 1)));
 
   const float moving_extent = horizontal ? source_rect.Height() : source_rect.Width();
@@ -229,8 +228,8 @@ void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
                                                   const RectF& target_rect, GenieEdge edge,
                                                   float progress) {
   const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
-  const int row_count = horizontal ? kLongGridSegmentCount : 1;
-  const int column_count = horizontal ? 1 : kLongGridSegmentCount;
+  const int row_count = horizontal ? long_grid_segment_count_ : 1;
+  const int column_count = horizontal ? 1 : long_grid_segment_count_;
 
   screen_positions_.resize(static_cast<std::size_t>((row_count + 1) * (column_count + 1)));
 

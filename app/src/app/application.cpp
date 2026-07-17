@@ -712,6 +712,7 @@ bool Application::Initialize(HINSTANCE instance) {
             return SetCustomEasingBezier(is_minimize, bezier, save);
           },
           [this](const std::string& style) { return SetAnimationStyle(style); },
+          [this](const std::string& mode) { return SetQualityMode(mode); },
           [this](float strength, bool save) { return SetGenieStrength(strength, save); },
           [this](const std::string& strength) { return SetFadeStrength(strength); },
           [this](bool enabled) { return SetTargetIndicator(enabled); },
@@ -837,6 +838,7 @@ void Application::BeginAnimationRendererRecovery() {
     return;
   }
 
+  recent_device_failures_ = std::min(recent_device_failures_ + 1u, 8u);
   LogDebug(L"App", L"Animation renderer device lost; rebuilding D3D resources");
   native_animation_blocker_.Disable();
 
@@ -1201,6 +1203,12 @@ void Application::AdvanceAnimationFrameDeadline(int run_index) {
   if (slot.next_animation_frame_time <= now) {
     const auto missed_intervals =
         (now - slot.next_animation_frame_time) / slot.animation_frame_interval;
+    if (missed_intervals > 0) {
+      recent_missed_frames_ =
+          std::min(recent_missed_frames_ + static_cast<unsigned int>(missed_intervals), 120u);
+    } else if (recent_missed_frames_ > 0) {
+      --recent_missed_frames_;
+    }
     slot.next_animation_frame_time += slot.animation_frame_interval * (missed_intervals + 1);
   }
 }
@@ -1899,6 +1907,18 @@ bool Application::SetAnimationStyle(const std::string& style) {
   return true;
 }
 
+bool Application::SetQualityMode(const std::string& mode) {
+  if (mode != "automatic" && mode != "best_quality" && mode != "power_saving") {
+    return false;
+  }
+  AppSettings proposed = settings_;
+  proposed.quality_mode = mode;
+  if (!SaveSettings(proposed)) return false;
+  settings_ = std::move(proposed);
+  settings_window_.UpdateState(settings_);
+  return true;
+}
+
 bool Application::SetGenieStrength(float strength, bool save) {
   settings_.genie_strength = std::clamp(strength, 0.25f, 1.0f);
   const bool saved = !save || SaveSettings(settings_);
@@ -1930,6 +1950,49 @@ float Application::CalculateAnimationDuration(float base_duration, const RECT& s
   (void)source;
   (void)target;
   return base_duration;
+}
+
+int Application::SelectMeshSegmentCount(const RECT& source) const {
+  if (settings_.quality_mode == "best_quality") return 50;
+  if (settings_.quality_mode == "power_saving") return 20;
+
+  int pressure = 0;
+  if (running_on_battery_) ++pressure;
+  if (battery_saver_active_) pressure += 2;
+
+  const std::int64_t width = std::max<LONG>(0, source.right - source.left);
+  const std::int64_t height = std::max<LONG>(0, source.bottom - source.top);
+  const std::int64_t pixels = width * height;
+  if (pixels >= 3840ll * 2160ll) {
+    pressure += 2;
+  } else if (pixels >= 2560ll * 1440ll) {
+    ++pressure;
+  }
+
+  const int active_animations =
+      static_cast<int>(std::count_if(runs_.begin(), runs_.end(),
+                                     [](const AnimationRun& run) { return run.overlay.active(); }));
+  if (active_animations >= 2) {
+    pressure += 2;
+  } else if (active_animations == 1) {
+    ++pressure;
+  }
+
+  if (last_capture_duration_ms_ >= 25.0f) {
+    pressure += 2;
+  } else if (last_capture_duration_ms_ >= 12.0f) {
+    ++pressure;
+  }
+  if (recent_missed_frames_ >= 10) {
+    pressure += 2;
+  } else if (recent_missed_frames_ >= 3) {
+    ++pressure;
+  }
+  if (recent_device_failures_ > 0 || animation_renderer_recovery_pending_) pressure += 2;
+
+  if (pressure >= 3) return 20;
+  if (pressure >= 1) return 35;
+  return 50;
 }
 
 bool Application::SetCloseBehavior(const std::string& close_behavior) {
@@ -2194,6 +2257,7 @@ bool Application::OnMinimizeStart(HWND window) {
                        WindowTraceString(window));
 
   rendering::CapturedTexture captured_texture;
+  const auto capture_started = std::chrono::steady_clock::now();
   RECT source_bounds = *animation_bounds;
   const bool window_is_already_minimized = IsIconic(window) != FALSE;
   RECT captured_window_bounds{};
@@ -2231,6 +2295,9 @@ bool Application::OnMinimizeStart(HWND window) {
     LogTrace(L"App", L"OnMinimizeStart capture=cached_after_live_failed bounds=" +
                          RectTraceString(source_bounds));
   }
+  last_capture_duration_ms_ =
+      std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - capture_started)
+          .count();
 
   // The target only needs to be in the topmost band while its pixels are being
   // captured. Restore its original z-order before saving any window styles so
@@ -2276,12 +2343,18 @@ bool Application::OnMinimizeStart(HWND window) {
   slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.minimize_easing),
                                   settings_.minimize_custom_bezier);
   slot.overlay.SetAnimationStyle(AnimationStyleFromName(settings_.animation_style));
+  const int mesh_segments = SelectMeshSegmentCount(source_bounds);
+  slot.overlay.SetMeshSegmentCount(mesh_segments);
   slot.overlay.SetGenieStrength(std::clamp(settings_.genie_strength, 0.0f, 1.0f));
   slot.overlay.SetFadeStrength(settings_.fade_strength == "Strong"   ? 0.55f
                                : settings_.fade_strength == "Subtle" ? 0.25f
                                                                      : 0.0f);
   slot.overlay.SetTargetIndicatorEnabled(settings_.show_target_indicator);
-  LogTrace(L"App", L"Captured minimize duration=" + std::to_wstring(animation_duration));
+  LogTrace(L"App", L"Captured minimize duration=" + std::to_wstring(animation_duration) +
+                       L" quality=" +
+                       std::wstring(settings_.quality_mode.begin(), settings_.quality_mode.end()) +
+                       L" segments=" + std::to_wstring(mesh_segments) +
+                       L" capture_ms=" + std::to_wstring(last_capture_duration_ms_));
   if (!slot.overlay.StartAnimation(captured_texture, ToRectF(source_bounds), target.rect,
                                    target.edge)) {
     TraceWindowEvent(L"OnMinimizeStart failed: overlay StartAnimation", window);
@@ -2686,12 +2759,17 @@ bool Application::OnRestoreAttempt(HWND window) {
   slot.overlay.SetAnimationEasing(animation::EasingCurveFromName(settings_.restore_easing),
                                   settings_.restore_custom_bezier);
   slot.overlay.SetAnimationStyle(AnimationStyleFromName(settings_.animation_style));
+  const int mesh_segments = SelectMeshSegmentCount(current_snapshot.bounds);
+  slot.overlay.SetMeshSegmentCount(mesh_segments);
   slot.overlay.SetGenieStrength(std::clamp(settings_.genie_strength, 0.0f, 1.0f));
   slot.overlay.SetFadeStrength(settings_.fade_strength == "Strong"   ? 0.55f
                                : settings_.fade_strength == "Subtle" ? 0.25f
                                                                      : 0.0f);
   slot.overlay.SetTargetIndicatorEnabled(settings_.show_target_indicator);
-  LogTrace(L"App", L"Captured restore duration=" + std::to_wstring(animation_duration));
+  LogTrace(L"App", L"Captured restore duration=" + std::to_wstring(animation_duration) +
+                       L" quality=" +
+                       std::wstring(settings_.quality_mode.begin(), settings_.quality_mode.end()) +
+                       L" segments=" + std::to_wstring(mesh_segments));
   if (!slot.overlay.StartAnimation(current_snapshot.texture, ToRectF(current_snapshot.bounds),
                                    current_snapshot.target.rect, current_snapshot.target.edge, 1.0f,
                                    0.0f)) {

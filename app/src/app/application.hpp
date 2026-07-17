@@ -99,6 +99,7 @@ private:
   bool SetEasing(const std::string& minimize_easing, const std::string& restore_easing);
   bool SetCustomEasingBezier(bool is_minimize, animation::CubicBezier bezier, bool save);
   bool SetAnimationStyle(const std::string& style);
+  bool SetQualityMode(const std::string& mode);
   bool SetGenieStrength(float strength, bool save);
   bool SetFadeStrength(const std::string& strength);
   bool SetTargetIndicator(bool enabled);
@@ -126,6 +127,7 @@ private:
   void RefreshEffectRuntimeState();
   [[nodiscard]] float CalculateAnimationDuration(float base_duration, const RECT& source,
                                                  const animation::RectF& target) const;
+  [[nodiscard]] int SelectMeshSegmentCount(const RECT& source) const;
   [[nodiscard]] bool IsWindowExcluded(HWND window) const;
   [[nodiscard]] HWND GetOverlayWindow() const;
   void ApplyExclusionTransitionOverrides();
@@ -175,6 +177,9 @@ private:
   bool battery_saver_active_ = false;
   bool battery_saver_suppressed_ = false;
   ULONGLONG last_power_check_ms_ = 0;
+  unsigned int recent_missed_frames_ = 0;
+  unsigned int recent_device_failures_ = 0;
+  float last_capture_duration_ms_ = 0.0f;
   bool safe_mode_ = false;
   bool session_started_ = false;
   std::string startup_repair_status_ = "Not checked";

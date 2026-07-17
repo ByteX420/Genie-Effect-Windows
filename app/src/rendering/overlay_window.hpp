@@ -39,6 +39,9 @@ public:
     animation_custom_bezier_.ClampHandles();
   }
   void SetAnimationStyle(genie::animation::AnimationStyle style) { animation_style_ = style; }
+  void SetMeshSegmentCount(int segment_count) {
+    mesh_generator_.SetLongGridSegmentCount(segment_count);
+  }
   void SetGenieStrength(float strength) { genie_strength_ = strength; }
   void SetFadeStrength(float strength) { fade_strength_ = strength; }
   void SetTargetIndicatorEnabled(bool enabled) { target_indicator_enabled_ = enabled; }

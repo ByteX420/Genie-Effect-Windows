@@ -761,14 +761,15 @@ bool CompactButton(const MotionContext& motion, const char* id, const char* labe
 }
 
 bool SegmentSelector(const MotionContext& motion, const char* id,
-                     const std::array<const char*, 2>& labels, int* selected, float width,
-                     ImFont* font, float scale, float alpha) {
-  if (!selected) return false;
+                     std::span<const char* const> labels, int* selected, float width, ImFont* font,
+                     float scale, float alpha) {
+  if (!selected || labels.empty()) return false;
   if (!font) font = ImGui::GetFont();
+  *selected = std::clamp(*selected, 0, static_cast<int>(labels.size()) - 1);
 
   const ImVec2 min = ImGui::GetCursorScreenPos();
   const float height = Metrics::kSegmentHeight * scale;
-  const float segment_width = width * 0.5f;
+  const float segment_width = width / static_cast<float>(labels.size());
   const float rounding = ControlRounding(scale);
   bool changed = false;
 
@@ -801,7 +802,7 @@ bool SegmentSelector(const MotionContext& motion, const char* id,
   draw->AddRect(pill_min, pill_max, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.08f * alpha)),
                 pill_rounding, 0, std::max(1.0f, scale));
 
-  for (int index = 0; index < 2; ++index) {
+  for (int index = 0; index < static_cast<int>(labels.size()); ++index) {
     const ImVec2 segment_min(min.x + segment_width * static_cast<float>(index), min.y);
     const ImVec2 segment_max(segment_min.x + segment_width, min.y + height);
 

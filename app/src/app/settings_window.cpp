@@ -158,7 +158,8 @@ bool SettingsWindow::Initialize(
     LinkCallback link_callback, FullscreenBehaviorCallback fullscreen_behavior_callback,
     BatterySaverCallback battery_saver_callback, EasingCallback easing_callback,
     CustomBezierCallback custom_bezier_callback, AnimationStyleCallback animation_style_callback,
-    StrengthCallback strength_callback, FadeCallback fade_callback,
+    QualityModeCallback quality_mode_callback, StrengthCallback strength_callback,
+    FadeCallback fade_callback,
     TargetIndicatorCallback target_indicator_callback, CloseBehaviorCallback close_behavior_callback,
     StartupCallback startup_callback, ExclusionCallback exclusion_callback,
     PauseCallback pause_callback, HotkeyUpdateCallback hotkey_update_callback,
@@ -173,6 +174,7 @@ bool SettingsWindow::Initialize(
   easing_callback_ = std::move(easing_callback);
   custom_bezier_callback_ = std::move(custom_bezier_callback);
   animation_style_callback_ = std::move(animation_style_callback);
+  quality_mode_callback_ = std::move(quality_mode_callback);
   strength_callback_ = std::move(strength_callback);
   fade_callback_ = std::move(fade_callback);
   target_indicator_callback_ = std::move(target_indicator_callback);
@@ -517,6 +519,7 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
       minimize_custom_bezier_ != settings.minimize_custom_bezier ||
       restore_custom_bezier_ != settings.restore_custom_bezier ||
       animation_style_ != settings.animation_style ||
+      quality_mode_ != settings.quality_mode ||
       std::abs(genie_strength_ - settings.genie_strength) > 0.0001f ||
       fade_strength_ != settings.fade_strength ||
       show_target_indicator_ != settings.show_target_indicator ||
@@ -534,6 +537,7 @@ void SettingsWindow::UpdateState(const AppSettings& settings) {
   minimize_custom_bezier_ = settings.minimize_custom_bezier;
   restore_custom_bezier_ = settings.restore_custom_bezier;
   animation_style_ = settings.animation_style;
+  quality_mode_ = settings.quality_mode;
   genie_strength_ = settings.genie_strength;
   fade_strength_ = settings.fade_strength;
   show_target_indicator_ = settings.show_target_indicator;
@@ -1163,11 +1167,12 @@ void SettingsWindow::RenderContents() {
     layout.BeginStackRow(20.0f, settings_ui::Metrics::kSegmentHeight);
     layout.RowTitle(font_body_, kLabelTextSize, "Close action", kPrimaryTextColor);
     {
+      constexpr std::array close_labels = {"Quit app", "Keep in tray"};
       int close_behavior_segment = close_behavior_ == "tray" ? 1 : 0;
       const float seg_w = layout.content_width();
       layout.SetCursor(layout.content_left(), layout.StackControlY());
-      if (SegmentSelector(widget_motion, "##close_behavior", {"Quit app", "Keep in tray"},
-                          &close_behavior_segment, seg_w, font_body_, scale, content_alpha)) {
+      if (SegmentSelector(widget_motion, "##close_behavior", close_labels, &close_behavior_segment,
+                          seg_w, font_body_, scale, content_alpha)) {
         const std::string previous_close_behavior = close_behavior_;
         close_behavior_ = close_behavior_segment == 1 ? "tray" : "exit";
         const bool saved = !close_behavior_callback_ || close_behavior_callback_(close_behavior_);
@@ -1443,6 +1448,30 @@ void SettingsWindow::RenderContents() {
 
     layout.SectionCaption(font_small_, kCaptionTextSize, "LOOK");
     layout.BeginGroup();
+    layout.BeginStackRow(20.0f, settings_ui::Metrics::kSegmentHeight);
+    layout.RowTitle(font_body_, kLabelTextSize, "Quality", kPrimaryTextColor);
+    layout.RowSubtitle(font_small_, kHelperTextSize, "Mesh resolution and power usage",
+                       kSecondaryTextColor);
+    {
+      constexpr std::array quality_labels = {"Automatic", "Best quality", "Power saving"};
+      int quality_segment = quality_mode_ == "best_quality" ? 1
+                            : quality_mode_ == "power_saving" ? 2
+                                                             : 0;
+      const float seg_w = layout.content_width();
+      layout.SetCursor(layout.content_left(), layout.StackControlY());
+      if (SegmentSelector(widget_motion, "##quality_mode", quality_labels, &quality_segment, seg_w,
+                          font_body_, scale, content_alpha)) {
+        const std::string previous = quality_mode_;
+        quality_mode_ = quality_segment == 1   ? "best_quality"
+                        : quality_segment == 2 ? "power_saving"
+                                               : "automatic";
+        const bool saved = !quality_mode_callback_ || quality_mode_callback_(quality_mode_);
+        if (!saved) quality_mode_ = previous;
+        RecordSaveResult(saved);
+      }
+    }
+    layout.EndRow();
+
     layout.BeginRow(settings_ui::Metrics::kRowHeight);
     {
       const float slider_w = layout.ControlMaxWidth(340.0f);

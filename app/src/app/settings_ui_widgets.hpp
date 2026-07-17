@@ -20,8 +20,8 @@ bool Combo(const MotionContext& motion, const char* id, const char* label, int* 
 bool CompactButton(const MotionContext& motion, const char* id, const char* label,
                    const ImVec2& size, ImFont* font, float scale, float alpha, bool active = false);
 bool SegmentSelector(const MotionContext& motion, const char* id,
-                     const std::array<const char*, 2>& labels, int* selected, float width,
-                     ImFont* font, float scale, float alpha);
+                     std::span<const char* const> labels, int* selected, float width, ImFont* font,
+                     float scale, float alpha);
 
 // Editable cubic-bezier easing graph. Returns true while the user is actively dragging a handle.
 // `changed` is set when handles moved this frame. Save on the transition from active→inactive.

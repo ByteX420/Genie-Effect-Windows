@@ -67,6 +67,7 @@ public:
   using CustomBezierCallback =
       std::function<bool(bool is_minimize, animation::CubicBezier bezier, bool save)>;
   using AnimationStyleCallback = std::function<bool(const std::string&)>;
+  using QualityModeCallback = std::function<bool(const std::string&)>;
   using StrengthCallback = std::function<bool(float, bool)>;
   using FadeCallback = std::function<bool(const std::string&)>;
   using TargetIndicatorCallback = std::function<bool(bool)>;
@@ -92,6 +93,7 @@ public:
                   BatterySaverCallback battery_saver_callback, EasingCallback easing_callback,
                   CustomBezierCallback custom_bezier_callback,
                   AnimationStyleCallback animation_style_callback,
+                  QualityModeCallback quality_mode_callback,
                   StrengthCallback strength_callback, FadeCallback fade_callback,
                   TargetIndicatorCallback target_indicator_callback,
                   CloseBehaviorCallback close_behavior_callback, StartupCallback startup_callback,
@@ -165,6 +167,7 @@ private:
   EasingCallback easing_callback_;
   CustomBezierCallback custom_bezier_callback_;
   AnimationStyleCallback animation_style_callback_;
+  QualityModeCallback quality_mode_callback_;
   StrengthCallback strength_callback_;
   FadeCallback fade_callback_;
   TargetIndicatorCallback target_indicator_callback_;
@@ -202,6 +205,7 @@ private:
   bool minimize_bezier_active_ = false;
   bool restore_bezier_active_ = false;
   std::string animation_style_ = "Gienie classic";
+  std::string quality_mode_ = "automatic";
   float genie_strength_ = 1.0f;
   std::string fade_strength_ = "Subtle";
   bool show_target_indicator_ = false;
