@@ -866,16 +866,10 @@ bool OverlayWindow::Render(float progress) {
     return false;
   }
 
-  float eased_progress = 0.0f;
-  if (animation_state_.style == genie::animation::AnimationStyle::kSquash) {
-    const float clamped = std::clamp(progress, 0.0f, 1.0f);
-    eased_progress = clamped * clamped * clamped;
-  } else if (animation_state_.style == genie::animation::AnimationStyle::kCurvy) {
-    eased_progress = std::clamp(progress, 0.0f, 1.0f);
-  } else {
-    eased_progress = genie::animation::ApplyEasing(animation_state_.easing, progress,
-                                                   animation_state_.custom_bezier);
-  }
+  // All animation styles honor the user-selected easing (including Custom cubic-bezier).
+  // Style-specific mesh shaping still runs later; this only remaps time → progress.
+  const float eased_progress = genie::animation::ApplyEasing(
+      animation_state_.easing, progress, animation_state_.custom_bezier);
   if (!UpdateFrameConstants(eased_progress)) return false;
   mesh_generator_.SetStrength(animation_state_.genie_strength);
   const bool indices_changed = mesh_generator_.GenerateInto(

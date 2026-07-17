@@ -854,28 +854,23 @@ bool EasingGraphEditor(const MotionContext& motion, const char* id, animation::C
   if (!caption_font) caption_font = ImGui::GetFont();
 
   ImGui::PushID(id);
+  // Square plot on top; four compact value fields (x1,y1,x2,y2) below.
+  const float field_h = 24.0f * scale;
+  const float row_pad = 2.0f * scale;
+  const float input_band = field_h + row_pad * 2.0f;
+  const float side =
+      std::max(8.0f, std::min(size.x, std::max(8.0f, size.y - input_band)));
   const ImVec2 origin = ImGui::GetCursorScreenPos();
-  ImGui::InvisibleButton("##easing_graph", size);
-  const bool hovered = ImGui::IsItemHovered();
-  const bool active = ImGui::IsItemActive();
   ImDrawList* draw = ImGui::GetWindowDrawList();
 
-  const float rounding = 10.0f * scale;
-  const float pad = 14.0f * scale;
-  const float caption_h = caption_font->FontSize + 6.0f * scale;
+  // Keep pad inside the square so plot_min/max never invert.
+  const float pad = std::min(10.0f * scale, side * 0.2f);
   const ImVec2 panel_min = origin;
-  const ImVec2 panel_max(origin.x + size.x, origin.y + size.y);
+  const ImVec2 panel_max(panel_min.x + side, panel_min.y + side);
 
-  // Soft inset card
-  draw->AddRectFilled(panel_min, panel_max,
-                      ImGui::GetColorU32(ImVec4(0.09f, 0.09f, 0.10f, alpha)), rounding);
-  draw->AddRect(panel_min, panel_max,
-                ImGui::GetColorU32(ImVec4(0.22f, 0.22f, 0.24f, 0.9f * alpha)), rounding, 0,
-                std::max(1.0f, scale));
-
-  // Plot area — leave room for axis labels at bottom
-  const ImVec2 plot_min(panel_min.x + pad, panel_min.y + pad * 0.65f);
-  const ImVec2 plot_max(panel_max.x - pad, panel_max.y - pad - caption_h);
+  // Plot fills the square with a light pad — no card/plot background.
+  const ImVec2 plot_min(panel_min.x + pad, panel_min.y + pad);
+  const ImVec2 plot_max(panel_max.x - pad, panel_max.y - pad);
   const float plot_w = std::max(1.0f, plot_max.x - plot_min.x);
   const float plot_h = std::max(1.0f, plot_max.y - plot_min.y);
 
@@ -884,20 +879,27 @@ bool EasingGraphEditor(const MotionContext& motion, const char* id, animation::C
   constexpr float kYMax = 1.25f;
   const float y_span = kYMax - kYMin;
 
+  auto clamp01 = [](float v) { return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); };
+  auto clamp_y = [](float v) {
+    return v < kYMin ? kYMin : (v > kYMax ? kYMax : v);
+  };
+
   auto to_screen = [&](float nx, float ny) -> ImVec2 {
-    const float u = std::clamp(nx, 0.0f, 1.0f);
-    const float v = (std::clamp(ny, kYMin, kYMax) - kYMin) / y_span;
+    const float u = clamp01(nx);
+    const float v = (clamp_y(ny) - kYMin) / y_span;
     return ImVec2(plot_min.x + u * plot_w, plot_max.y - v * plot_h);
   };
   auto from_screen = [&](ImVec2 p, float* nx, float* ny) {
-    *nx = std::clamp((p.x - plot_min.x) / plot_w, 0.0f, 1.0f);
-    const float v = std::clamp((plot_max.y - p.y) / plot_h, 0.0f, 1.0f);
+    *nx = clamp01((p.x - plot_min.x) / plot_w);
+    const float v = clamp01((plot_max.y - p.y) / plot_h);
     *ny = kYMin + v * y_span;
   };
 
-  // Plot background
-  draw->AddRectFilled(plot_min, plot_max,
-                      ImGui::GetColorU32(ImVec4(0.06f, 0.06f, 0.07f, alpha)), 6.0f * scale);
+  // Graph hit target only (inputs live below).
+  ImGui::SetCursorScreenPos(panel_min);
+  ImGui::InvisibleButton("##easing_graph", ImVec2(side, side));
+  const bool hovered = ImGui::IsItemHovered();
+  const bool active = ImGui::IsItemActive();
 
   // Grid
   for (int i = 0; i <= 4; ++i) {
@@ -1036,21 +1038,52 @@ bool EasingGraphEditor(const MotionContext& motion, const char* id, animation::C
   draw_handle(p1, drag_handle == 1 || (hovered && near_handle(p1) && drag_handle == 0));
   draw_handle(p2, drag_handle == 2 || (hovered && near_handle(p2) && drag_handle == 0));
 
-  // Caption: cubic-bezier values
-  char caption[96]{};
-  std::snprintf(caption, sizeof(caption), "cubic-bezier(%.2f, %.2f, %.2f, %.2f)", bezier->x1,
-                bezier->y1, bezier->x2, bezier->y2);
-  const ImVec2 cap_size =
-      caption_font->CalcTextSizeA(caption_font->FontSize, FLT_MAX, 0.0f, caption);
-  const float cap_x = std::floor(panel_min.x + (size.x - cap_size.x) * 0.5f + 0.5f);
-  const float cap_y = std::floor(panel_max.y - pad * 0.35f - caption_font->FontSize + 0.5f);
-  draw->AddText(caption_font, caption_font->FontSize, ImVec2(cap_x, cap_y),
-                ImGui::GetColorU32(ImVec4(colors::textDim.x, colors::textDim.y, colors::textDim.z,
-                                          colors::textDim.w * alpha)),
-                caption);
+  // --- Value inputs below the graph: x1, y1, x2, y2 ---
+  const float field_gap = 4.0f * scale;
+  const float field_w = std::max(1.0f, (side - field_gap * 3.0f) * 0.25f);
+  float* field_values[4] = {&bezier->x1, &bezier->y1, &bezier->x2, &bezier->y2};
+  const char* field_ids[4] = {"##bx1", "##by1", "##bx2", "##by2"};
+  bool input_active = false;
+  bool input_changed = false;
+
+  ImGui::PushFont(caption_font);
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                      ImVec2(4.0f * scale, std::max(1.0f, (field_h - caption_font->FontSize) * 0.5f)));
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f * scale);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+  ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.09f, 0.09f, 0.10f, 0.95f * alpha));
+  ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.12f, 0.12f, 0.13f, 0.98f * alpha));
+  ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.14f, 0.14f, 0.15f, 1.0f * alpha));
+  ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.22f, 0.22f, 0.24f, 0.9f * alpha));
+  ImGui::PushStyleColor(ImGuiCol_Text,
+                        ImVec4(colors::text.x, colors::text.y, colors::text.z, alpha));
+
+  const float input_row_y = origin.y + side + row_pad;
+  for (int i = 0; i < 4; ++i) {
+    const float fx = origin.x + static_cast<float>(i) * (field_w + field_gap);
+    ImGui::SetCursorScreenPos(ImVec2(std::floor(fx + 0.5f), std::floor(input_row_y + 0.5f)));
+    ImGui::SetNextItemWidth(field_w);
+    const float before = *field_values[i];
+    if (ImGui::InputFloat(field_ids[i], field_values[i], 0.0f, 0.0f, "%.2f")) {
+      input_changed = true;
+    }
+    if (ImGui::IsItemActive() || ImGui::IsItemDeactivated()) input_active = true;
+    if (ImGui::IsItemDeactivatedAfterEdit()) input_changed = true;
+    if (std::abs(*field_values[i] - before) > 1e-6f) input_changed = true;
+  }
+
+  ImGui::PopStyleColor(5);
+  ImGui::PopStyleVar(4);
+  ImGui::PopFont();
+
+  if (input_changed) {
+    bezier->ClampHandles();
+    if (changed) *changed = true;
+  }
 
   ImGui::PopID();
-  return dragging || active;
+  return dragging || active || input_active;
 }
 
 }  // namespace genie::app::settings_ui

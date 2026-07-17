@@ -1306,8 +1306,9 @@ void SettingsWindow::RenderContents() {
         float delta = updated - *duration;
         if (link_speeds_) {
           float* other = is_minimize ? &restore_duration_seconds_ : &minimize_duration_seconds_;
-          delta = std::clamp(delta, kMinimumAnimationDurationSeconds - *other,
-                             kMaximumAnimationDurationSeconds - *other);
+          const float lo = kMinimumAnimationDurationSeconds - *other;
+          const float hi = kMaximumAnimationDurationSeconds - *other;
+          if (lo <= hi) delta = std::clamp(delta, lo, hi);
           *other += delta;
         }
         *duration += delta;
@@ -1365,7 +1366,11 @@ void SettingsWindow::RenderContents() {
     };
     // Same preferred width as duration sliders so the right edge lines up across groups.
     const float combo_w = layout.ControlMaxWidth(340.0f);
-    const float graph_h = px(168.0f);
+    // Square graph: 80% of combo width; four value inputs sit below the plot.
+    const float graph_side = combo_w * 0.8f;
+    const float graph_input_band = 24.0f * scale + 4.0f * scale;  // field_h + pads
+    const float graph_block_h = graph_side + graph_input_band;
+    const float graph_block_logical = graph_block_h / scale;
 
     const auto combo_row = [&](const char* id, const char* title, int* index,
                                std::span<const char* const> items, auto on_change) {
@@ -1395,21 +1400,21 @@ void SettingsWindow::RenderContents() {
       });
       if (*easing_name != "Custom") return;
 
-      // Full-width stack under the combo: editable cubic-bezier graph.
-      layout.BeginStackRow(0.0f, 168.0f + 8.0f);
+      // Square graph under the combo, right-aligned to the same control column.
+      layout.BeginStackRow(0.0f, graph_block_logical + 8.0f);
       {
-        const float graph_w = layout.content_width();
-        const ImVec2 cursor = layout.ToScreen(layout.content_left(), layout.StackControlY());
-        // SetCursor expects layout-local coords (ToScreen already applied origin/scroll).
-        layout.SetCursor(layout.content_left(), layout.StackControlY());
-        (void)cursor;
+        const float graph_x = layout.content_right() - graph_side;
+        const float graph_y =
+            layout.StackControlY() + (layout.StackControlHeight() - graph_block_h) * 0.5f;
+        layout.SetCursor(graph_x, graph_y);
         bool graph_changed = false;
         const bool graph_active =
             settings_ui::EasingGraphEditor(widget_motion, graph_id, bezier,
-                                           ImVec2(graph_w, graph_h), scale, content_alpha,
+                                           ImVec2(graph_side, graph_block_h), scale, content_alpha,
                                            &graph_changed, font_small_);
         DelayedTooltip(
-            "Drag the two handles to shape the easing curve. Hold Shift for finer steps.", scale);
+            "Drag handles or type x1, y1, x2, y2. Hold Shift while dragging for finer steps.",
+            scale);
         if (graph_changed) {
           *bezier_dirty = true;
           if (custom_bezier_callback_) {
@@ -2056,8 +2061,10 @@ void SettingsWindow::RenderContents() {
     const float track_h = std::max(1.0f, track_bot - track_top);
     const float view_h = size.y;
     const float content_h = view_h + scroll_max;
+    // Min grab must never exceed track_h — MSVC debug std::clamp asserts if lo > hi.
+    const float grab_h_floor = std::min(px(28.0f), track_h);
     const float grab_h =
-        std::clamp(track_h * (view_h / std::max(content_h, 1.0f)), px(28.0f), track_h);
+        std::clamp(track_h * (view_h / std::max(content_h, 1.0f)), grab_h_floor, track_h);
     const float grab_travel = std::max(0.0f, track_h - grab_h);
     const float grab_t = scroll_max > 0.0f ? std::clamp(scroll_y / scroll_max, 0.0f, 1.0f) : 0.0f;
     const float grab_y = track_top + grab_travel * grab_t;

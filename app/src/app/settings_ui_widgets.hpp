@@ -23,8 +23,9 @@ bool SegmentSelector(const MotionContext& motion, const char* id,
                      std::span<const char* const> labels, int* selected, float width, ImFont* font,
                      float scale, float alpha);
 
-// Editable cubic-bezier easing graph. Returns true while the user is actively dragging a handle.
-// `changed` is set when handles moved this frame. Save on the transition from active→inactive.
+// Editable cubic-bezier easing graph with value inputs (x1,y1,x2,y2) below the plot.
+// Returns true while dragging a handle or editing an input. `changed` is set when values
+// move this frame. Save on the transition from active→inactive.
 bool EasingGraphEditor(const MotionContext& motion, const char* id,
                        animation::CubicBezier* bezier, const ImVec2& size, float scale, float alpha,
                        bool* changed, ImFont* caption_font = nullptr);

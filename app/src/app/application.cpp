@@ -1894,13 +1894,7 @@ bool Application::SetAnimationStyle(const std::string& style) {
   }
   AppSettings proposed = settings_;
   proposed.animation_style = style;
-  if (style == "Gienie classic") {
-    proposed.minimize_easing = "Ease In Out";
-    proposed.restore_easing = "Ease In Out";
-  } else {
-    proposed.minimize_easing = "Linear";
-    proposed.restore_easing = "Linear";
-  }
+  // Keep minimize/restore easing (including Custom bezier) — style only changes mesh shaping.
   if (!SaveSettings(proposed)) return false;
   settings_ = std::move(proposed);
   settings_window_.UpdateState(settings_);
