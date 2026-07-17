@@ -19,10 +19,11 @@ It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished
 - **Genie minimize & restore** — mesh-based deformation toward the taskbar (or a custom rect)
 - **Concurrent animations** — multiple windows can animate without blocking each other
 - **Separate motion controls** — minimize vs restore duration, linked or independent speeds
-- **Easing & style options** — classic Genie, strength, fade, and related motion tweaks
+- **Easing & style options** — presets, custom cubic-bezier, classic / curvy / squash, strength, fade
+- **Automatic quality** — adaptive mesh density under load and resolution pressure
 - **App exclusions** — skip the effect for specific executables
 - **System integration** — run at startup, start minimized, tray icon, close-to-tray or exit
-- **Hotkeys** — toggle the effect, open settings, repair hooks (configurable)
+- **Hotkeys** — toggle the effect, open settings, repair windows (configurable)
 - **Settings UI** — dark macOS-inspired shell (traffic lights, sidebar, cards, motion)
 - **Repair / diagnostics** — status for effect, hook, renderer, D3D device, display
 - **Native animation suppression** — disables classic shell + DWM transitions while running
@@ -34,13 +35,14 @@ It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished
 
 Windows does **not** expose a public API that means “replace this DWM minimize animation before the compositor runs it.” Genie Effect uses the strongest **documented** path available:
 
-1. **Detect** minimize/restore with `SetWinEventHook` (`EVENT_SYSTEM_MINIMIZESTART` / related events).
-2. **Suppress** the stock transition with `DwmSetWindowAttribute(DWMWA_TRANSITIONS_FORCEDISABLED)` and temporary `SystemParametersInfo(SPI_SETANIMATION)` changes (restored on exit).
-3. **Capture** the visible window region via **DXGI Desktop Duplication** into an `ID3D11Texture2D`.
-4. **Composite** a transparent topmost overlay with **DirectComposition** + a D3D11 swap chain.
-5. **Deform** a textured mesh (Genie curve / squash) each frame until the window lands at the taskbar target.
+1. **Detect** minimize/restore via WinEvents and a **CBT hook DLL** (`GenieHookPost.dll`).
+2. **Policy** decides whether the effect applies (enabled, pause, fullscreen, battery saver, exclusions).
+3. **Suppress** the stock transition with `DwmSetWindowAttribute(DWMWA_TRANSITIONS_FORCEDISABLED)` and temporary `SystemParametersInfo(SPI_SETANIMATION)` changes (restored on exit).
+4. **Capture** the visible window region via **DXGI Desktop Duplication** into an `ID3D11Texture2D`.
+5. **Composite** a transparent topmost overlay with **DirectComposition** + a D3D11 swap chain.
+6. **Deform** a textured mesh (Genie curve / squash) each frame until the window lands at the taskbar target.
 
-A separate **CBT hook DLL** (`GenieHookPost.dll`) helps observe and coordinate window events. Elevated processes are only visible to the hook if Genie Effect itself runs elevated (UIPI).
+Elevated processes are only visible to the hook if Genie Effect itself runs elevated (UIPI).
 
 For a deeper technical write-up, see [`docs/architecture.md`](docs/architecture.md).
 
@@ -107,7 +109,7 @@ MSBuild.exe GenieEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 | Page | What you control |
 | --- | --- |
 | **Effect** | Master enable, close behavior, startup options |
-| **Motion** | Durations, easing, style, strength, fade, preview |
+| **Motion** | Durations, easing, custom bezier, style, quality, strength, fade, preview |
 | **Apps** | Exclude executables from the effect |
 | **System** | Windows integration helpers |
 | **Hotkeys** | Global shortcuts |
@@ -158,21 +160,31 @@ Genie-Effect-Windows/
 |-- GenieEffect.slnx
 |-- app/
 |   |-- GenieEffect.vcxproj
+|   |-- GenieEffect.rc
 |   |-- assets/fonts/
 |   |-- shaders/
 |   |-- src/
-|   |   |-- animation/          # Pure mesh geometry and easing
-|   |   |-- app/                # Composition, lifecycle, message loop
-|   |   |-- core/               # Logging, environment, resources
-|   |   |-- features/           # Product policy and use cases
-|   |   |-- platform/windows/   # Focused Win32/DWM/shell adapters
-|   |   |-- rendering/          # Capture and GPU rendering
-|   |   |-- runtime/            # Runs, state, pacing, recovery
-|   |   |-- settings/           # Validation and persistence
-|   |   `-- ui/                 # Host, pages, components, motion
-|   `-- third_party/            # ImGui and FreeType
-|-- hook/                       # Separate CBT hook DLL
+|   |   |-- main.cpp
+|   |   |-- animation/            # Mesh geometry and easing (platform-free)
+|   |   |-- app/                  # Composition root, lifecycle, message loop
+|   |   |-- core/                 # Logger, environment, embedded resources
+|   |   |-- features/             # Policy, minimize/restore, pause, diagnostics
+|   |   |-- platform/windows/     # Win32/DWM/shell/hook/hotkey adapters
+|   |   |-- rendering/            # D3D device, capture, overlay draw path
+|   |   |-- runtime/              # Animation runs, state, pacing, recovery
+|   |   |-- settings/             # Model, validation, serializer, repository
+|   |   `-- ui/                   # Settings host, shell, tray, preview
+|   |       |-- pages/            # Effect, Motion, Apps, System, Hotkeys, Repair, About
+|   |       |-- components/       # Controls, combo, easing editor, layout
+|   |       |-- theme/            # Visual tokens and chrome
+|   |       |-- motion/           # UI motion system
+|   |       `-- rendering/        # ImGui/D3D settings renderer
+|   `-- third_party/              # Vendored ImGui + FreeType
+|-- hook/                         # GenieHookPost.dll (CBTProc)
 |-- docs/
+|   `-- architecture.md
+|-- LICENSE.txt
+`-- README.md
 ```
 
 ### Code style
@@ -190,6 +202,12 @@ Get-ChildItem app\src, hook -Recurse -Include *.cpp,*.hpp,*.h |
 
 ## Architecture notes for contributors
 
+Dependencies point inward:
+
+```text
+main -> app -> features / runtime / ui -> rendering / platform / settings -> core / animation
+```
+
 | Layer | Responsibility |
 | --- | --- |
 | `core/` | Logging, environment flags, embedded resources |
@@ -198,8 +216,8 @@ Get-ChildItem app\src, hook -Recurse -Include *.cpp,*.hpp,*.h |
 | `rendering/` | Device, desktop duplication, mesh and overlay rendering |
 | `settings/` | Model, validation, serializer, repository, service |
 | `runtime/` | Runs, state machine, pacing, snapshots, recovery |
-| `features/` | Policy, minimize/restore, pause, diagnostics, recovery |
-| `ui/` | Win32 host, ImGui renderer, shell, pages, components |
+| `features/` | Policy, minimize/restore, pause, diagnostics, mutations |
+| `ui/` | Win32 host, ImGui renderer, shell, pages, components, tray |
 | `app/` | Composition root, lifecycle, message loop |
 | `hook/` | Separate CBT DLL and stable app/DLL boundary |
 
@@ -210,7 +228,7 @@ Get-ChildItem app\src, hook -Recurse -Include *.cpp,*.hpp,*.h |
 - Multi-monitor / exotic taskbar setups may need `GENIE_TASKBAR_RECT`.
 - Fullscreen games / exclusive modes may disable or skip the effect (settings flags exist for battery saver / fullscreen-related behavior).
 
-See [`docs/architecture.md`](docs/architecture.md) for the public-API boundary and intentional isolation of invasive shell work.
+See [`docs/architecture.md`](docs/architecture.md) for ownership, state machine, and recovery paths.
 
 ---
 
@@ -229,10 +247,10 @@ Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
 1. On `dev` (or a branch), bump the version macros in `app/GenieEffect.rc`:
 
    ```c
-   #define GENIE_FILE_VERSION      1,0,1,0
-   #define GENIE_PRODUCT_VERSION   1,0,1,0
-   #define GENIE_FILE_VERSION_STR  "1.0.1\0"
-   #define GENIE_PRODUCT_VERSION_STR "1.0.1\0"
+   #define GENIE_FILE_VERSION      1,2,0,0
+   #define GENIE_PRODUCT_VERSION   1,2,0,0
+   #define GENIE_FILE_VERSION_STR  "1.2.0\0"
+   #define GENIE_PRODUCT_VERSION_STR "1.2.0\0"
    ```
 
 2. Merge into **`stable`** and push:
