@@ -1,8 +1,7 @@
 #pragma once
 
-// Compatibility include required by the  beta ImGui fork. Keeping this
-// shim outside third_party leaves every imported vendor file byte-identical.
-#include "pch.hpp"
+// The imported ImGui fork includes this integration header directly. It is
+// intentionally independent from the application's precompiled header.
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif

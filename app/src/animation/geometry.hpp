@@ -10,8 +10,6 @@ struct RectF {
 
   [[nodiscard]] float Width() const { return right - left; }
   [[nodiscard]] float Height() const { return bottom - top; }
-  [[nodiscard]] float CenterX() const { return (left + right) * 0.5f; }
-  [[nodiscard]] float CenterY() const { return (top + bottom) * 0.5f; }
 };
 
 struct PointF {

@@ -1,0 +1,109 @@
+#include "pch.hpp"
+
+#include "rendering/animation_renderer.hpp"
+
+#include <algorithm>
+
+namespace genie::rendering {
+
+void AnimationRenderer::SetEasing(animation::EasingCurve easing, animation::CubicBezier custom) {
+  configured_easing_ = easing;
+  configured_custom_bezier_ = custom;
+  configured_custom_bezier_.ClampHandles();
+}
+
+bool AnimationRenderer::Begin(CapturedTexture texture, const animation::RectF& source,
+                              const animation::RectF& target, animation::GenieEdge edge,
+                              float start_progress, float target_progress) {
+  if (texture.shader_resource_view == nullptr) return false;
+  active_ = true;
+  clock_started_ = false;
+  texture_ = std::move(texture);
+  source_ = source;
+  target_ = target;
+  edge_ = edge;
+  progress_ = std::clamp(start_progress, 0.0f, 1.0f);
+  target_progress_ = std::clamp(target_progress, 0.0f, 1.0f);
+  duration_seconds_ = std::max(0.001f, configured_duration_seconds_);
+  easing_ = configured_easing_;
+  custom_bezier_ = configured_custom_bezier_;
+  style_ = configured_style_;
+  genie_strength_ = configured_genie_strength_;
+  fade_strength_ = configured_fade_strength_;
+  return true;
+}
+
+void AnimationRenderer::StartClock() {
+  if (!active_) return;
+  last_tick_time_ = std::chrono::steady_clock::now();
+  clock_started_ = true;
+}
+
+void AnimationRenderer::ContinueMinimize() {
+  if (!active_) return;
+  target_progress_ = 1.0f;
+  StartClock();
+}
+
+void AnimationRenderer::Reverse() {
+  if (!active_) return;
+  target_progress_ = 0.0f;
+  StartClock();
+}
+
+AnimationRenderer::AdvanceResult AnimationRenderer::Advance() {
+  if (!active_) return {};
+  if (!clock_started_) return {.progress = progress_};
+  const auto now = std::chrono::steady_clock::now();
+  const float elapsed = std::chrono::duration<float>(now - last_tick_time_).count();
+  last_tick_time_ = now;
+  const float step = elapsed / duration_seconds_;
+  if (target_progress_ >= progress_) {
+    progress_ = std::min(target_progress_, progress_ + step);
+  } else {
+    progress_ = std::max(target_progress_, progress_ - step);
+  }
+  return {
+      .should_render = true,
+      .reached_target = progress_ == target_progress_,
+      .progress = progress_,
+  };
+}
+
+void AnimationRenderer::CompleteFrame(bool render_succeeded, bool reached_target) {
+  if (render_succeeded && !reached_target) return;
+  active_ = false;
+  if (!render_succeeded || target_progress_ != 0.0f) texture_ = {};
+}
+
+void AnimationRenderer::Cancel() {
+  active_ = false;
+  clock_started_ = false;
+  texture_ = {};
+}
+
+void AnimationRenderer::FinishRestore() {
+  active_ = false;
+  clock_started_ = false;
+  texture_ = {};
+}
+
+float AnimationRenderer::eased_progress() const {
+  return animation::ApplyEasing(easing_, progress_, custom_bezier_);
+}
+
+float AnimationRenderer::opacity(float rendered_progress) const {
+  if (!active_) return 1.0f;
+  if (style_ == animation::AnimationStyle::kSquash) {
+    return 1.0f - std::clamp(rendered_progress, 0.0f, 1.0f);
+  }
+  return 1.0f - std::clamp(fade_strength_, 0.0f, 0.65f) * std::clamp(progress_, 0.0f, 1.0f);
+}
+
+bool AnimationRenderer::GenerateMesh(float viewport_height) {
+  mesh_generator_.SetStrength(genie_strength_);
+  return mesh_generator_.GenerateInto(source_, target_, edge_, animation::GenieDirection::kMinimize,
+                                      style_, eased_progress(), viewport_height, &reusable_mesh_);
+}
+
+}  // namespace genie::rendering

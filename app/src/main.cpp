@@ -1,68 +1,39 @@
 #include "pch.hpp"
 
 #include "app/application.hpp"
+#include "platform/windows/process_runtime.hpp"
+#include "platform/windows/single_instance_guard.hpp"
 
 #ifndef _DEBUG
 #pragma comment(linker, "/subsystem:windows /ENTRY:wmainCRTStartup")
 #endif
 
-static genie::app::Application* g_application = nullptr;
-constexpr wchar_t kSingleInstanceMutexName[] = L"Local\\GenieEffect.Windows.SingleInstance";
-
-BOOL WINAPI ConsoleHandler(DWORD signal) {
-  if (signal == CTRL_CLOSE_EVENT || signal == CTRL_C_EVENT || signal == CTRL_BREAK_EVENT ||
-      signal == CTRL_LOGOFF_EVENT || signal == CTRL_SHUTDOWN_EVENT) {
-    if (g_application != nullptr) {
-      g_application->RequestShutdown();
-    }
-    return TRUE;
-  }
-  return FALSE;
-}
-
 int wmain() {
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-
-  HANDLE instance_mutex = CreateMutexW(nullptr, TRUE, kSingleInstanceMutexName);
-  const DWORD mutex_error = GetLastError();
-  if (instance_mutex == nullptr) {
-    if (mutex_error == ERROR_ACCESS_DENIED) {
-      (void)genie::app::SettingsWindow::ActivateExistingInstance(5000);
-      return 0;
-    }
-    std::wcerr << L"Could not create the single-instance guard: " << mutex_error << L"\n";
-    return 1;
-  }
-  if (mutex_error == ERROR_ALREADY_EXISTS) {
-    CloseHandle(instance_mutex);
-    (void)genie::app::SettingsWindow::ActivateExistingInstance(5000);
+  genie::platform::windows::SingleInstanceGuard instance_guard;
+  const auto instance_result = instance_guard.Acquire();
+  if (instance_result == genie::platform::windows::SingleInstanceResult::kAlreadyRunning) {
+    (void)genie::platform::windows::SingleInstanceGuard::ActivateExistingInstance(5000);
     return 0;
   }
+  if (instance_result == genie::platform::windows::SingleInstanceResult::kError) {
+    std::wcerr << L"Could not create the single-instance guard: " << instance_guard.error()
+               << L"\n";
+    return 1;
+  }
 
-  const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  if (FAILED(hr)) {
-    std::wcerr << L"CoInitializeEx failed: 0x" << std::hex << hr << L"\n";
-    CloseHandle(instance_mutex);
+  genie::platform::windows::ProcessRuntime process_runtime;
+  if (!process_runtime.Initialize()) {
+    std::wcerr << L"Process initialization failed: 0x" << std::hex << process_runtime.error()
+               << L"\n";
     return 1;
   }
 
   genie::app::Application application;
-  g_application = &application;
-  SetConsoleCtrlHandler(ConsoleHandler, TRUE);
+  process_runtime.SetShutdownHandler([&application] { application.RequestShutdown(); });
 
   if (!application.Initialize(GetModuleHandleW(nullptr))) {
-    g_application = nullptr;
-    SetConsoleCtrlHandler(ConsoleHandler, FALSE);
-    CoUninitialize();
-    CloseHandle(instance_mutex);
     return 1;
   }
 
-  const int result = application.Run();
-  g_application = nullptr;
-  SetConsoleCtrlHandler(ConsoleHandler, FALSE);
-  CoUninitialize();
-  CloseHandle(instance_mutex);
-
-  return result;
+  return application.Run();
 }

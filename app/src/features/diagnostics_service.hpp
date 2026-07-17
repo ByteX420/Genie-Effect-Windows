@@ -1,0 +1,70 @@
+#pragma once
+
+#include <functional>
+#include <string>
+#include <windows.h>
+
+namespace genie::platform {
+class TaskbarTargetProvider;
+}
+namespace genie::rendering {
+class D3dDevice;
+}
+
+namespace genie::features {
+
+struct DiagnosticsSnapshot {
+  std::string effect;
+  std::string hook;
+  std::string renderer;
+  std::string d3d_device;
+  std::string active_animations;
+  std::string watchdog;
+  std::string display_refresh;
+  std::string window_monitor;
+  std::string taskbar;
+  std::string startup_repair;
+  std::string version;
+  std::string windows_version;
+  std::string graphics_adapter;
+  std::string monitor_configuration;
+  std::string log_folder_size;
+  std::string report;
+};
+
+struct DiagnosticsContext {
+  bool effect_active = false;
+  bool hook_installed = false;
+  bool renderer_recovering = false;
+  const rendering::D3dDevice* d3d_device = nullptr;
+  int active_animations = 0;
+  std::string startup_repair;
+  HWND reference_window = nullptr;
+  const platform::TaskbarTargetProvider* taskbar_targets = nullptr;
+};
+
+enum class DiagnosticsAction {
+  kCopy,
+  kOpenLogFolder,
+  kRepairWindows,
+  kRestartRenderer,
+  kExitSafeMode,
+};
+
+struct DiagnosticsActions {
+  HWND owner = nullptr;
+  std::function<std::string()> build_report;
+  std::function<bool()> repair_windows;
+  std::function<bool()> restart_renderer;
+  std::function<bool()> exit_safe_mode;
+};
+
+class DiagnosticsService final {
+public:
+  [[nodiscard]] DiagnosticsSnapshot Build(const DiagnosticsContext& context) const;
+  [[nodiscard]] bool Execute(DiagnosticsAction action, const DiagnosticsActions& actions) const;
+  [[nodiscard]] bool CopyReport(HWND owner, const std::string& report) const;
+  [[nodiscard]] bool OpenLogFolder(HWND owner) const;
+};
+
+}  // namespace genie::features

@@ -1,0 +1,152 @@
+#include "pch.hpp"
+
+#include "rendering/desktop_duplication_session.hpp"
+
+#include <iostream>
+
+#include "rendering/d3d_device.hpp"
+
+namespace genie::rendering {
+namespace {
+
+int RectWidth(const RECT& rect) { return static_cast<int>(rect.right - rect.left); }
+int RectHeight(const RECT& rect) { return static_cast<int>(rect.bottom - rect.top); }
+
+bool ContainsRect(const RECT& outer, const RECT& inner) {
+  return inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right &&
+         inner.bottom <= outer.bottom;
+}
+
+}  // namespace
+
+DesktopDuplicationSession::DesktopDuplicationSession(D3dDevice* d3d_device)
+    : d3d_device_(d3d_device) {}
+
+DesktopDuplicationSession::OutputCapture* DesktopDuplicationSession::AcquireFrameForRect(
+    const RECT& screen_rect, UINT first_frame_timeout_ms) {
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    if (outputs_.empty() && !InitializeOutputs()) return nullptr;
+    OutputCapture* output = FindOutputForRect(screen_rect);
+    if (output == nullptr) return nullptr;
+    const UINT timeout_ms = output->latest_frame == nullptr ? first_frame_timeout_ms : 0;
+    const AcquireResult result = TryAcquireLatestFrame(output, timeout_ms);
+    if (result == AcquireResult::kAccessLost) {
+      Reset();
+      continue;
+    }
+    if (result == AcquireResult::kDeviceLost) return nullptr;
+    return output->latest_frame != nullptr ? output : nullptr;
+  }
+  return nullptr;
+}
+
+DesktopDuplicationSession::AcquireResult DesktopDuplicationSession::TryAcquireLatestFrame(
+    OutputCapture* output, UINT timeout_ms) {
+  if (output == nullptr || output->duplication == nullptr) return AcquireResult::kFailed;
+  DXGI_OUTDUPL_FRAME_INFO frame_info{};
+  Microsoft::WRL::ComPtr<IDXGIResource> desktop_resource;
+  HRESULT result =
+      output->duplication->AcquireNextFrame(timeout_ms, &frame_info, &desktop_resource);
+  if (result == DXGI_ERROR_WAIT_TIMEOUT) return AcquireResult::kNoNewFrame;
+  if (result == DXGI_ERROR_ACCESS_LOST) return AcquireResult::kAccessLost;
+  if (D3dDevice::IsDeviceLostError(result)) {
+    MarkDeviceLost(L"AcquireNextFrame", result);
+    return AcquireResult::kDeviceLost;
+  }
+  if (FAILED(result)) return AcquireResult::kFailed;
+
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> desktop_texture;
+  result = desktop_resource.As(&desktop_texture);
+  if (FAILED(result)) {
+    output->duplication->ReleaseFrame();
+    return AcquireResult::kFailed;
+  }
+  D3D11_TEXTURE2D_DESC desktop_description{};
+  desktop_texture->GetDesc(&desktop_description);
+  output->latest_frame_format = desktop_description.Format;
+  if (output->latest_frame != nullptr) {
+    D3D11_TEXTURE2D_DESC cached_description{};
+    output->latest_frame->GetDesc(&cached_description);
+    if (cached_description.Width != desktop_description.Width ||
+        cached_description.Height != desktop_description.Height ||
+        cached_description.Format != desktop_description.Format) {
+      output->latest_frame.Reset();
+    }
+  }
+  if (output->latest_frame == nullptr) {
+    D3D11_TEXTURE2D_DESC cached_description = desktop_description;
+    cached_description.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    cached_description.CPUAccessFlags = 0;
+    cached_description.MiscFlags = 0;
+    cached_description.Usage = D3D11_USAGE_DEFAULT;
+    result =
+        d3d_device_->device()->CreateTexture2D(&cached_description, nullptr, &output->latest_frame);
+    if (FAILED(result)) {
+      output->duplication->ReleaseFrame();
+      if (D3dDevice::IsDeviceLostError(result)) {
+        MarkDeviceLost(L"CreateTexture2D cached desktop frame", result);
+        return AcquireResult::kDeviceLost;
+      }
+      return AcquireResult::kFailed;
+    }
+  }
+  d3d_device_->context()->CopyResource(output->latest_frame.Get(), desktop_texture.Get());
+  output->duplication->ReleaseFrame();
+  return AcquireResult::kAcquired;
+}
+
+bool DesktopDuplicationSession::InitializeOutputs() {
+  Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+  HRESULT result = d3d_device_->dxgi_device()->GetAdapter(&adapter);
+  if (FAILED(result)) return false;
+  for (UINT index = 0;; ++index) {
+    Microsoft::WRL::ComPtr<IDXGIOutput> output;
+    result = adapter->EnumOutputs(index, &output);
+    if (result == DXGI_ERROR_NOT_FOUND) break;
+    if (FAILED(result)) continue;
+    DXGI_OUTPUT_DESC description{};
+    output->GetDesc(&description);
+    Microsoft::WRL::ComPtr<IDXGIOutput1> output1;
+    if (FAILED(output.As(&output1))) continue;
+    Microsoft::WRL::ComPtr<IDXGIOutputDuplication> duplication;
+    result = output1->DuplicateOutput(d3d_device_->device(), &duplication);
+    if (FAILED(result)) continue;
+    outputs_.push_back(OutputCapture{
+        .desktop_coordinates = description.DesktopCoordinates,
+        .duplication = duplication,
+    });
+  }
+  return !outputs_.empty();
+}
+
+DesktopDuplicationSession::OutputCapture* DesktopDuplicationSession::FindOutputForRect(
+    const RECT& screen_rect) {
+  for (OutputCapture& output : outputs_) {
+    if (ContainsRect(output.desktop_coordinates, screen_rect)) return &output;
+  }
+  const LONG center_x = screen_rect.left + RectWidth(screen_rect) / 2;
+  const LONG center_y = screen_rect.top + RectHeight(screen_rect) / 2;
+  for (OutputCapture& output : outputs_) {
+    const RECT& rect = output.desktop_coordinates;
+    if (center_x >= rect.left && center_x < rect.right && center_y >= rect.top &&
+        center_y < rect.bottom) {
+      return &output;
+    }
+  }
+  return nullptr;
+}
+
+void DesktopDuplicationSession::ClearHistory() {
+  for (OutputCapture& output : outputs_) output.latest_frame.Reset();
+}
+
+void DesktopDuplicationSession::Reset() { outputs_.clear(); }
+
+void DesktopDuplicationSession::MarkDeviceLost(const wchar_t* context, HRESULT result) {
+  device_lost_ = true;
+  const HRESULT reason = d3d_device_ != nullptr ? d3d_device_->DeviceRemovedReason() : S_OK;
+  std::wcerr << L"D3D device lost during " << context << L": hr=0x" << std::hex << result
+             << L", reason=0x" << reason << std::dec << L".\n";
+}
+
+}  // namespace genie::rendering

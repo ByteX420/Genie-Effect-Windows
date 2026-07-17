@@ -57,7 +57,7 @@
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;$(ProjectDir)third_party\freetype\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)vendor_integration;$(ProjectDir);$(ProjectDir)src;$(ProjectDir)third_party\imgui;$(ProjectDir)third_party\imgui\backends;$(ProjectDir)third_party\freetype\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/FS /utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -120,16 +120,90 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\animation\easing.cpp" />
+    <ClCompile Include="src\animation\genie_mesh.cpp" />
+    <ClCompile Include="src\app\application.cpp" />
+    <ClCompile Include="src\app\application_runtime.cpp" />
+    <ClCompile Include="src\app\message_loop.cpp" />
+    <ClCompile Include="src\app\session_state_store.cpp" />
+    <ClCompile Include="src\core\embedded_resource.cpp" />
+    <ClCompile Include="src\core\environment.cpp" />
+    <ClCompile Include="src\core\logger.cpp" />
+    <ClCompile Include="src\features\animation_configuration.cpp" />
+    <ClCompile Include="src\features\diagnostics_service.cpp" />
+    <ClCompile Include="src\features\effect_controller.cpp" />
+    <ClCompile Include="src\features\effect_policy.cpp" />
+    <ClCompile Include="src\features\hotkey_controller.cpp" />
+    <ClCompile Include="src\features\minimize_feature.cpp" />
+    <ClCompile Include="src\features\pause_controller.cpp" />
+    <ClCompile Include="src\features\restore_feature.cpp" />
+    <ClCompile Include="src\features\settings_actions_controller.cpp" />
+    <ClCompile Include="src\features\settings_mutation_service.cpp" />
+    <ClCompile Include="src\features\window_recovery_service.cpp" />
+    <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\animation\genie_mesh.cpp" />
-    <ClCompile Include="src\app\application.cpp" />
-    <ClCompile Include="src\app\settings_store.cpp" />
-    <ClCompile Include="src\app\startup_manager.cpp" />
-    <ClCompile Include="src\app\settings_ui_theme.cpp" />
-    <ClCompile Include="src\app\settings_ui_widgets.cpp" />
-    <ClCompile Include="src\app\settings_window.cpp" />
+    <ClCompile Include="src\platform\windows\app_container_permissions.cpp" />
+    <ClCompile Include="src\platform\windows\cbt_hook_manager.cpp" />
+    <ClCompile Include="src\platform\windows\display_info.cpp" />
+    <ClCompile Include="src\platform\windows\global_hotkey_manager.cpp" />
+    <ClCompile Include="src\platform\windows\native_animation_blocker.cpp" />
+    <ClCompile Include="src\platform\windows\power_status.cpp" />
+    <ClCompile Include="src\platform\windows\process_info.cpp" />
+    <ClCompile Include="src\platform\windows\process_runtime.cpp" />
+    <ClCompile Include="src\platform\windows\single_instance_guard.cpp" />
+    <ClCompile Include="src\platform\windows\startup_manager.cpp" />
+    <ClCompile Include="src\platform\windows\taskbar_locator.cpp" />
+    <ClCompile Include="src\platform\windows\taskbar_target_provider.cpp" />
+    <ClCompile Include="src\platform\windows\window_diagnostics.cpp" />
+    <ClCompile Include="src\platform\windows\window_event_monitor.cpp" />
+    <ClCompile Include="src\platform\windows\window_properties.cpp" />
+    <ClCompile Include="src\platform\windows\window_state.cpp" />
+    <ClCompile Include="src\rendering\animation_renderer.cpp" />
+    <ClCompile Include="src\rendering\capture_geometry.cpp" />
+    <ClCompile Include="src\rendering\d3d_device.cpp" />
+    <ClCompile Include="src\rendering\desktop_capture.cpp" />
+    <ClCompile Include="src\rendering\desktop_duplication_session.cpp" />
+    <ClCompile Include="src\rendering\overlay_renderer.cpp" />
+    <ClCompile Include="src\rendering\overlay_window.cpp" />
+    <ClCompile Include="src\rendering\window_capture_mask.cpp" />
+    <ClCompile Include="src\runtime\animation_run_coordinator.cpp" />
+    <ClCompile Include="src\runtime\animation_run_pool.cpp" />
+    <ClCompile Include="src\runtime\effect_runtime_coordinator.cpp" />
+    <ClCompile Include="src\runtime\frame_scheduler.cpp" />
+    <ClCompile Include="src\runtime\renderer_recovery.cpp" />
+    <ClCompile Include="src\runtime\run_state.cpp" />
+    <ClCompile Include="src\runtime\snapshot_cache.cpp" />
+    <ClCompile Include="src\settings\exclusion_rules.cpp" />
+    <ClCompile Include="src\settings\settings_repository.cpp" />
+    <ClCompile Include="src\settings\settings_serializer.cpp" />
+    <ClCompile Include="src\settings\settings_service.cpp" />
+    <ClCompile Include="src\settings\settings_validator.cpp" />
+    <ClCompile Include="src\ui\animation_preview.cpp" />
+    <ClCompile Include="src\ui\application_list_provider.cpp" />
+    <ClCompile Include="src\ui\components\combo.cpp" />
+    <ClCompile Include="src\ui\components\controls.cpp" />
+    <ClCompile Include="src\ui\components\easing_editor.cpp" />
+    <ClCompile Include="src\ui\components\page_layout.cpp" />
+    <ClCompile Include="src\ui\hotkey_presenter.cpp" />
+    <ClCompile Include="src\ui\motion\motion.cpp" />
+    <ClCompile Include="src\ui\motion\motion_tokens.cpp" />
+    <ClCompile Include="src\ui\pages\about_page.cpp" />
+    <ClCompile Include="src\ui\pages\animation_page.cpp" />
+    <ClCompile Include="src\ui\pages\applications_page.cpp" />
+    <ClCompile Include="src\ui\pages\diagnostics_page.cpp" />
+    <ClCompile Include="src\ui\pages\general_page.cpp" />
+    <ClCompile Include="src\ui\pages\hotkeys_page.cpp" />
+    <ClCompile Include="src\ui\pages\windows_integration_page.cpp" />
+    <ClCompile Include="src\ui\rendering\imgui_renderer.cpp" />
+    <ClCompile Include="src\ui\settings_controller.cpp" />
+    <ClCompile Include="src\ui\settings_shell.cpp" />
+    <ClCompile Include="src\ui\settings_view_model.cpp" />
+    <ClCompile Include="src\ui\settings_window.cpp" />
+    <ClCompile Include="src\ui\settings_window_proc.cpp" />
+    <ClCompile Include="src\ui\theme\theme.cpp" />
+    <ClCompile Include="src\ui\tray_icon.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
@@ -159,45 +233,95 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
     </ClCompile>
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\platform\native_animation_blocker.cpp" />
-    <ClCompile Include="src\platform\taskbar_target_provider.cpp" />
-    <ClCompile Include="src\platform\window_event_monitor.cpp" />
-    <ClCompile Include="src\platform\window_util.cpp" />
-    <ClCompile Include="src\rendering\d3d_device.cpp" />
-    <ClCompile Include="src\rendering\desktop_capture.cpp" />
-    <ClCompile Include="src\rendering\overlay_window.cpp" />
-    <ClCompile Include="src\menu\motion\motion.cpp">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <ObjectFileName>$(IntDir)menu_motion.obj</ObjectFileName>
-      <ProgramDataBaseFileName>$(IntDir)menu_motion.pdb</ProgramDataBaseFileName>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\animation\easing.hpp" />
-    <ClInclude Include="src\pch.hpp" />
-    <ClInclude Include="src\pch.h" />
-    <ClInclude Include="src\common\debug_log.hpp" />
-    <ClInclude Include="src\animation\geometry.hpp" />
     <ClInclude Include="src\animation\genie_mesh.hpp" />
+    <ClInclude Include="src\animation\geometry.hpp" />
     <ClInclude Include="src\app\application.hpp" />
-    <ClInclude Include="src\app\settings_store.hpp" />
-    <ClInclude Include="src\app\startup_manager.hpp" />
+    <ClInclude Include="src\app\application_runtime.hpp" />
+    <ClInclude Include="src\app\message_loop.hpp" />
     <ClInclude Include="src\app\resource.hpp" />
-    <ClInclude Include="src\app\settings_ui_theme.hpp" />
-    <ClInclude Include="src\app\settings_ui_widgets.hpp" />
-    <ClInclude Include="src\app\settings_window.hpp" />
-    <ClInclude Include="src\platform\native_animation_blocker.hpp" />
-    <ClInclude Include="src\platform\taskbar_target_provider.hpp" />
-    <ClInclude Include="src\platform\window_event_monitor.hpp" />
-    <ClInclude Include="src\platform\window_util.hpp" />
+    <ClInclude Include="src\app\session_state_store.hpp" />
+    <ClInclude Include="src\core\embedded_resource.hpp" />
+    <ClInclude Include="src\core\environment.hpp" />
+    <ClInclude Include="src\core\logger.hpp" />
+    <ClInclude Include="src\features\animation_configuration.hpp" />
+    <ClInclude Include="src\features\diagnostics_service.hpp" />
+    <ClInclude Include="src\features\effect_controller.hpp" />
+    <ClInclude Include="src\features\effect_policy.hpp" />
+    <ClInclude Include="src\features\hotkey_controller.hpp" />
+    <ClInclude Include="src\features\minimize_feature.hpp" />
+    <ClInclude Include="src\features\pause_controller.hpp" />
+    <ClInclude Include="src\features\restore_feature.hpp" />
+    <ClInclude Include="src\features\settings_mutation_service.hpp" />
+    <ClInclude Include="src\features\window_recovery_service.hpp" />
+    <ClInclude Include="src\pch.h" />
+    <ClInclude Include="src\pch.hpp" />
+    <ClInclude Include="src\platform\windows\app_container_permissions.hpp" />
+    <ClInclude Include="src\platform\windows\cbt_hook_manager.hpp" />
+    <ClInclude Include="src\platform\windows\display_info.hpp" />
+    <ClInclude Include="src\platform\windows\global_hotkey_manager.hpp" />
+    <ClInclude Include="src\platform\windows\native_animation_blocker.hpp" />
+    <ClInclude Include="src\platform\windows\power_status.hpp" />
+    <ClInclude Include="src\platform\windows\process_info.hpp" />
+    <ClInclude Include="src\platform\windows\process_runtime.hpp" />
+    <ClInclude Include="src\platform\windows\single_instance_guard.hpp" />
+    <ClInclude Include="src\platform\windows\startup_manager.hpp" />
+    <ClInclude Include="src\platform\windows\taskbar_locator.hpp" />
+    <ClInclude Include="src\platform\windows\taskbar_target_provider.hpp" />
+    <ClInclude Include="src\platform\windows\window_diagnostics.hpp" />
+    <ClInclude Include="src\platform\windows\window_event_monitor.hpp" />
+    <ClInclude Include="src\platform\windows\window_properties.hpp" />
+    <ClInclude Include="src\platform\windows\window_state.hpp" />
+    <ClInclude Include="src\rendering\animation_renderer.hpp" />
+    <ClInclude Include="src\rendering\capture_geometry.hpp" />
     <ClInclude Include="src\rendering\d3d_device.hpp" />
     <ClInclude Include="src\rendering\desktop_capture.hpp" />
+    <ClInclude Include="src\rendering\desktop_duplication_session.hpp" />
+    <ClInclude Include="src\rendering\overlay_renderer.hpp" />
     <ClInclude Include="src\rendering\overlay_window.hpp" />
-    <ClInclude Include="src\menu\motion\motion.hpp" />
-    <ClInclude Include="src\menu\motion\motion_context.hpp" />
-    <ClInclude Include="src\menu\motion\motion_tokens.hpp" />
-    <ClInclude Include="src\menu\theme.hpp" />
+    <ClInclude Include="src\rendering\window_capture_mask.hpp" />
+    <ClInclude Include="src\runtime\animation_run.hpp" />
+    <ClInclude Include="src\runtime\animation_run_pool.hpp" />
+    <ClInclude Include="src\runtime\frame_scheduler.hpp" />
+    <ClInclude Include="src\runtime\renderer_recovery.hpp" />
+    <ClInclude Include="src\runtime\run_state.hpp" />
+    <ClInclude Include="src\runtime\snapshot_cache.hpp" />
+    <ClInclude Include="src\settings\app_settings.hpp" />
+    <ClInclude Include="src\settings\exclusion_rules.hpp" />
+    <ClInclude Include="src\settings\hotkey_binding.hpp" />
+    <ClInclude Include="src\settings\settings_repository.hpp" />
+    <ClInclude Include="src\settings\settings_serializer.hpp" />
+    <ClInclude Include="src\settings\settings_service.hpp" />
+    <ClInclude Include="src\settings\settings_validator.hpp" />
+    <ClInclude Include="src\ui\animation_preview.hpp" />
+    <ClInclude Include="src\ui\application_list_provider.hpp" />
+    <ClInclude Include="src\ui\components\combo.hpp" />
+    <ClInclude Include="src\ui\components\component_helpers.hpp" />
+    <ClInclude Include="src\ui\components\controls.hpp" />
+    <ClInclude Include="src\ui\components\easing_editor.hpp" />
+    <ClInclude Include="src\ui\components\page_layout.hpp" />
+    <ClInclude Include="src\ui\hotkey_presenter.hpp" />
+    <ClInclude Include="src\ui\motion\motion.hpp" />
+    <ClInclude Include="src\ui\motion\motion_context.hpp" />
+    <ClInclude Include="src\ui\motion\motion_tokens.hpp" />
+    <ClInclude Include="src\ui\pages\about_page.hpp" />
+    <ClInclude Include="src\ui\pages\animation_page.hpp" />
+    <ClInclude Include="src\ui\pages\applications_page.hpp" />
+    <ClInclude Include="src\ui\pages\diagnostics_page.hpp" />
+    <ClInclude Include="src\ui\pages\general_page.hpp" />
+    <ClInclude Include="src\ui\pages\hotkeys_page.hpp" />
+    <ClInclude Include="src\ui\pages\windows_integration_page.hpp" />
+    <ClInclude Include="src\ui\rendering\imgui_renderer.hpp" />
+    <ClInclude Include="src\ui\settings_actions.hpp" />
+    <ClInclude Include="src\ui\settings_controller.hpp" />
+    <ClInclude Include="src\ui\settings_shell.hpp" />
+    <ClInclude Include="src\ui\settings_view_model.hpp" />
+    <ClInclude Include="src\ui\settings_window.hpp" />
+    <ClInclude Include="src\ui\theme\theme.hpp" />
+    <ClInclude Include="src\ui\theme\theme_tokens.hpp" />
+    <ClInclude Include="src\ui\tray_icon.hpp" />
     <ClInclude Include="third_party\imgui\backends\imgui_impl_dx11.h" />
     <ClInclude Include="third_party\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="third_party\imgui\imconfig.h" />

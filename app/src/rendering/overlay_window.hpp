@@ -10,8 +10,10 @@
 
 #include "animation/easing.hpp"
 #include "animation/genie_mesh.hpp"
+#include "rendering/animation_renderer.hpp"
 #include "rendering/d3d_device.hpp"
 #include "rendering/desktop_capture.hpp"
+#include "rendering/overlay_renderer.hpp"
 
 namespace genie::rendering {
 
@@ -30,26 +32,26 @@ public:
                   RestoreCallback restore_callback);
   void Shutdown();
   void SetAnimationDuration(float duration_seconds) {
-    animation_duration_seconds_ = duration_seconds;
+    animation_renderer_.SetDuration(duration_seconds);
   }
   void SetAnimationEasing(genie::animation::EasingCurve easing,
                           genie::animation::CubicBezier custom = {}) {
-    animation_easing_ = easing;
-    animation_custom_bezier_ = custom;
-    animation_custom_bezier_.ClampHandles();
+    animation_renderer_.SetEasing(easing, custom);
   }
-  void SetAnimationStyle(genie::animation::AnimationStyle style) { animation_style_ = style; }
+  void SetAnimationStyle(genie::animation::AnimationStyle style) {
+    animation_renderer_.SetStyle(style);
+  }
   void SetMeshSegmentCount(int segment_count) {
-    mesh_generator_.SetLongGridSegmentCount(segment_count);
+    animation_renderer_.SetMeshSegmentCount(segment_count);
   }
-  void SetGenieStrength(float strength) { genie_strength_ = strength; }
-  void SetFadeStrength(float strength) { fade_strength_ = strength; }
+  void SetGenieStrength(float strength) { animation_renderer_.SetGenieStrength(strength); }
+  void SetFadeStrength(float strength) { animation_renderer_.SetFadeStrength(strength); }
   void SetTargetIndicatorEnabled(bool enabled) { target_indicator_enabled_ = enabled; }
 
   [[nodiscard]] HWND window() const { return window_; }
-  [[nodiscard]] bool active() const { return animation_state_.active; }
-  [[nodiscard]] bool clock_started() const { return animation_state_.clock_started; }
-  [[nodiscard]] bool device_lost() const { return device_lost_; }
+  [[nodiscard]] bool active() const { return animation_renderer_.active(); }
+  [[nodiscard]] bool clock_started() const { return animation_renderer_.clock_started(); }
+  [[nodiscard]] bool device_lost() const { return device_lost_ || overlay_renderer_.device_lost(); }
 
   [[nodiscard]] bool StartAnimation(CapturedTexture captured_texture,
                                     const genie::animation::RectF& source_screen_rect,
@@ -62,32 +64,12 @@ public:
   bool Tick();
   void CancelAnimation();
   void FinishRestoreAnimation();
-  [[nodiscard]] bool restoring() const {
-    return animation_state_.active && animation_state_.target_progress < animation_state_.progress;
-  }
+  [[nodiscard]] bool restoring() const { return animation_renderer_.restoring(); }
   [[nodiscard]] CapturedTexture* mutable_captured_texture() {
-    return &animation_state_.captured_texture;
+    return animation_renderer_.mutable_texture();
   }
 
 private:
-  struct AnimationState {
-    bool active = false;
-    CapturedTexture captured_texture;
-    genie::animation::RectF source_rect;
-    genie::animation::RectF target_rect;
-    genie::animation::GenieEdge edge = genie::animation::GenieEdge::kBottom;
-    std::chrono::steady_clock::time_point last_tick_time;
-    float progress = 0.0f;
-    float target_progress = 1.0f;
-    float duration_seconds = 0.70f;
-    genie::animation::EasingCurve easing = genie::animation::EasingCurve::kLinear;
-    genie::animation::CubicBezier custom_bezier = genie::animation::CubicBezier::EaseInOut();
-    genie::animation::AnimationStyle style = genie::animation::AnimationStyle::kClassic;
-    float genie_strength = 1.0f;
-    float fade_strength = 0.0f;
-    bool clock_started = false;
-  };
-
   static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM w_param, LPARAM l_param);
   LRESULT HandleMessage(HWND hwnd, UINT message, WPARAM w_param, LPARAM l_param);
 
@@ -97,10 +79,6 @@ private:
   bool CreateRenderTarget();
   bool ResizeOverlaySurface(const RECT& screen_rect);
   void ApplyVisibleOverlayRegion(HWND taskbar_window);
-  bool CreateRenderResources();
-  bool CompileShaders();
-  bool UploadMesh(const genie::animation::GenieMesh& mesh, bool upload_indices);
-  bool UpdateFrameConstants(float rendered_progress);
   [[nodiscard]] bool Render(float progress);
   void ClearFrame();
   void HideOverlay();
@@ -123,29 +101,10 @@ private:
   Microsoft::WRL::ComPtr<IDCompositionDevice> composition_device_;
   Microsoft::WRL::ComPtr<IDCompositionTarget> composition_target_;
   Microsoft::WRL::ComPtr<IDCompositionVisual> composition_visual_;
-  Microsoft::WRL::ComPtr<ID3D11VertexShader> vertex_shader_;
-  Microsoft::WRL::ComPtr<ID3D11PixelShader> pixel_shader_;
-  Microsoft::WRL::ComPtr<ID3D11InputLayout> input_layout_;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> vertex_buffer_;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> index_buffer_;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> constant_buffer_;
-  Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_state_;
-  Microsoft::WRL::ComPtr<ID3D11BlendState> blend_state_;
-  Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizer_state_;
-
-  UINT index_count_ = 0;
-  AnimationState animation_state_;
-  genie::animation::GenieMeshGenerator mesh_generator_;
-  genie::animation::GenieMesh reusable_mesh_;
+  AnimationRenderer animation_renderer_;
+  OverlayRenderer overlay_renderer_;
   MinimizeCallback minimize_callback_;
   RestoreCallback restore_callback_;
-  float animation_duration_seconds_ = 0.70f;
-  genie::animation::EasingCurve animation_easing_ = genie::animation::EasingCurve::kLinear;
-  genie::animation::CubicBezier animation_custom_bezier_ =
-      genie::animation::CubicBezier::EaseInOut();
-  genie::animation::AnimationStyle animation_style_ = genie::animation::AnimationStyle::kClassic;
-  float genie_strength_ = 1.0f;
-  float fade_strength_ = 0.0f;
   bool target_indicator_enabled_ = false;
   std::chrono::steady_clock::time_point target_indicator_hide_time_{};
   UINT minimize_attempt_message_ = 0;

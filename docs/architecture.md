@@ -1,54 +1,87 @@
-# Windows 11 Genie Minimize Effect
+# Genie Effect architecture
 
-This project is a native Windows 11 prototype for replacing the visible minimize
-transition with a GPU-rendered Genie-style mesh animation.
+Genie Effect is a native Windows application that replaces the visible
+minimize/restore transition with a Direct3D 11 mesh animation. Windows has no
+documented “replace DWM animation” API, so shell integration is isolated behind
+Windows adapters and restored during every cleanup path.
 
-## Public API boundary
+## Dependency direction
 
-Windows does not expose a documented API that says "replace this DWM minimize
-animation before the compositor starts it." The implementation therefore uses
-the strongest public API path:
+Dependencies point inward:
 
-- `SetWinEventHook(EVENT_SYSTEM_MINIMIZESTART)` detects the minimize event.
-- `DwmSetWindowAttribute(DWMWA_TRANSITIONS_FORCEDISABLED)` is applied to
-  top-level windows.
-- `SystemParametersInfo(SPI_SETANIMATION)` disables the classic shell window
-  animation while the process is running, then restores the previous setting on
-  exit.
-- DXGI Desktop Duplication captures the visible desktop region directly into an
-  `ID3D11Texture2D`.
-- DirectComposition hosts a transparent topmost overlay backed by a D3D11 swap
-  chain.
-- A D3D11 textured mesh renders the Genie deformation.
-
-For a production-grade, perfectly pre-DWM replacement, the missing layer is an
-invasive shell/DWM interception component. This scaffold keeps that boundary
-isolated behind `platform/native_animation_blocker.*` and
-`platform/window_event_monitor.*`.
-
-## Folder layout
-
-- `app/src/app`: application orchestration and message loop.
-- `app/src/animation`: platform-independent Genie mesh math.
-- `app/src/platform`: Win32, DWM, shell taskbar, and event monitoring.
-- `app/src/rendering`: Direct3D 11, DXGI capture, DirectComposition overlay.
-- `app/shaders`: HLSL reference shader source.
-- `hook`: the separate CBT hook DLL project.
-
-## Custom taskbar target
-
-By default the target rectangle is derived from `SHAppBarMessage` and points at
-the Windows taskbar. A custom taskbar can set:
-
-```powershell
-$env:GENIE_TASKBAR_RECT = "100,980,1820,1070"
+```text
+main -> app composition -> features/runtime/ui -> rendering/platform/settings -> core/animation
 ```
 
-The format is `left,top,right,bottom` in physical screen coordinates.
+- `core/`: logging, environment access, and embedded resources.
+- `animation/`: geometry, easing, and mesh generation.
+- `settings/`: model, validation, serialization, repository, and service.
+- `platform/windows/`: focused Win32, DWM, shell, power, display, hook,
+  process, startup, session, and process-lifetime adapters.
+- `rendering/`: D3D device, desktop duplication/capture, animation renderer,
+  overlay renderer, and overlay HWND/DirectComposition host.
+- `runtime/`: animation runs and states, snapshots, frame scheduling, renderer
+  recovery, and per-frame runtime coordination.
+- `features/`: policy, minimize, restore, pause, diagnostics, settings
+  mutations, hotkeys, animation configuration, and window recovery.
+- `ui/`: settings host, ImGui renderer, shell, controller/view model, tray,
+  preview, pages, components, motion, and theme.
+- `app/`: composition/lifecycle and the callback-driven message loop.
 
-## Reference
+`third_party/` remains vendor-owned and is not modified by first-party work.
 
-The animation timing and mesh-shaping logic are adapted from Harshil Shah's
-MIT-licensed `Genie` SpriteKit playground:
+## Ownership and state
 
-https://github.com/HarshilShah/Genie
+`Application` is a small composition root. Dependencies are constructed in
+declaration order and destroyed in reverse order. `CleanupAndRestoreAll` is
+idempotent and shared by normal shutdown, failed initialization, cancellation,
+timeouts, and renderer failure.
+
+Each animation occupies one `AnimationRun` from `AnimationRunPool`. `RunState`
+validates transitions. A run owns its overlay and transient window/capture
+state; shared pre-minimize and restore snapshots live in `SnapshotCache`.
+
+The settings UI uses one `SettingsActions` boundary. Pages own presentation
+only through `SettingsViewModel`; settings persistence remains outside UI.
+
+## Minimize and restore
+
+```text
+WinEvent/CBT observation
+  -> EffectController policy decision
+  -> MinimizeFeature or RestoreFeature transaction
+  -> capture + AnimationConfiguration
+  -> AnimationRun state transition
+  -> OverlayWindow / AnimationRenderer
+  -> shared completion or abort cleanup
+```
+
+`EffectPolicy` combines enabled state, temporary pause, fullscreen and
+battery-saver suppression, safe mode, and executable exclusions. Minimize and
+restore use explicit transaction contexts so partially completed work restores
+native window state.
+
+## Rendering and recovery
+
+Animation and settings have separate rendering paths. `AnimationRenderer` and
+`OverlayRenderer` render the captured mesh. `ImguiRenderer` owns the settings
+swap chain, ImGui backends, fonts, DPI rebuilds, resize handling, and
+device-loss recovery.
+
+Desktop Duplication is isolated in `DesktopDuplicationSession`. Device removal
+is surfaced to `RendererRecovery`, which applies bounded retry/backoff. Active
+runs enter the shared abort/cleanup path before graphics resources are rebuilt.
+
+## Windows boundary
+
+The documented integration path uses WinEvent plus the separate CBT hook DLL,
+per-window DWM transition suppression, temporary system-animation suppression,
+DXGI Desktop Duplication, and a DirectComposition overlay.
+
+`SingleInstanceGuard` owns the mutex and existing-instance activation.
+`ProcessRuntime` owns DPI awareness, COM lifetime, and console-control shutdown
+routing. `main.cpp` only coordinates these program-entry concerns.
+
+`GENIE_TASKBAR_RECT=left,top,right,bottom` overrides shell target discovery in
+physical screen coordinates. Parsing and target selection remain isolated in
+the taskbar provider.

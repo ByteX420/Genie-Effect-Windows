@@ -1,0 +1,325 @@
+#include "pch.hpp"
+
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cstring>
+#include <iostream>
+#include <string_view>
+
+#include "app/application_runtime.hpp"
+#include "core/environment.hpp"
+#include "core/logger.hpp"
+#include "platform/windows/app_container_permissions.hpp"
+#include "platform/windows/display_info.hpp"
+#include "platform/windows/power_status.hpp"
+#include "platform/windows/process_info.hpp"
+#include "platform/windows/startup_manager.hpp"
+#include "platform/windows/window_diagnostics.hpp"
+#include "platform/windows/window_properties.hpp"
+#include "platform/windows/window_state.hpp"
+#include "settings/exclusion_rules.hpp"
+
+namespace genie::app {
+
+int ApplicationRuntime::FindRunForWindow(HWND window) const {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (runs_[i].animating_window == window) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int ApplicationRuntime::FindAvailableRun() {
+  for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
+    if (runs_[i].state == runtime::RunState::kIdle && runs_[i].animating_window == nullptr &&
+        !runs_[i].overlay.active()) {
+      return i;
+    }
+  }
+  runtime::AnimationRun& first_run = runs_.Add();
+  if (!InitializeRun(first_run)) {
+    runs_.RemoveLast();
+    return -1;
+  }
+  return static_cast<int>(runs_.size() - 1);
+}
+
+bool ApplicationRuntime::IsOverlayWindow(HWND window) const {
+  return std::any_of(runs_.begin(), runs_.end(), [window](const runtime::AnimationRun& slot) {
+    return slot.overlay.window() == window;
+  });
+}
+
+bool ApplicationRuntime::InitializeRun(runtime::AnimationRun& slot) {
+  if (!slot.overlay.Initialize(
+          instance_, d3d_device_.get(), [this](HWND window) { return OnMinimizeStart(window); },
+          [this](HWND window) { return OnRestoreAttempt(window); })) {
+    return false;
+  }
+  slot.overlay.SetAnimationDuration(settings_service_.Get().minimize_duration);
+  slot.state = runtime::RunState::kIdle;
+  slot.state_entered_ms = GetTickCount64();
+  return true;
+}
+
+void ApplicationRuntime::SetRunState(int run_index, runtime::RunState state) {
+  if (run_index < 0 || run_index >= static_cast<int>(runs_.size())) return;
+  const runtime::RunState previous = runs_[run_index].state;
+  if (!runtime::IsRunStateTransitionAllowed(previous, state)) {
+    genie::core::LogDebug(
+        L"Runtime",
+        L"Rejected run-state transition " +
+            std::wstring(
+                runtime::RunStateName(previous),
+                runtime::RunStateName(previous) + std::strlen(runtime::RunStateName(previous))) +
+            L" -> " +
+            std::wstring(runtime::RunStateName(state),
+                         runtime::RunStateName(state) + std::strlen(runtime::RunStateName(state))));
+    return;
+  }
+  genie::core::LogTrace(
+      L"Runtime",
+      L"Run " + std::to_wstring(run_index) + L" state " +
+          std::wstring(
+              runtime::RunStateName(previous),
+              runtime::RunStateName(previous) + std::strlen(runtime::RunStateName(previous))) +
+          L" -> " +
+          std::wstring(runtime::RunStateName(state),
+                       runtime::RunStateName(state) + std::strlen(runtime::RunStateName(state))));
+  runs_[run_index].state = state;
+  runs_[run_index].state_entered_ms = GetTickCount64();
+}
+
+void ApplicationRuntime::CleanupRun(int run_index, RunCleanupOutcome outcome) {
+  if (run_index < 0 || run_index >= static_cast<int>(runs_.size())) return;
+  runtime::AnimationRun& slot = runs_[run_index];
+  HWND window = slot.animating_window != nullptr ? slot.animating_window
+                                                 : slot.pending_native_minimize_window;
+  const bool was_restoring = slot.animating_restore;
+  const bool native_minimize_pending = slot.pending_native_minimize_window == window;
+
+  if (outcome == RunCleanupOutcome::kAborted && slot.state != runtime::RunState::kIdle) {
+    SetRunState(run_index, runtime::RunState::kAborting);
+  }
+  if (slot.state != runtime::RunState::kIdle) {
+    SetRunState(run_index, runtime::RunState::kCleaningUp);
+  }
+
+  // Detach first: restoring or showing the real window can synchronously re-enter event handlers.
+  slot.animating_window = nullptr;
+  slot.pending_native_minimize_window = nullptr;
+  slot.animating_restore = false;
+  slot.live_animation_capture_enabled = false;
+
+  if (window != nullptr && IsWindow(window)) {
+    if (outcome == RunCleanupOutcome::kAborted) {
+      if (was_restoring) {
+        restore_feature_.Cancel(window, true);
+      } else {
+        minimize_feature_.Cancel(window);
+      }
+      snapshot_cache_.Restore().erase(window);
+      snapshot_cache_.PreMinimize().erase(window);
+    } else if (was_restoring) {
+      restore_feature_.Complete(window);
+      RestoreWindowFromGenieState(window);
+      slot.overlay.FinishRestoreAnimation();
+      snapshot_cache_.Restore().erase(window);
+      std::wcout << L"Restore animation completed.\n";
+    } else {
+      minimize_feature_.Complete(window);
+      if (native_minimize_pending) {
+        SetPropW(window, platform::windows::properties::kAllowMinimize,
+                 reinterpret_cast<HANDLE>(1));
+        ShowWindow(window, SW_MINIMIZE);
+        RemovePropW(window, platform::windows::properties::kAllowMinimize);
+      }
+      RemovePropW(window, platform::windows::properties::kAllowMinimize);
+      HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
+      (void)platform::SetOwnedWindowRegion(window, hidden_region, true);
+      std::wcout << L"Minimize animation completed.\n";
+    }
+  } else {
+    snapshot_cache_.Restore().erase(window);
+    snapshot_cache_.PreMinimize().erase(window);
+  }
+
+  if (slot.overlay.active()) slot.overlay.CancelAnimation();
+  slot.animation_monitor = nullptr;
+  slot.animation_frame_interval = std::chrono::steady_clock::duration::zero();
+  SetRunState(run_index, runtime::RunState::kIdle);
+
+  const bool any_active =
+      std::any_of(runs_.begin(), runs_.end(),
+                  [](const runtime::AnimationRun& run) { return run.overlay.active(); });
+  if (!any_active) {
+    frame_scheduler_.EndFallbackTimerResolution();
+    frame_scheduler_.Wake();
+  }
+}
+
+void ApplicationRuntime::CheckAnimationTimeouts() {
+  const ULONGLONG now = GetTickCount64();
+  for (int index = 0; index < static_cast<int>(runs_.size()); ++index) {
+    runtime::AnimationRun& slot = runs_[index];
+    if (slot.state == runtime::RunState::kIdle) continue;
+    ULONGLONG timeout_ms = 10000;
+    if (slot.state == runtime::RunState::kCapturing) timeout_ms = 2500;
+    if (slot.state == runtime::RunState::kWaitingForNativeMinimize) timeout_ms = 2000;
+    if (slot.state == runtime::RunState::kAborting ||
+        slot.state == runtime::RunState::kCleaningUp) {
+      timeout_ms = 1500;
+    }
+    const ULONGLONG elapsed = now - slot.state_entered_ms;
+    if (elapsed <= timeout_ms) continue;
+
+    HWND window = slot.animating_window != nullptr ? slot.animating_window
+                                                   : slot.pending_native_minimize_window;
+    wchar_t title[128]{};
+    if (window != nullptr) GetWindowTextW(window, title, 128);
+    genie::core::LogDebug(
+        L"Watchdog", L"Aborting stuck animation=" + std::to_wstring(index) + L" state=" +
+                         std::wstring(runtime::RunStateName(slot.state),
+                                      runtime::RunStateName(slot.state) +
+                                          std::strlen(runtime::RunStateName(slot.state))) +
+                         L" elapsed_ms=" + std::to_wstring(elapsed) + L" hwnd=" +
+                         std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) + L" title=\"" +
+                         title + L"\"");
+    CleanupRun(index, RunCleanupOutcome::kAborted);
+  }
+}
+
+HWND ApplicationRuntime::GetOverlayWindow() const {
+  return runs_.empty() ? nullptr : runs_[0].overlay.window();
+}
+
+bool ApplicationRuntime::OnMinimizeStart(HWND window) {
+  const features::RenderingPressure pressure = GetRenderingPressure();
+  return minimize_feature_.Execute(
+      window,
+      features::MinimizeExecutionContext{
+          .overlay = GetOverlayWindow(),
+          .effect_active = IsEffectActive(),
+          .renderer_recovering = renderer_recovery_.pending(),
+          .shutting_down = shutting_down_.load(std::memory_order_acquire),
+          .capture = desktop_capture_.get(),
+          .taskbar_targets = &taskbar_target_provider_,
+          .animation_blocker = &native_animation_blocker_,
+          .animation_configuration = &animation_configuration_,
+          .rendering_pressure = &pressure,
+          .find_run = [this](HWND target) { return FindRunForWindow(target); },
+          .find_available_run = [this] { return FindAvailableRun(); },
+          .set_state = [this](int index, runtime::RunState state) { SetRunState(index, state); },
+          .reset_frame_pacing =
+              [this](int index, HWND target, const RECT& bounds) {
+                ResetAnimationFramePacing(index, target, bounds);
+              },
+          .abort_run = [this](int index) { CleanupRun(index, RunCleanupOutcome::kAborted); },
+          .complete_restore = [this](HWND target) { restore_feature_.Complete(target); },
+          .record_capture_duration =
+              [this](float duration_ms) { last_capture_duration_ms_ = duration_ms; },
+      });
+}
+
+void ApplicationRuntime::FinishActiveAnimation(int run_index) {
+  if (run_index < 0 || run_index >= static_cast<int>(runs_.size())) return;
+  CleanupRun(run_index, RunCleanupOutcome::kCompleted);
+  DwmFlush();
+}
+
+bool ApplicationRuntime::OnRestoreAttempt(HWND window) {
+  const features::RenderingPressure pressure = GetRenderingPressure();
+  return restore_feature_.Execute(
+      window,
+      features::RestoreExecutionContext{
+          .overlay = GetOverlayWindow(),
+          .effect_active = IsEffectActive(),
+          .renderer_recovering = renderer_recovery_.pending(),
+          .shutting_down = shutting_down_.load(std::memory_order_acquire),
+          .animation_blocker = &native_animation_blocker_,
+          .animation_configuration = &animation_configuration_,
+          .rendering_pressure = &pressure,
+          .find_run = [this](HWND target) { return FindRunForWindow(target); },
+          .find_available_run = [this] { return FindAvailableRun(); },
+          .set_state = [this](int index, runtime::RunState state) { SetRunState(index, state); },
+          .reset_frame_pacing =
+              [this](int index, HWND target, const RECT& bounds) {
+                ResetAnimationFramePacing(index, target, bounds);
+              },
+          .finish_run = [this](int index) { FinishActiveAnimation(index); },
+          .abort_run = [this](int index) { CleanupRun(index, RunCleanupOutcome::kAborted); },
+      });
+}
+
+void ApplicationRuntime::RestoreWindowFromGenieState(HWND window, bool force_show_if_iconic) {
+  window_recovery_service_.Restore(window, force_show_if_iconic);
+}
+
+void ApplicationRuntime::HealLeftoverWindows() {
+  const std::size_t repaired_count = window_recovery_service_.HealLeftovers();
+  startup_repair_status_ = repaired_count == 0
+                               ? "No issues found"
+                               : std::to_string(repaired_count) + " window(s) repaired";
+  genie::core::LogDebug(L"App", L"Startup repair result: " + std::to_wstring(repaired_count) +
+                                    L" suspicious window(s) repaired");
+}
+
+void ApplicationRuntime::CleanupAndRestoreAll() {
+  if (cleaned_up_.exchange(true, std::memory_order_acq_rel)) {
+    return;
+  }
+
+  // Signal the main loop and all event handlers to stop immediately.
+  shutting_down_.store(true, std::memory_order_release);
+
+  genie::core::LogDebug(L"App", L"CleanupAndRestoreAll starting");
+  UnregisterAllHotkeys();
+  effect_controller_.Stop();
+  cbt_hook_manager_.Uninstall();
+  native_animation_blocker_.Disable();
+
+  // Post WM_QUIT so the main message loop exits if it's still running.
+  if (GetOverlayWindow() != nullptr) {
+    PostMessageW(GetOverlayWindow(), WM_CLOSE, 0, 0);
+  }
+
+  for (int index = 0; index < static_cast<int>(runs_.size()); ++index) {
+    runtime::AnimationRun& run = runs_[index];
+    if (run.animating_window != nullptr || run.pending_native_minimize_window != nullptr ||
+        run.overlay.active()) {
+      CleanupRun(index, RunCleanupOutcome::kAborted);
+    }
+  }
+  minimize_feature_.CancelAll();
+  restore_feature_.CancelAll();
+  runtime::SnapshotCache::Contents snapshots = snapshot_cache_.TakeAll();
+
+  window_recovery_service_.HealUntrackedWindows();
+
+  // Also restore any tracked windows from our maps.
+  for (const auto& [hwnd, snapshot] : snapshots.restore) {
+    RestoreWindowFromGenieState(hwnd);
+  }
+  for (const auto& [hwnd, snapshot] : snapshots.pre_minimize) {
+    RestoreWindowFromGenieState(hwnd);
+  }
+
+  runs_.ShutdownOverlays();
+  settings_window_.Shutdown();
+  desktop_capture_.reset();
+  d3d_device_.reset();
+  frame_scheduler_.EndFallbackTimerResolution();
+  frame_scheduler_.Wake();
+  if (session_started_) {
+    if (!session_state_store_.Write("clean")) {
+      genie::core::LogDebug(L"SafeMode", L"Failed to write the clean session marker");
+    }
+    session_started_ = false;
+  }
+  genie::core::LogDebug(L"App", L"CleanupAndRestoreAll completed");
+}
+
+}  // namespace genie::app

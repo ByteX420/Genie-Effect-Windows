@@ -155,29 +155,24 @@ Debug builds write diagnostics to:
 
 ```text
 Genie-Effect-Windows/
-├── GenieEffect.slnx              # Solution
-├── app/
-│   ├── GenieEffect.vcxproj       # Main app
-│   ├── assets/fonts/             # Inter (OFL)
-│   ├── shaders/                  # HLSL (genie mesh reference)
-│   ├── src/
-│   │   ├── animation/            # Mesh math, easing (platform-independent)
-│   │   ├── app/                  # Application, settings UI, store, startup
-│   │   ├── common/               # Shared helpers (logging)
-│   │   ├── menu/                 # Motion system + UI theme tokens
-│   │   ├── platform/             # Win32, DWM, taskbar, hooks helpers
-│   │   └── rendering/            # D3D11, capture, overlay
-│   └── third_party/
-│       ├── imgui/                # Dear ImGui + Win32/DX11 backends
-│       └── freetype/             # Headers + static lib for crisp UI text
-├── hook/
-│   ├── GenieHook.vcxproj
-│   └── hook.cpp                  # CBT hook DLL
-├── docs/
-│   └── architecture.md           # Technical boundary & design notes
-├── build/                        # Local build outputs (not source of truth)
-├── .clang-format                 # Google-based C++ style
-└── LICENSE.txt
+|-- GenieEffect.slnx
+|-- app/
+|   |-- GenieEffect.vcxproj
+|   |-- assets/fonts/
+|   |-- shaders/
+|   |-- src/
+|   |   |-- animation/          # Pure mesh geometry and easing
+|   |   |-- app/                # Composition, lifecycle, message loop
+|   |   |-- core/               # Logging, environment, resources
+|   |   |-- features/           # Product policy and use cases
+|   |   |-- platform/windows/   # Focused Win32/DWM/shell adapters
+|   |   |-- rendering/          # Capture and GPU rendering
+|   |   |-- runtime/            # Runs, state, pacing, recovery
+|   |   |-- settings/           # Validation and persistence
+|   |   `-- ui/                 # Host, pages, components, motion
+|   `-- third_party/            # ImGui and FreeType
+|-- hook/                       # Separate CBT hook DLL
+|-- docs/
 ```
 
 ### Code style
@@ -197,12 +192,16 @@ Get-ChildItem app\src, hook -Recurse -Include *.cpp,*.hpp,*.h |
 
 | Layer | Responsibility |
 | --- | --- |
-| `animation/` | Pure Genie mesh / geometry / easing — no Win32 |
-| `platform/` | Window events, native animation blocker, taskbar rect |
-| `rendering/` | Device, desktop capture, overlay window |
-| `app/` | Lifetime, settings persistence, ImGui shell |
-| `menu/motion/` | Shared spring/timed motion for UI chrome |
-| `hook/` | Separate DLL; keep the app/DLL boundary clean |
+| `core/` | Logging, environment flags, embedded resources |
+| `animation/` | Pure mesh, geometry, and easing |
+| `platform/windows/` | Window events, DWM, hooks, process/shell adapters |
+| `rendering/` | Device, desktop duplication, mesh and overlay rendering |
+| `settings/` | Model, validation, serializer, repository, service |
+| `runtime/` | Runs, state machine, pacing, snapshots, recovery |
+| `features/` | Policy, minimize/restore, pause, diagnostics, recovery |
+| `ui/` | Win32 host, ImGui renderer, shell, pages, components |
+| `app/` | Composition root, lifecycle, message loop |
+| `hook/` | Separate CBT DLL and stable app/DLL boundary |
 
 **Important limitations (by design):**
 

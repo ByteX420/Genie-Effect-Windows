@@ -59,6 +59,12 @@ void AppendCellIndices(int rows, int columns, std::vector<std::uint16_t>* indice
 
 }  // namespace
 
+void GenieMeshGenerator::SetStrength(float strength) { strength_ = strength; }
+
+void GenieMeshGenerator::SetLongGridSegmentCount(int segment_count) {
+  long_grid_segment_count_ = std::clamp(segment_count, 2, 100);
+}
+
 bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& target_rect,
                                       GenieEdge edge, GenieDirection direction,
                                       AnimationStyle style, float progress, float viewport_height,

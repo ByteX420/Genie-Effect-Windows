@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -40,10 +39,9 @@ struct GenieMesh {
 
 class GenieMeshGenerator {
 public:
-  void SetStrength(float strength) { strength_ = strength; }
-  void SetLongGridSegmentCount(int segment_count) {
-    long_grid_segment_count_ = std::clamp(segment_count, 2, 100);
-  }
+  void SetStrength(float strength);
+  void SetLongGridSegmentCount(int segment_count);
+
   // Returns true when the index layout changed and must be uploaded again.
   bool GenerateInto(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
                     GenieDirection direction, AnimationStyle style, float progress,

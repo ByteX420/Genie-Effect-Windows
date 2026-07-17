@@ -1,0 +1,78 @@
+#include "pch.hpp"
+
+#include "features/window_recovery_service.hpp"
+
+#include <cstdint>
+#include <utility>
+
+#include "core/logger.hpp"
+#include "platform/windows/window_properties.hpp"
+#include "platform/windows/window_state.hpp"
+#include "runtime/snapshot_cache.hpp"
+
+namespace genie::features {
+
+WindowRecoveryService::WindowRecoveryService(runtime::SnapshotCache& snapshots)
+    : snapshots_(snapshots) {}
+
+void WindowRecoveryService::Restore(HWND window, bool force_show_if_iconic) {
+  if (!IsWindow(window)) return;
+  restoring_ = true;
+
+  (void)platform::SetOwnedWindowRegion(window, nullptr, true);
+  const runtime::CachedSnapshot* snapshot = snapshots_.FindBest(window);
+  const bool was_maximized =
+      snapshot != nullptr
+          ? snapshot->was_maximized
+          : GetPropW(window, platform::windows::properties::kWasMaximized) != nullptr;
+
+  platform::SetWindowCloaked(window, false);
+  platform::windows::properties::RestoreTransparency(window);
+  platform::windows::properties::ClearGenieState(window);
+
+  if (IsIconic(window) == FALSE || force_show_if_iconic) {
+    SetPropW(window, platform::windows::properties::kAllowRestore, reinterpret_cast<HANDLE>(1));
+    ShowWindow(window, was_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
+    RemovePropW(window, platform::windows::properties::kAllowRestore);
+  }
+  restoring_ = false;
+}
+
+std::size_t WindowRecoveryService::HealLeftovers() {
+  core::LogDebug(L"Recovery", L"Checking for leftover Genie windows");
+  std::size_t repaired_count = 0;
+  std::pair<WindowRecoveryService*, std::size_t*> context{this, &repaired_count};
+  EnumWindows(
+      [](HWND window, LPARAM parameter) -> BOOL {
+        auto* context =
+            reinterpret_cast<std::pair<WindowRecoveryService*, std::size_t*>*>(parameter);
+        RemovePropW(window, platform::windows::properties::kExcludedApplication);
+        if (platform::windows::properties::HasGenieState(window)) {
+          core::LogDebug(L"Recovery",
+                         L"Restoring leftover window hwnd=0x" +
+                             std::to_wstring(reinterpret_cast<std::uintptr_t>(window)));
+          context->first->Restore(window, false);
+          ++*context->second;
+        }
+        return TRUE;
+      },
+      reinterpret_cast<LPARAM>(&context));
+  return repaired_count;
+}
+
+void WindowRecoveryService::HealUntrackedWindows() {
+  EnumWindows(
+      [](HWND window, LPARAM) -> BOOL {
+        RemovePropW(window, platform::windows::properties::kExcludedApplication);
+        if (platform::windows::properties::HasGenieState(window)) {
+          platform::SetWindowCloaked(window, false);
+          platform::windows::properties::RestoreTransparency(window);
+          (void)platform::SetOwnedWindowRegion(window, nullptr, true);
+          platform::windows::properties::ClearGenieState(window);
+        }
+        return TRUE;
+      },
+      0);
+}
+
+}  // namespace genie::features

@@ -1,0 +1,637 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Project">
+      <UniqueIdentifier>{7b5fea5e-df9e-35c0-c9fc-50a288047a3b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{1cecf981-0991-f010-0312-d7f9db11ac34}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{d33ce1c9-c899-2950-aa62-67d7f9216d3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\animation">
+      <UniqueIdentifier>{8fbf9c87-e01b-7c9c-7ca2-9c1ca23d45be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\app">
+      <UniqueIdentifier>{003e6dfa-3a90-576a-a88a-800680a09f35}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core">
+      <UniqueIdentifier>{ecf7d1d4-58ea-893e-2abe-8e46abc8fd4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\features">
+      <UniqueIdentifier>{fa006fa0-008e-6f2e-702e-7cbdeac0a52b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\platform\windows">
+      <UniqueIdentifier>{dc293531-a529-9018-da5a-046319d9008c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\rendering">
+      <UniqueIdentifier>{5bfe3a55-9a03-a056-d458-c5ebd0ff3fa6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\runtime">
+      <UniqueIdentifier>{4df583c1-7d69-fea8-012a-4e704729d8cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\settings">
+      <UniqueIdentifier>{15794962-025c-4b3e-4bbe-48272338a7f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ui">
+      <UniqueIdentifier>{7278fba5-93e9-684c-8f8e-251bc82d364c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ui\components">
+      <UniqueIdentifier>{b94122ff-b7e5-951a-dae4-93b6971b1240}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ui\motion">
+      <UniqueIdentifier>{8af02d59-bc2f-9176-e988-fb72af57198a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ui\pages">
+      <UniqueIdentifier>{bd0ac259-4b0d-8954-0d66-d9cef185eea8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ui\rendering">
+      <UniqueIdentifier>{0e369249-baf3-28ba-4d3c-7d7fe54b1f56}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\ui\theme">
+      <UniqueIdentifier>{fb65e864-694c-8128-51b0-76f201b0cce9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\imgui">
+      <UniqueIdentifier>{ee653734-f8d6-cfe2-300a-3a4a85785d73}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\imgui\backends">
+      <UniqueIdentifier>{05922519-3001-1518-551a-03c0d51995a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\imgui\misc\freetype">
+      <UniqueIdentifier>{dd62edba-8fc2-6278-7d7c-ba970cf42a67}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\animation\easing.cpp">
+      <Filter>src\animation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\animation\genie_mesh.cpp">
+      <Filter>src\animation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\application.cpp">
+      <Filter>src\app</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\application_runtime.cpp">
+      <Filter>src\app</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\message_loop.cpp">
+      <Filter>src\app</Filter>
+    </ClCompile>
+    <ClCompile Include="src\app\session_state_store.cpp">
+      <Filter>src\app</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\embedded_resource.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\environment.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\logger.cpp">
+      <Filter>src\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\animation_configuration.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\diagnostics_service.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\effect_controller.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\effect_policy.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\hotkey_controller.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\minimize_feature.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\pause_controller.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\restore_feature.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\settings_actions_controller.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\settings_mutation_service.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\features\window_recovery_service.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pch.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\app_container_permissions.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\cbt_hook_manager.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\display_info.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\global_hotkey_manager.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\native_animation_blocker.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\power_status.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\process_info.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\process_runtime.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\single_instance_guard.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\startup_manager.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\taskbar_locator.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\taskbar_target_provider.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\window_diagnostics.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\window_event_monitor.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\window_properties.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\window_state.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\animation_renderer.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\capture_geometry.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\d3d_device.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\desktop_capture.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\desktop_duplication_session.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\overlay_renderer.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\overlay_window.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendering\window_capture_mask.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\animation_run_coordinator.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\animation_run_pool.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\effect_runtime_coordinator.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\frame_scheduler.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\renderer_recovery.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\run_state.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\runtime\snapshot_cache.cpp">
+      <Filter>src\runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="src\settings\exclusion_rules.cpp">
+      <Filter>src\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\settings\settings_repository.cpp">
+      <Filter>src\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\settings\settings_serializer.cpp">
+      <Filter>src\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\settings\settings_service.cpp">
+      <Filter>src\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\settings\settings_validator.cpp">
+      <Filter>src\settings</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\animation_preview.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\application_list_provider.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\components\combo.cpp">
+      <Filter>src\ui\components</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\components\controls.cpp">
+      <Filter>src\ui\components</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\components\easing_editor.cpp">
+      <Filter>src\ui\components</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\components\page_layout.cpp">
+      <Filter>src\ui\components</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\hotkey_presenter.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\motion\motion.cpp">
+      <Filter>src\ui\motion</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\motion\motion_tokens.cpp">
+      <Filter>src\ui\motion</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\about_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\animation_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\applications_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\diagnostics_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\general_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\hotkeys_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\pages\windows_integration_page.cpp">
+      <Filter>src\ui\pages</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\rendering\imgui_renderer.cpp">
+      <Filter>src\ui\rendering</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\settings_controller.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\settings_shell.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\settings_view_model.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\settings_window.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\settings_window_proc.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\theme\theme.cpp">
+      <Filter>src\ui\theme</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\tray_icon.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp">
+      <Filter>third_party\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_dx11.cpp">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\misc\freetype\imgui_freetype.cpp">
+      <Filter>third_party\imgui\misc\freetype</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\animation\easing.hpp">
+      <Filter>src\animation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\animation\genie_mesh.hpp">
+      <Filter>src\animation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\animation\geometry.hpp">
+      <Filter>src\animation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\application.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\application_runtime.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\message_loop.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\resource.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\app\session_state_store.hpp">
+      <Filter>src\app</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\embedded_resource.hpp">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\environment.hpp">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\logger.hpp">
+      <Filter>src\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\animation_configuration.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\diagnostics_service.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\effect_controller.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\effect_policy.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\hotkey_controller.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\minimize_feature.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\pause_controller.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\restore_feature.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\settings_mutation_service.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\features\window_recovery_service.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pch.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pch.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\app_container_permissions.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\cbt_hook_manager.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\display_info.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\global_hotkey_manager.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\native_animation_blocker.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\power_status.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\process_info.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\process_runtime.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\single_instance_guard.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\startup_manager.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\taskbar_locator.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\taskbar_target_provider.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\window_diagnostics.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\window_event_monitor.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\window_properties.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\window_state.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\animation_renderer.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\capture_geometry.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\d3d_device.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\desktop_capture.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\desktop_duplication_session.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\overlay_renderer.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\overlay_window.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendering\window_capture_mask.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\animation_run.hpp">
+      <Filter>src\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\animation_run_pool.hpp">
+      <Filter>src\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\frame_scheduler.hpp">
+      <Filter>src\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\renderer_recovery.hpp">
+      <Filter>src\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\run_state.hpp">
+      <Filter>src\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\runtime\snapshot_cache.hpp">
+      <Filter>src\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\app_settings.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\exclusion_rules.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\hotkey_binding.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\settings_repository.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\settings_serializer.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\settings_service.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings\settings_validator.hpp">
+      <Filter>src\settings</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\animation_preview.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\application_list_provider.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\components\combo.hpp">
+      <Filter>src\ui\components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\components\component_helpers.hpp">
+      <Filter>src\ui\components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\components\controls.hpp">
+      <Filter>src\ui\components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\components\easing_editor.hpp">
+      <Filter>src\ui\components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\components\page_layout.hpp">
+      <Filter>src\ui\components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\hotkey_presenter.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\motion\motion.hpp">
+      <Filter>src\ui\motion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\motion\motion_context.hpp">
+      <Filter>src\ui\motion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\motion\motion_tokens.hpp">
+      <Filter>src\ui\motion</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\about_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\animation_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\applications_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\diagnostics_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\general_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\hotkeys_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\pages\windows_integration_page.hpp">
+      <Filter>src\ui\pages</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\rendering\imgui_renderer.hpp">
+      <Filter>src\ui\rendering</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\settings_actions.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\settings_controller.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\settings_shell.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\settings_view_model.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\settings_window.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\theme\theme.hpp">
+      <Filter>src\ui\theme</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\theme\theme_tokens.hpp">
+      <Filter>src\ui\theme</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\tray_icon.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\backends\imgui_impl_dx11.h">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\backends\imgui_impl_win32.h">
+      <Filter>third_party\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imconfig.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imgui.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imgui_extra.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imgui_internal.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imstb_rectpack.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imstb_textedit.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\imstb_truetype.h">
+      <Filter>third_party\imgui</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="GenieEffect.rc">
+      <Filter>Project</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="third_party\imgui\imgui_demo.cpp">
+      <Filter>third_party\imgui</Filter>
+    </None>
+    <None Include="shaders\genie_mesh.hlsl">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>
