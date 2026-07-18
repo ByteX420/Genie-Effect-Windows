@@ -92,7 +92,8 @@ void SettingsShell::Render(SettingsWindow& window) {
                                       px(theme::Metrics::kSidebarBrandY) + brand_shift);
     draw->AddText(window.font_small_, window.font_small_->FontSize,
                   ImVec2(std::floor(brand.x + 0.5f), std::floor(brand.y + 0.5f)),
-                  WithAlpha(theme::kMutedText, content_alpha * brand_reveal * 0.85f), "GENIE");
+                  WithAlpha(theme::kMutedText, content_alpha * brand_reveal * 0.85f),
+                  "MINIMIZE EFFECT");
   }
 
   struct PageEntry {
