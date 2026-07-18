@@ -381,18 +381,20 @@ bool MinimizeFeature::SeedSnapshotsInProgress() const {
 
 void MinimizeFeature::CancelSeedSnapshotsForIconicWindows() {
   if (seed_phase_ == SeedPhase::kIdle) return;
-  // Re-minimize anything we restored but have not finished capturing yet.
-  for (std::size_t index = seed_index_; index < seed_candidates_.size(); ++index) {
-    SeedCandidate& candidate = seed_candidates_[index];
-    if (candidate.window == nullptr || !IsWindow(candidate.window)) continue;
-    SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
-             reinterpret_cast<HANDLE>(1));
-    WINDOWPLACEMENT placement = candidate.placement;
-    placement.showCmd = SW_SHOWMINNOACTIVE;
-    SetWindowPlacement(candidate.window, &placement);
-    RemovePropW(candidate.window, platform::windows::properties::kAllowMinimize);
-    RemovePropW(candidate.window, platform::windows::properties::kAllowRestore);
-    platform::SetDwmTransitionsDisabled(candidate.window, false);
+  // Only the current window may be restored; re-minimize it if needed.
+  if (seed_index_ < seed_candidates_.size()) {
+    SeedCandidate& candidate = seed_candidates_[seed_index_];
+    if (candidate.window != nullptr && IsWindow(candidate.window) &&
+        IsIconic(candidate.window) == FALSE) {
+      SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
+               reinterpret_cast<HANDLE>(1));
+      WINDOWPLACEMENT placement = candidate.placement;
+      placement.showCmd = SW_SHOWMINNOACTIVE;
+      SetWindowPlacement(candidate.window, &placement);
+      RemovePropW(candidate.window, platform::windows::properties::kAllowMinimize);
+      RemovePropW(candidate.window, platform::windows::properties::kAllowRestore);
+      platform::SetDwmTransitionsDisabled(candidate.window, false);
+    }
   }
   seed_candidates_.clear();
   seed_index_ = 0;
@@ -404,8 +406,7 @@ void MinimizeFeature::CancelSeedSnapshotsForIconicWindows() {
 void MinimizeFeature::BeginSeedSnapshotsForIconicWindows(
     HWND overlay, rendering::DesktopCapture* capture,
     platform::TaskbarTargetProvider* taskbar_targets, bool renderer_recovering) {
-  // Spread across frames: restore all now, wait one paint frame, then capture one window/tick.
-  // No Sleep — that freezes the settings enter animation mid-flight.
+  // Collect only — restore happens one window at a time so others never flash open together.
   CancelSeedSnapshotsForIconicWindows();
   if (capture == nullptr || renderer_recovering || taskbar_targets == nullptr) return;
 
@@ -436,96 +437,111 @@ void MinimizeFeature::BeginSeedSnapshotsForIconicWindows(
   }
   if (seed_candidates_.empty()) return;
 
-  for (SeedCandidate& candidate : seed_candidates_) {
+  seed_capture_ = capture;
+  seed_targets_ = taskbar_targets;
+  seed_index_ = 0;
+  seed_phase_ = SeedPhase::kRestoreCurrent;
+}
+
+bool MinimizeFeature::TickSeedSnapshotsForIconicWindows() {
+  if (seed_phase_ == SeedPhase::kIdle) return false;
+  if (seed_capture_ == nullptr || seed_targets_ == nullptr) {
+    CancelSeedSnapshotsForIconicWindows();
+    return false;
+  }
+
+  auto finish_all = [this] {
+    snapshots_.Prune();
+    seed_candidates_.clear();
+    seed_index_ = 0;
+    seed_capture_ = nullptr;
+    seed_targets_ = nullptr;
+    seed_phase_ = SeedPhase::kIdle;
+  };
+
+  // Skip holes left by destroyed windows.
+  while (seed_index_ < seed_candidates_.size() &&
+         (seed_candidates_[seed_index_].window == nullptr ||
+          !IsWindow(seed_candidates_[seed_index_].window))) {
+    ++seed_index_;
+  }
+  if (seed_index_ >= seed_candidates_.size()) {
+    finish_all();
+    return false;
+  }
+
+  SeedCandidate& candidate = seed_candidates_[seed_index_];
+
+  if (seed_phase_ == SeedPhase::kRestoreCurrent) {
     platform::SetDwmTransitionsDisabled(candidate.window, true);
     SetPropW(candidate.window, platform::windows::properties::kAllowRestore,
              reinterpret_cast<HANDLE>(1));
     WINDOWPLACEMENT placement = candidate.placement;
     placement.showCmd = SW_SHOWNOACTIVATE;
     SetWindowPlacement(candidate.window, &placement);
-  }
-  DwmFlush();
-
-  seed_capture_ = capture;
-  seed_targets_ = taskbar_targets;
-  seed_index_ = 0;
-  seed_phase_ = SeedPhase::kWaitPaint;
-}
-
-bool MinimizeFeature::TickSeedSnapshotsForIconicWindows() {
-  if (seed_phase_ == SeedPhase::kIdle) return false;
-
-  if (seed_phase_ == SeedPhase::kWaitPaint) {
-    // One message-loop frame after restore so apps/DWM can paint without Sleep.
     DwmFlush();
-    seed_phase_ = SeedPhase::kCapture;
+    seed_phase_ = SeedPhase::kWaitPaint;
     return true;
   }
 
-  if (seed_capture_ == nullptr || seed_targets_ == nullptr) {
-    CancelSeedSnapshotsForIconicWindows();
+  if (seed_phase_ == SeedPhase::kWaitPaint) {
+    // One message-loop frame so this single restored window can paint.
+    DwmFlush();
+    seed_phase_ = SeedPhase::kCaptureCurrent;
+    return true;
+  }
+
+  // kCaptureCurrent — capture then immediately re-minimize this window only.
+  RECT live{};
+  if (!GetWindowRect(candidate.window, &live) || !IsUsableRect(live)) live = candidate.normal;
+  const std::optional<RECT> frame = platform::GetExtendedFrameBounds(candidate.window);
+  RECT bounds = (frame.has_value() && IsUsableRect(*frame)) ? *frame : live;
+
+  rendering::CapturedTexture texture;
+  RECT captured_window_bounds{};
+  bool ok =
+      seed_capture_->CaptureWindow(candidate.window, bounds, &texture, &captured_window_bounds);
+  if (ok && IsUsableRect(captured_window_bounds)) {
+    bounds = captured_window_bounds;
+  } else if (!ok) {
+    ok = seed_capture_->CaptureRegion(bounds, &texture);
+  }
+  if (!ok || texture.shader_resource_view == nullptr) {
+    core::LogDebug(L"Minimize", L"Startup seed capture failed for iconic window");
+    ok = false;
+  }
+
+  SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
+           reinterpret_cast<HANDLE>(1));
+  WINDOWPLACEMENT placement = candidate.placement;
+  placement.showCmd = SW_SHOWMINNOACTIVE;
+  SetWindowPlacement(candidate.window, &placement);
+  RemovePropW(candidate.window, platform::windows::properties::kAllowMinimize);
+  RemovePropW(candidate.window, platform::windows::properties::kAllowRestore);
+  platform::SetDwmTransitionsDisabled(candidate.window, false);
+
+  if (ok) {
+    runtime::CachedSnapshot snapshot;
+    snapshot.window = candidate.window;
+    snapshot.bounds = bounds;
+    snapshot.texture = std::move(texture);
+    snapshot.target = seed_targets_->GetTargetForWindow(candidate.window, bounds);
+    snapshot.original_placement = candidate.normal;
+    snapshot.was_maximized = candidate.was_maximized;
+    snapshot.process_id = platform::WindowProcessId(candidate.window);
+    snapshot.captured_at_ms = GetTickCount64();
+    snapshots_.PreMinimize()[candidate.window] = snapshot;
+    snapshots_.Restore()[candidate.window] = std::move(snapshot);
+    core::LogDebug(L"Minimize", L"Seeded snapshot for already-minimized window");
+  }
+
+  ++seed_index_;
+  if (seed_index_ >= seed_candidates_.size()) {
+    finish_all();
     return false;
   }
-
-  // Capture + re-minimize exactly one window per tick so ImGui motion stays smooth.
-  while (seed_index_ < seed_candidates_.size()) {
-    SeedCandidate& candidate = seed_candidates_[seed_index_++];
-    if (candidate.window == nullptr || !IsWindow(candidate.window)) continue;
-
-    RECT live{};
-    if (!GetWindowRect(candidate.window, &live) || !IsUsableRect(live)) live = candidate.normal;
-    const std::optional<RECT> frame = platform::GetExtendedFrameBounds(candidate.window);
-    RECT bounds = (frame.has_value() && IsUsableRect(*frame)) ? *frame : live;
-
-    rendering::CapturedTexture texture;
-    RECT captured_window_bounds{};
-    bool ok =
-        seed_capture_->CaptureWindow(candidate.window, bounds, &texture, &captured_window_bounds);
-    if (ok && IsUsableRect(captured_window_bounds)) {
-      bounds = captured_window_bounds;
-    } else if (!ok) {
-      ok = seed_capture_->CaptureRegion(bounds, &texture);
-    }
-    if (!ok || texture.shader_resource_view == nullptr) {
-      core::LogDebug(L"Minimize", L"Startup seed capture failed for iconic window");
-      ok = false;
-    }
-
-    SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
-             reinterpret_cast<HANDLE>(1));
-    WINDOWPLACEMENT placement = candidate.placement;
-    placement.showCmd = SW_SHOWMINNOACTIVE;
-    SetWindowPlacement(candidate.window, &placement);
-    RemovePropW(candidate.window, platform::windows::properties::kAllowMinimize);
-    RemovePropW(candidate.window, platform::windows::properties::kAllowRestore);
-    platform::SetDwmTransitionsDisabled(candidate.window, false);
-
-    if (ok) {
-      runtime::CachedSnapshot snapshot;
-      snapshot.window = candidate.window;
-      snapshot.bounds = bounds;
-      snapshot.texture = std::move(texture);
-      snapshot.target = seed_targets_->GetTargetForWindow(candidate.window, bounds);
-      snapshot.original_placement = candidate.normal;
-      snapshot.was_maximized = candidate.was_maximized;
-      snapshot.process_id = platform::WindowProcessId(candidate.window);
-      snapshot.captured_at_ms = GetTickCount64();
-      snapshots_.PreMinimize()[candidate.window] = snapshot;
-      snapshots_.Restore()[candidate.window] = std::move(snapshot);
-      core::LogDebug(L"Minimize", L"Seeded snapshot for already-minimized window");
-    }
-    // One window per call — keep the rest for later ticks.
-    if (seed_index_ < seed_candidates_.size()) return true;
-    break;
-  }
-
-  snapshots_.Prune();
-  seed_candidates_.clear();
-  seed_index_ = 0;
-  seed_capture_ = nullptr;
-  seed_targets_ = nullptr;
-  seed_phase_ = SeedPhase::kIdle;
-  return false;
+  seed_phase_ = SeedPhase::kRestoreCurrent;
+  return true;
 }
 
 void MinimizeFeature::CompletePendingNativeMinimize(

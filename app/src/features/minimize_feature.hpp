@@ -85,8 +85,7 @@ public:
   [[nodiscard]] bool IsAnimating(HWND window) const;
   void UpdatePreMinimizeSnapshot(HWND window, HWND overlay, rendering::DesktopCapture* capture,
                                  bool renderer_recovering);
-  // Startup seed spread across frames so the settings enter animation never hitch-blocks.
-  // Begin restores all candidates; Tick captures/re-minimizes one window per call.
+  // Startup seed: one window at a time (restore → paint frame → capture → minimize → next).
   void BeginSeedSnapshotsForIconicWindows(HWND overlay, rendering::DesktopCapture* capture,
                                           platform::TaskbarTargetProvider* taskbar_targets,
                                           bool renderer_recovering);
@@ -117,8 +116,9 @@ private:
 
   enum class SeedPhase {
     kIdle,
+    kRestoreCurrent,
     kWaitPaint,
-    kCapture,
+    kCaptureCurrent,
   };
   SeedPhase seed_phase_ = SeedPhase::kIdle;
   std::vector<SeedCandidate> seed_candidates_;
