@@ -169,14 +169,14 @@ jobs:
             Automated **stable** release build (Windows x64, MultiByte, LTCG /O2).
 
             ### Highlights
-            - **Modular architecture rewrite** — first-party code split into focused layers (`app`, `features`, `runtime`, `rendering`, `platform`, `settings`, `ui`, `core`, `animation`) with clear ownership and dependency direction
-            - **Runtime state machine** — explicit animation runs and cleanup paths for minimize/restore, cancel, timeout, and device loss
-            - **Effect policy** — enable, pause, fullscreen, battery saver, and app exclusions in one place
-            - **Settings pipeline** — separate model, validation, serializer, repository, and service; UI talks through a single actions boundary
-            - **UI structure** — settings host, shell, tray, preview, and per-page sources (Effect, Motion, Apps, System, Hotkeys, Repair, About)
-            - **Automatic animation quality** — adaptive mesh density from load and display pressure
-            - **Motion polish** — custom cubic-bezier editor improvements; Back easing endpoints are exact at 0/1
-            - **Leaner product path** — session “safe mode” / `session.state` recovery path removed; normal start always wires hook and renderer
+            - **Displays page** — multi-monitor arrangement in Settings; disable Genie per display and persist via `excludedDisplays` in settings.json
+            - **Smart skip under load** — fall back to native minimize when capture/GPU pressure is high, with hysteresis, decay, and abort after unusually slow captures
+            - **Iconic seed on startup** — already-minimized windows get snapshots one at a time after the settings enter motion settles (no mid-open freeze)
+            - **Cleaner exit** — Genie-minimized windows stay minimized when the app exits (no mass un-minimize)
+            - **Motion Reset** — one atomic write restores every Motion-tab field to defaults (including fade default **No fade**)
+            - **Import / export profiles** — JSON settings backup; cancel vs hard failure are distinguished; failed startup registration after import is reported without a false success toast
+            - **UI motion** — sidebar nav selection/hover matches the rest of the settings motion system
+            - **Settings shell** — Effect, Motion, Apps, Displays, System, Hotkeys, Repair, About
 
             ### Install
             1. Download **GenieEffect-windows-x64.zip**
