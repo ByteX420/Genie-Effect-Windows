@@ -123,6 +123,26 @@ bool SettingsMutationService::SetFadeStrength(const std::string& strength) {
   return settings_.Update(std::move(proposed));
 }
 
+bool SettingsMutationService::ResetMotionSettings() {
+  // One write for the whole Motion tab so intermediate UpdateState reloads cannot clobber
+  // fields that have not been saved yet (chained per-field setters were only lasting for speeds).
+  const settings::AppSettings defaults{};
+  auto proposed = settings_.Get();
+  proposed.minimize_duration = defaults.minimize_duration;
+  proposed.restore_duration = defaults.restore_duration;
+  proposed.link_speeds = defaults.link_speeds;
+  proposed.minimize_easing = defaults.minimize_easing;
+  proposed.restore_easing = defaults.restore_easing;
+  proposed.minimize_custom_bezier = defaults.minimize_custom_bezier;
+  proposed.restore_custom_bezier = defaults.restore_custom_bezier;
+  proposed.animation_style = defaults.animation_style;
+  proposed.quality_mode = defaults.quality_mode;
+  proposed.genie_strength = defaults.genie_strength;
+  proposed.fade_strength = defaults.fade_strength;
+  proposed.show_target_indicator = defaults.show_target_indicator;
+  return settings_.Update(std::move(proposed));
+}
+
 bool SettingsMutationService::SetTargetIndicator(bool enabled) {
   auto proposed = settings_.Get();
   proposed.show_target_indicator = enabled;

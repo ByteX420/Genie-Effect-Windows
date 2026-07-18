@@ -23,6 +23,8 @@ public:
   bool SetQualityMode(const std::string& mode);
   bool SetGenieStrength(float strength, bool save);
   bool SetFadeStrength(const std::string& strength);
+  // Atomically restore every Motion-page field to AppSettings defaults.
+  bool ResetMotionSettings();
   bool SetTargetIndicator(bool enabled);
   bool SetSmartSkipUnderLoad(bool enabled, const std::function<void()>& applied);
   bool SetCloseBehavior(const std::string& behavior);

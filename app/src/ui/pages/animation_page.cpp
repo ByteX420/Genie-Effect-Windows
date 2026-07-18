@@ -71,14 +71,27 @@ void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::Page
     window.animation_preview_.Start(window.hwnd_);
   }
   layout.SetCursor(layout.group_right() - action_width, title_top + px(2.0f));
-  if (CompactButton(motion, "##reset_speeds", "Reset", ImVec2(action_width, button_height),
+  if (CompactButton(motion, "##reset_motion", "Reset", ImVec2(action_width, button_height),
                     window.font_body_, scale, alpha)) {
-    model.minimize_duration = settings::kDefaultMinimizeDuration;
-    model.restore_duration = settings::kDefaultRestoreDuration;
+    // Single atomic write for every Motion-tab field (chained setters clobber via UpdateState).
+    const bool ok = actions.ResetMotionSettings();
     window.minimize_slider_dirty_ = false;
     window.restore_slider_dirty_ = false;
-    window.RecordSaveResult(
-        actions.SetAnimationDurations(model.minimize_duration, model.restore_duration, true));
+    window.strength_slider_dirty_ = false;
+    window.minimize_bezier_dirty_ = false;
+    window.restore_bezier_dirty_ = false;
+    // Snap slider fills to defaults after UpdateState reloads the model.
+    motion.system.Set(ui::motion::MotionKey("menu.slider", "##min_duration", "fill"),
+                      std::clamp((model.minimize_duration - kMinimumDuration) /
+                                     (kMaximumDuration - kMinimumDuration),
+                                 0.0f, 1.0f));
+    motion.system.Set(ui::motion::MotionKey("menu.slider", "##restore_duration", "fill"),
+                      std::clamp((model.restore_duration - kMinimumDuration) /
+                                     (kMaximumDuration - kMinimumDuration),
+                                 0.0f, 1.0f));
+    motion.system.Set(ui::motion::MotionKey("menu.slider", "##genie_strength", "fill"),
+                      std::clamp((model.genie_strength - 0.25f) / 0.75f, 0.0f, 1.0f));
+    window.RecordSaveResult(ok);
   }
 
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "TIMING");

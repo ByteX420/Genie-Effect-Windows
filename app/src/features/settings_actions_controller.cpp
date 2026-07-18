@@ -194,6 +194,12 @@ bool ApplicationRuntime::SetFadeStrength(const std::string& strength) {
   return result;
 }
 
+bool ApplicationRuntime::ResetMotionSettings() {
+  const bool result = settings_mutations_.ResetMotionSettings();
+  settings_window_.UpdateState(settings_service_.Get());
+  return result;
+}
+
 bool ApplicationRuntime::SetTargetIndicator(bool enabled) {
   const bool result = settings_mutations_.SetTargetIndicator(enabled);
   settings_window_.UpdateState(settings_service_.Get());

@@ -308,11 +308,16 @@ bool Slider(const MotionContext& motion, const char* id, const char* label, floa
   const auto& tokens = motion.tokens;
   const auto fill_key = detail::MotionKey("menu.slider", id, "fill");
   const float visual = std::clamp((*value - minimum) / (maximum - minimum), 0.0f, 1.0f);
-  // Always spring the fill (same path for duration + strength). Snappy while scrubbing so the
-  // pearl still tracks the pointer; soft spring when released or set externally.
+  // Snappy while scrubbing. For external jumps (Reset/presets), use a short timed snap so the
+  // rail does not lag behind the real value on a soft spring.
+  const bool interactive = slider_active || editing || *mode > 0;
   const ui::motion::MotionSpec& fill_spec =
-      (slider_active || editing || *mode > 0) ? tokens.spring_snappy : tokens.spring_soft;
-  const float animated = reference_motion.AnimateValue(fill_key, visual, fill_spec, visual);
+      interactive ? tokens.spring_snappy : tokens.select_sharp;
+  float animated = reference_motion.AnimateValue(fill_key, visual, fill_spec, visual);
+  if (!interactive && std::abs(animated - visual) > 0.35f) {
+    reference_motion.Set(fill_key, visual);
+    animated = visual;
+  }
   const float track_y = origin.y + height * 0.5f;
   const float pearl_x = start + (end - start) * animated;
   ImDrawList* draw = ImGui::GetWindowDrawList();

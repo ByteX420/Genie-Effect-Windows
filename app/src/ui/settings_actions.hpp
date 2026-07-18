@@ -51,6 +51,7 @@ public:
   virtual bool SetQualityMode(const std::string& mode) = 0;
   virtual bool SetGenieStrength(float strength, bool save) = 0;
   virtual bool SetFadeStrength(const std::string& strength) = 0;
+  virtual bool ResetMotionSettings() = 0;
   virtual bool SetTargetIndicator(bool enabled) = 0;
   virtual bool SetSmartSkipUnderLoad(bool enabled) = 0;
   virtual bool SetCloseBehavior(const std::string& behavior) = 0;

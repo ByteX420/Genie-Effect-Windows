@@ -62,6 +62,7 @@ public:
   bool SetQualityMode(const std::string& mode) override;
   bool SetGenieStrength(float strength, bool save) override;
   bool SetFadeStrength(const std::string& strength) override;
+  bool ResetMotionSettings() override;
   bool SetTargetIndicator(bool enabled) override;
   bool SetSmartSkipUnderLoad(bool enabled) override;
   bool SetCloseBehavior(const std::string& close_behavior) override;

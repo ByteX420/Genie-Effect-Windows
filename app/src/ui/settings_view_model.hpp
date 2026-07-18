@@ -34,7 +34,7 @@ public:
   std::string animation_style = "Gienie classic";
   std::string quality_mode = "automatic";
   float genie_strength = 1.0f;
-  std::string fade_strength = "Subtle";
+  std::string fade_strength = "No fade";
   bool show_target_indicator = false;
   bool smart_skip_under_load = true;
   std::string close_behavior = "exit";
