@@ -207,27 +207,28 @@ bool SidebarItem(const motion::MotionContext& motion, const char* id, const char
   if (!regular) regular = ImGui::GetFont();
   if (!emphasis) emphasis = regular;
   ImGui::SetCursorScreenPos(position);
-  const bool pressed = ImGui::InvisibleButton(id, size);
+  const bool clicked = ImGui::InvisibleButton(id, size);
   const bool hovered = ImGui::IsItemHovered();
   const bool focused = ImGui::IsItemFocused();
+  const bool active = ImGui::IsItemActive();
   if (hovered) ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
   ImDrawList* draw = ImGui::GetWindowDrawList();
 
+  // Same interaction channels as segment rows / buttons: hover + press.
+  // Drive fill from the animated hover value (not is_hot) so enter/leave both ease —
+  // matching SegmentSelector. Selection fill is the shared sliding pill in SettingsShell.
   const bool is_hot = hovered || focused;
-  const float hover =
-      motion.system.AnimateValue(ui::motion::MotionKey("sidebar-main", id, "hover"),
-                                 is_hot ? 1.0f : 0.0f, motion.tokens.hover_fast, 0.0f);
-  const float select =
-      motion.system.AnimateValue(ui::motion::MotionKey("sidebar-main", id, "select"),
-                                 selected ? 1.0f : 0.0f, motion.tokens.select_sharp, 0.0f);
+  // Slightly slower than global hover_soft so the pill ease is easy to read.
+  const ui::motion::MotionSpec hover_spec =
+      ui::motion::MotionSpec::Timed(0.28f, ui::motion::MotionEasing::kSmootherStep);
+  const float hover = motion.system.AnimateValue(
+      ui::motion::MotionKey("sidebar-main", id, "hover"), is_hot ? 1.0f : 0.0f, hover_spec, 0.0f);
+  const float press =
+      motion.system.AnimateValue(ui::motion::MotionKey("sidebar-main", id, "press"),
+                                 is_hot && active ? 1.0f : 0.0f, motion.tokens.press_fast, 0.0f);
   const float rounding = 8.0f * scale;
-  // Paint hover only while this item is actually hot — residual motion on a previous
-  // row must not leave a second pill lit when the pointer already moved on.
-  const float visual_hover = is_hot ? hover : 0.0f;
-  if (visual_hover > 0.001f || select > 0.001f) {
-    // Quieter pill — selected a bit stronger, hover barely there.
-    // Selection is the pill + weight only (no sliding rail between items).
-    const float fill_alpha = 0.10f * select + 0.04f * visual_hover * (1.0f - select);
+  if (!selected && hover > 0.001f) {
+    const float fill_alpha = 0.05f * hover * (1.0f - 0.35f * press);
     draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y),
                         ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, fill_alpha * alpha)), rounding);
   }
@@ -235,16 +236,19 @@ bool SidebarItem(const motion::MotionContext& motion, const char* id, const char
   // Weight rule: selected nav uses SemiBold (emphasis), idle uses Regular.
   ImFont* font = selected ? emphasis : regular;
   const float font_size = font->FontSize;
-  const ImVec4 text_target = selected || is_hot ? ui::theme::kTextColor : ui::theme::kTextDimColor;
+  const ImVec4 text_target =
+      selected || is_hot ? ui::theme::kTextColor : ui::theme::kTextDimColor;
   ImVec4 text_color = motion.system.AnimateColor(
       ui::motion::MotionKey("sidebar-main", id, "text"), text_target,
       selected ? motion.tokens.select_sharp : motion.tokens.hover_fast, ui::theme::kTextDimColor);
-  text_color.w *= alpha;
+  // Press subtly tightens text (same idea as menu buttons).
+  text_color.w *= alpha * (1.0f - 0.08f * press);
+  const float text_nudge = 0.5f * press * scale;
   draw->AddText(font, font_size,
-                ImVec2(std::floor(position.x + 14.0f * scale + 0.5f),
+                ImVec2(std::floor(position.x + 14.0f * scale + text_nudge + 0.5f),
                        CenteredTextTop(font, position.y, size.y)),
                 ImGui::GetColorU32(text_color), label);
-  return pressed;
+  return clicked;
 }
 
 }  // namespace genie::ui::theme

@@ -108,25 +108,60 @@ void SettingsShell::Render(SettingsWindow& window) {
       PageEntry{SettingsWindow::Page::kDiagnostics, "Repair", false},
       PageEntry{SettingsWindow::Page::kAbout, "About", false},
   };
-  float navigation_y = px(theme::Metrics::kNavigationY);
+  // Sidebar tabs — same motion vocabulary as SegmentSelector / buttons:
+  // staggered enter, sliding selection pill (spring), per-item hover/press/text.
   const float nav_x = px(theme::Metrics::kSidebarMargin);
   const float nav_w = px(theme::Metrics::kSidebarContentWidth);
   const float nav_h = px(theme::Metrics::kNavigationRowHeight);
+  const float nav_step = px(theme::Metrics::kNavigationRowHeight + theme::Metrics::kNavigationSpacing);
+  const float nav_base_y = px(theme::Metrics::kNavigationY);
+
+  std::array<float, pages.size()> item_offsets{};
+  float layout_y = nav_base_y;
+  size_t selected_index = 0;
   for (size_t index = 0; index < pages.size(); ++index) {
     const PageEntry& entry = pages[index];
     if (entry.section_gap) {
-      // Quiet divider between primary and secondary nav groups.
-      navigation_y += px(10.0f);
-      const float div_y = navigation_y - px(5.0f);
+      layout_y += px(10.0f);
+      const float div_y = layout_y - px(5.0f);
       draw->AddLine(window_point(nav_x + px(4.0f), div_y),
                     window_point(nav_x + nav_w - px(4.0f), div_y),
                     WithAlpha(theme::kSeparator, content_alpha * 0.55f));
     }
-    const ImVec2 item_position = window_point(nav_x, navigation_y);
+    item_offsets[index] = layout_y - nav_base_y;
+    if (window.selected_page_ == entry.page) selected_index = index;
+    layout_y += nav_step;
+  }
+
+  // Relative Y so the spring survives DPI/window moves (same idea as segment slide-x).
+  const float select_target = item_offsets[selected_index];
+  const float select_y = window.motion_system_.AnimateValue(
+      ui::motion::MotionKey("sidebar", "nav", "select-y"), select_target,
+      window.motion_tokens_.spring_soft, select_target);
+  {
+    const float pill_rounding = 8.0f * scale;
+    const ImVec2 pill_min = window_point(nav_x, nav_base_y + select_y);
+    const ImVec2 pill_max(pill_min.x + nav_w, pill_min.y + nav_h);
+    draw->AddRectFilled(pill_min, pill_max,
+                        ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 0.10f * content_alpha)),
+                        pill_rounding);
+  }
+
+  for (size_t index = 0; index < pages.size(); ++index) {
+    const PageEntry& entry = pages[index];
     const std::string id = std::format("##settings_page_{}", index);
+    // Staggered enter like page layout Reveal / brand chip.
+    const float item_reveal = window.motion_system_.AnimateValue(
+        ui::motion::MotionKey("sidebar", id, "reveal"), 1.0f,
+        ui::motion::MotionSpec::Timed(0.34f, ui::motion::MotionEasing::kSmootherStep,
+                                      0.03f * static_cast<float>(index)),
+        0.0f);
+    const float item_alpha = content_alpha * std::clamp(item_reveal, 0.0f, 1.0f);
+    const float item_shift = (1.0f - item_reveal) * px(6.0f);
+    const ImVec2 item_position = window_point(nav_x - item_shift, nav_base_y + item_offsets[index]);
     if (theme::SidebarItem(widget_motion, id.c_str(), entry.label,
                            window.selected_page_ == entry.page, item_position, ImVec2(nav_w, nav_h),
-                           window.font_body_, window.font_medium_, scale, content_alpha) &&
+                           window.font_body_, window.font_medium_, scale, item_alpha) &&
         window.selected_page_ != entry.page) {
       window.FlushPendingSpeedSave();
       window.selected_page_ = entry.page;
@@ -135,7 +170,6 @@ void SettingsShell::Render(SettingsWindow& window) {
       window.motion_system_.Set(ui::motion::MotionKey("page", "content", "offset"),
                                 ImVec2(0.0f, 14.0f));
     }
-    navigation_y += px(theme::Metrics::kNavigationRowHeight + theme::Metrics::kNavigationSpacing);
   }
 
   // Status chip: same left column as nav/ampel; bottom inset mirrors traffic-light top edge.
