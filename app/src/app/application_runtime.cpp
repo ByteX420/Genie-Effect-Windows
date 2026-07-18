@@ -69,7 +69,7 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
     std::wcerr << L"WARNING: Not running as Administrator. Elevated windows (like Task Manager, "
                   L"cmd as Admin, etc.)\n"
                << L"         will NOT be hooked due to Windows UIPI security restrictions.\n"
-               << L"         To hook all windows, please run GenieEffect.exe as Administrator.\n\n";
+               << L"         To hook all windows, please run MinimizeEffect.exe as Administrator.\n\n";
     genie::core::LogDebug(L"App", L"Warning: Not running as Administrator");
   } else {
     genie::core::LogDebug(L"App", L"Running as Administrator");

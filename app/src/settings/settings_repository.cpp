@@ -18,7 +18,7 @@ std::wstring SettingsRepository::Path() {
   const DWORD written = GetEnvironmentVariableW(L"LOCALAPPDATA", local_app_data.data(), required);
   if (written == 0 || written >= required) return {};
   local_app_data.resize(written);
-  return local_app_data + L"\\GenieEffect\\settings.json";
+  return local_app_data + L"\\MinimizeEffect\\settings.json";
 }
 
 AppSettings SettingsRepository::Load() const {

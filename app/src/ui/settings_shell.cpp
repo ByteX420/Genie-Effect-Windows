@@ -43,7 +43,7 @@ void SettingsShell::Render(SettingsWindow& window) {
   constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                                      ImGuiWindowFlags_NoSavedSettings |
                                      ImGuiWindowFlags_NoBringToFrontOnFocus;
-  ImGui::Begin("GenieEffectRoot", nullptr, flags);
+  ImGui::Begin("MinimizeEffectRoot", nullptr, flags);
   ImDrawList* draw = ImGui::GetWindowDrawList();
   const ImVec2 window_origin = ImGui::GetWindowPos();
   const auto window_point = [&window_origin](float x, float y) {

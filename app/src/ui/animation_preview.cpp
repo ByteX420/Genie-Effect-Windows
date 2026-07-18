@@ -7,7 +7,7 @@
 namespace genie::ui {
 namespace {
 
-constexpr wchar_t kPreviewWindowClass[] = L"GenieEffectAnimationPreview";
+constexpr wchar_t kPreviewWindowClass[] = L"MinimizeEffectAnimationPreview";
 
 }  // namespace
 
@@ -35,7 +35,7 @@ void AnimationPreview::Start(HWND owner) {
   const int height = std::min(420, static_cast<int>(work.bottom - work.top - 80));
   const int x = work.left + (work.right - work.left - width) / 2;
   const int y = work.top + (work.bottom - work.top - height) / 2;
-  window_ = CreateWindowExW(WS_EX_APPWINDOW, kPreviewWindowClass, L"Genie Effect Preview",
+  window_ = CreateWindowExW(WS_EX_APPWINDOW, kPreviewWindowClass, L"Minimize Effect Preview",
                             WS_POPUP | WS_SYSMENU | WS_MINIMIZEBOX, x, y, width, height, nullptr,
                             nullptr, instance, this);
   if (window_ == nullptr) return;

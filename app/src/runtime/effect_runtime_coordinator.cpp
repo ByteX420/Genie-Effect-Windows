@@ -445,7 +445,7 @@ void ApplicationRuntime::RefreshEffectRuntimeState() {
 
 void ApplicationRuntime::UpdateTemporaryPause() {
   if (!pause_controller_.Update(GetTickCount64())) return;
-  genie::core::LogDebug(L"Pause", L"Temporary pause expired; resuming Genie Effect");
+  genie::core::LogDebug(L"Pause", L"Temporary pause expired; resuming Minimize Effect");
   RefreshEffectRuntimeState();
   settings_window_.UpdatePauseState(false, false);
 }

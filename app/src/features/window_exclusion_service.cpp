@@ -10,7 +10,7 @@
 namespace genie::features {
 namespace {
 
-constexpr wchar_t kWindowExclusionMarker[] = L"GenieEffect.PerWindowExclusion";
+constexpr wchar_t kWindowExclusionMarker[] = L"MinimizeEffect.PerWindowExclusion";
 
 std::string WideToUtf8(std::wstring_view value) {
   if (value.empty()) return {};

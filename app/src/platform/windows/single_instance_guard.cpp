@@ -5,8 +5,8 @@
 namespace genie::platform::windows {
 namespace {
 
-constexpr wchar_t kMutexName[] = L"Local\\GenieEffect.Windows.SingleInstance";
-constexpr wchar_t kSettingsWindowClass[] = L"GenieEffectImGuiSettings";
+constexpr wchar_t kMutexName[] = L"Local\\MinimizeEffect.Windows.SingleInstance";
+constexpr wchar_t kSettingsWindowClass[] = L"MinimizeEffectImGuiSettings";
 constexpr UINT kShowSettingsMessage = WM_APP + 101;
 
 }  // namespace

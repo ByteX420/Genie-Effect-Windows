@@ -1,6 +1,6 @@
-# Genie Effect architecture
+# Minimize Effect architecture
 
-Genie Effect is a native Windows application that replaces the visible
+Minimize Effect is a native Windows application that replaces the visible
 minimize/restore transition with a Direct3D 11 mesh animation. Windows has no
 documented “replace DWM animation” API, so shell integration is isolated behind
 Windows adapters and restored during every cleanup path.

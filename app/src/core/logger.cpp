@@ -172,12 +172,12 @@ const std::wstring& DebugLogPath() {
       path.assign(environment_path, length);
     } else {
       wchar_t default_path[MAX_PATH]{};
-      length = ExpandEnvironmentStringsW(L"%LOCALAPPDATA%\\GenieEffect\\genie_debug.log",
+      length = ExpandEnvironmentStringsW(L"%LOCALAPPDATA%\\MinimizeEffect\\minimize_debug.log",
                                          default_path, MAX_PATH);
       if (length > 0 && length < MAX_PATH) {
         path.assign(default_path, length - 1);
       } else {
-        path = L"genie_debug.log";
+        path = L"minimize_debug.log";
       }
     }
 
@@ -217,7 +217,7 @@ void CleanupDebugLogs(std::size_t maximum_files, std::uintmax_t maximum_total_by
     SYSTEMTIME time{};
     GetLocalTime(&time);
     wchar_t suffix[40]{};
-    swprintf_s(suffix, L"genie_debug_%04u%02u%02u_%02u%02u%02u.log", time.wYear, time.wMonth,
+    swprintf_s(suffix, L"minimize_debug_%04u%02u%02u_%02u%02u%02u.log", time.wYear, time.wMonth,
                time.wDay, time.wHour, time.wMinute, time.wSecond);
     std::filesystem::rename(active, folder / suffix, error);
     error.clear();
@@ -229,7 +229,7 @@ void CleanupDebugLogs(std::size_t maximum_files, std::uintmax_t maximum_total_by
       break;
     }
     if (entry.is_regular_file(error) && entry.path() != active &&
-        entry.path().filename().wstring().starts_with(L"genie_debug")) {
+        entry.path().filename().wstring().starts_with(L"minimize_debug")) {
       logs.push_back(entry);
     }
     error.clear();

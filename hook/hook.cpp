@@ -8,7 +8,7 @@ namespace {
 
 constexpr wchar_t kOverlayMessageName[] = L"GenieMinimizeAttempt";
 constexpr wchar_t kRestoreMessageName[] = L"GenieRestoreAttempt";
-constexpr wchar_t kOverlayClassName[] = L"GenieEffectOverlayWindow";
+constexpr wchar_t kOverlayClassName[] = L"MinimizeEffectOverlayWindow";
 
 bool IsMinimizeCommand(LPARAM l_param) {
   if (l_param == SW_MINIMIZE || l_param == SW_SHOWMINIMIZED || l_param == SW_FORCEMINIMIZE) {

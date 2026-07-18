@@ -325,7 +325,7 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
   restore_feature_.ReleaseAll();
   runtime::SnapshotCache::Contents snapshots = snapshot_cache_.TakeAll();
 
-  // Snapshots of Genie-minimized windows first (finish_as_minimized), while Genie props still exist.
+  // Snapshots of effect-minimized windows first (finish_as_minimized), while effect props still exist.
   for (const auto& [hwnd, snapshot] : snapshots.restore) {
     (void)snapshot;
     window_recovery_service_.ReleaseWithoutShowing(hwnd, true);

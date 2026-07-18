@@ -24,13 +24,13 @@ BEGIN
   BEGIN
     BLOCK "040904B0"
     BEGIN
-      VALUE "CompanyName",      "Genie Effect\0"
-      VALUE "FileDescription",  "Genie Effect\0"
+      VALUE "CompanyName",      "Minimize Effect\0"
+      VALUE "FileDescription",  "Minimize Effect\0"
       VALUE "FileVersion",      GENIE_FILE_VERSION_STR
-      VALUE "InternalName",     "GenieEffect\0"
+      VALUE "InternalName",     "MinimizeEffect\0"
       VALUE "LegalCopyright",   "\0"
-      VALUE "OriginalFilename", "GenieEffect.exe\0"
-      VALUE "ProductName",      "Genie Effect\0"
+      VALUE "OriginalFilename", "MinimizeEffect.exe\0"
+      VALUE "ProductName",      "Minimize Effect\0"
       VALUE "ProductVersion",   GENIE_PRODUCT_VERSION_STR
     END
   END

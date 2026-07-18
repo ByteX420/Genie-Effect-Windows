@@ -44,7 +44,7 @@
   <PropertyGroup>
     <OutDir>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\build\obj\App\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>GenieEffect</TargetName>
+    <TargetName>MinimizeEffect</TargetName>
     <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>

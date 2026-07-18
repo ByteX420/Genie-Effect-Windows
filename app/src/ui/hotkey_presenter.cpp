@@ -34,7 +34,7 @@ const char* HotkeyUpdateMessage(HotkeyUpdateResult result) {
     case HotkeyUpdateResult::kInvalid:
       return "Choose a valid key combination";
     case HotkeyUpdateResult::kDuplicate:
-      return "That combination is already used by Genie Effect";
+      return "That combination is already used by Minimize Effect";
     case HotkeyUpdateResult::kUnavailable:
       return "Hotkey unavailable; another application may use it";
     case HotkeyUpdateResult::kSaveFailed:

@@ -64,7 +64,7 @@ std::filesystem::path HookCacheDirectory() {
     const DWORD written = GetEnvironmentVariableW(L"LOCALAPPDATA", local_app_data.data(), required);
     if (written != 0 && written < required) {
       local_app_data.resize(written);
-      return std::filesystem::path(local_app_data) / L"GenieEffect" / L"hooks";
+      return std::filesystem::path(local_app_data) / L"MinimizeEffect" / L"hooks";
     }
   }
 
@@ -72,7 +72,7 @@ std::filesystem::path HookCacheDirectory() {
   const DWORD length = GetTempPathW(static_cast<DWORD>(temporary.size()), temporary.data());
   if (length == 0 || length >= temporary.size()) return {};
   temporary.resize(length);
-  return std::filesystem::path(temporary) / L"GenieEffect" / L"hooks";
+  return std::filesystem::path(temporary) / L"MinimizeEffect" / L"hooks";
 }
 
 std::wstring ExtractEmbeddedHookDll() {

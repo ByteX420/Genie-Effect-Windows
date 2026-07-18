@@ -18,8 +18,8 @@
 namespace genie::rendering {
 namespace {
 
-constexpr wchar_t kOverlayWindowClassName[] = L"GenieEffectOverlayWindow";
-constexpr wchar_t kTargetIndicatorClassName[] = L"GenieEffectTargetIndicator";
+constexpr wchar_t kOverlayWindowClassName[] = L"MinimizeEffectOverlayWindow";
+constexpr wchar_t kTargetIndicatorClassName[] = L"MinimizeEffectTargetIndicator";
 constexpr LONG kOverlayPadding = 2;
 
 int RectWidth(const RECT& rect) { return static_cast<int>(rect.right - rect.left); }
@@ -348,7 +348,7 @@ bool OverlayWindow::CreateOverlayWindow(HINSTANCE instance) {
   constexpr DWORD kExStyle =
       WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT | WS_EX_LAYERED;
   window_ =
-      CreateWindowExW(kExStyle, kOverlayWindowClassName, L"Genie Effect Overlay", WS_POPUP,
+      CreateWindowExW(kExStyle, kOverlayWindowClassName, L"Minimize Effect Overlay", WS_POPUP,
                       overlay_screen_rect_.left, overlay_screen_rect_.top, static_cast<int>(width_),
                       static_cast<int>(height_), nullptr, nullptr, instance, this);
   target_indicator_window_ = CreateWindowExW(

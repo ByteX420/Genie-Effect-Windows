@@ -28,10 +28,10 @@ void TrayIcon::Initialize() {
 
 const wchar_t* TrayIcon::Tooltip(const SettingsViewModel& view_model) {
   if (view_model.temporarily_paused) {
-    return view_model.paused_until_restart ? L"Genie Effect \u2014 Paused until restart"
-                                           : L"Genie Effect \u2014 Paused temporarily";
+    return view_model.paused_until_restart ? L"Minimize Effect \u2014 Paused until restart"
+                                           : L"Minimize Effect \u2014 Paused temporarily";
   }
-  return view_model.enabled ? L"Genie Effect \u2014 Enabled" : L"Genie Effect \u2014 Paused";
+  return view_model.enabled ? L"Minimize Effect \u2014 Enabled" : L"Minimize Effect \u2014 Paused";
 }
 
 bool TrayIcon::Add(HWND owner, const SettingsViewModel& view_model) {
@@ -96,10 +96,10 @@ TrayCommand TrayIcon::HandleCallback(HWND owner, LPARAM parameter,
   HMENU menu = CreatePopupMenu();
   if (menu == nullptr) return TrayCommand::kNone;
   AppendMenuW(menu, MF_STRING | (view_model.enabled ? MF_CHECKED : MF_UNCHECKED), kToggleEnabled,
-              L"Genie Effect Enabled");
+              L"Minimize Effect Enabled");
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   if (view_model.temporarily_paused) {
-    AppendMenuW(menu, MF_STRING, kResume, L"Resume Genie Effect");
+    AppendMenuW(menu, MF_STRING, kResume, L"Resume Minimize Effect");
   } else {
     const UINT pause_flags = view_model.enabled ? MF_STRING : MF_STRING | MF_GRAYED;
     AppendMenuW(menu, pause_flags, kPauseTenMinutes, L"Pause for 10 minutes");

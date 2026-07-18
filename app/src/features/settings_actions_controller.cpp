@@ -336,7 +336,7 @@ SettingsFilePickerResult PickSettingsFile(HWND owner, bool save) {
   ofn.lpstrDefExt = L"json";
   ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY |
               (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
-  ofn.lpstrTitle = save ? L"Export Genie Effect settings" : L"Import Genie Effect settings";
+  ofn.lpstrTitle = save ? L"Export Minimize Effect settings" : L"Import Minimize Effect settings";
   const BOOL ok = save ? GetSaveFileNameW(&ofn) : GetOpenFileNameW(&ofn);
   if (ok != FALSE && path[0] != L'\0') {
     return SettingsFilePickerResult{

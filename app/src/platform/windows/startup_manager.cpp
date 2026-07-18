@@ -8,7 +8,7 @@ namespace genie::platform::windows {
 namespace {
 
 constexpr wchar_t kRunKeyPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-constexpr wchar_t kRunValueName[] = L"GenieEffect";
+constexpr wchar_t kRunValueName[] = L"MinimizeEffect";
 
 std::wstring CurrentExecutablePath() {
   std::vector<wchar_t> buffer(512);

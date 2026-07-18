@@ -1,6 +1,6 @@
-# Genie Effect for Windows
+# Minimize Effect for Windows
 
-**Genie Effect** is an open-source Windows desktop app that replaces the stock minimize and restore transition with a **macOS-style Genie animation**. When you minimize a window, the live desktop region is captured and warped into a deformable mesh that sucks into the taskbar (and expands back out on restore).
+**Minimize Effect** (`Minimize-Effect-Windows`) is an open-source Windows desktop app that replaces the stock minimize and restore transition with **smooth mesh animations** into the taskbar (classic / curvy genie-style curves and squash). When you minimize a window, the live desktop region is captured and warped until it lands on the taskbar target (and expands back out on restore).
 
 It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished ImGui settings UI — not a shell theme pack or AutoHotkey script.
 
@@ -16,7 +16,7 @@ It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished
 
 ## Features
 
-- **Genie minimize & restore** — mesh-based deformation toward the taskbar (or a custom rect)
+- **Custom minimize & restore** — mesh-based deformation toward the taskbar (or a custom rect)
 - **Concurrent animations** — multiple windows can animate without blocking each other
 - **Separate motion controls** — minimize vs restore duration, linked or independent speeds
 - **Easing & style options** — presets, custom cubic-bezier, classic / curvy / squash, strength, fade
@@ -33,7 +33,7 @@ It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished
 
 ## How it works (high level)
 
-Windows does **not** expose a public API that means “replace this DWM minimize animation before the compositor runs it.” Genie Effect uses the strongest **documented** path available:
+Windows does **not** expose a public API that means “replace this DWM minimize animation before the compositor runs it.” Minimize Effect uses the strongest **documented** path available:
 
 1. **Detect** minimize/restore via WinEvents and a **CBT hook DLL** (`GenieHookPost.dll`).
 2. **Policy** decides whether the effect applies (enabled, pause, fullscreen, battery saver, exclusions).
@@ -42,7 +42,7 @@ Windows does **not** expose a public API that means “replace this DWM minimize
 5. **Composite** a transparent topmost overlay with **DirectComposition** + a D3D11 swap chain.
 6. **Deform** a textured mesh (Genie curve / squash) each frame until the window lands at the taskbar target.
 
-Elevated processes are only visible to the hook if Genie Effect itself runs elevated (UIPI).
+Elevated processes are only visible to the hook if Minimize Effect itself runs elevated (UIPI).
 
 For a deeper technical write-up, see [`docs/architecture.md`](docs/architecture.md).
 
@@ -71,7 +71,7 @@ For a deeper technical write-up, see [`docs/architecture.md`](docs/architecture.
 
 ### Visual Studio
 
-1. Open `GenieEffect.slnx`
+1. Open `MinimizeEffect.slnx`
 2. Select configuration **Release** (or **Debug**) and platform **x64**
 3. Build **Solution** (`Ctrl+Shift+B`)
 
@@ -80,26 +80,26 @@ The app project builds the hook DLL first, then links/embeds it as needed.
 ### Command line (Developer PowerShell)
 
 ```powershell
-MSBuild.exe GenieEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
+MSBuild.exe MinimizeEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 ```
 
 ### Outputs
 
 | Path | Contents |
 | --- | --- |
-| `build\bin\x64\Release\` | `GenieEffect.exe`, `GenieHookPost.dll` (+ PDBs) |
+| `build\bin\x64\Release\` | `MinimizeEffect.exe`, `GenieHookPost.dll` (+ PDBs) |
 | `build\bin\x64\Debug\` | Debug binaries |
 | `build\obj\App\x64\<Config>\` | App intermediates |
 | `build\obj\Hook\x64\<Config>\` | Hook intermediates |
 
-**Runtime:** keep `GenieEffect.exe` and `GenieHookPost.dll` in the **same folder**. Release builds can also use the embedded hook resource when configured with `GENIE_EMBED_RELEASE_HOOK`.
+**Runtime:** keep `MinimizeEffect.exe` and `GenieHookPost.dll` in the **same folder**. Release builds can also use the embedded hook resource when configured with `GENIE_EMBED_RELEASE_HOOK`.
 
 ---
 
 ## Usage
 
 1. Build (or obtain) a Release binary pair.
-2. Run `GenieEffect.exe` (optionally **as Administrator** if you want the effect on elevated windows).
+2. Run `MinimizeEffect.exe` (optionally **as Administrator** if you want the effect on elevated windows).
 3. Open the settings window from the tray or hotkey.
 4. Enable the effect (sidebar status chip shows **On** / **Off** / **Paused**).
 5. Minimize any eligible window — it should Genie into the taskbar.
@@ -119,7 +119,7 @@ MSBuild.exe GenieEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 Settings persist to:
 
 ```text
-%LOCALAPPDATA%\GenieEffect\settings.json
+%LOCALAPPDATA%\MinimizeEffect\settings.json
 ```
 
 ---
@@ -140,7 +140,7 @@ Example custom taskbar target:
 
 ```powershell
 $env:GENIE_TASKBAR_RECT = "100,980,1820,1070"
-.\GenieEffect.exe
+.\MinimizeEffect.exe
 ```
 
 ### Debug log
@@ -148,7 +148,7 @@ $env:GENIE_TASKBAR_RECT = "100,980,1820,1070"
 Debug builds write diagnostics to:
 
 ```text
-%LOCALAPPDATA%\GenieEffect\genie_debug.log
+%LOCALAPPDATA%\MinimizeEffect\minimize_debug.log
 ```
 
 ---
@@ -156,10 +156,10 @@ Debug builds write diagnostics to:
 ## Project layout
 
 ```text
-Genie-Effect-Windows/
-|-- GenieEffect.slnx
+Minimize-Effect-Windows/
+|-- GenieEffect.slnx              # solution file name (legacy); product is Minimize Effect
 |-- app/
-|   |-- GenieEffect.vcxproj
+|   |-- GenieEffect.vcxproj       # builds MinimizeEffect.exe
 |   |-- GenieEffect.rc
 |   |-- assets/fonts/
 |   |-- shaders/
@@ -174,7 +174,7 @@ Genie-Effect-Windows/
 |   |   |-- runtime/              # Animation runs, state, pacing, recovery
 |   |   |-- settings/             # Model, validation, serializer, repository
 |   |   `-- ui/                   # Settings host, shell, tray, preview
-|   |       |-- pages/            # Effect, Motion, Apps, System, Hotkeys, Repair, About
+|   |       |-- pages/            # Effect, Motion, Apps, Displays, System, Hotkeys, Repair, About
 |   |       |-- components/       # Controls, combo, easing editor, layout
 |   |       |-- theme/            # Visual tokens and chrome
 |   |       |-- motion/           # UI motion system
@@ -224,7 +224,7 @@ main -> app -> features / runtime / ui -> rendering / platform / settings -> cor
 **Important limitations (by design):**
 
 - No official “pre-DWM replace animation” API — behavior can vary with shell updates.
-- **UIPI:** non-elevated Genie Effect cannot hook elevated windows.
+- **UIPI:** non-elevated Minimize Effect cannot hook elevated windows.
 - Multi-monitor / exotic taskbar setups may need `GENIE_TASKBAR_RECT`.
 - Fullscreen games / exclusive modes may disable or skip the effect (settings flags exist for battery saver / fullscreen-related behavior).
 
@@ -234,17 +234,17 @@ See [`docs/architecture.md`](docs/architecture.md) for ownership, state machine,
 
 ## Automated releases (GitHub Actions)
 
-When the **product version** in `app/GenieEffect.rc` changes on the **`stable`** branch, GitHub Actions:
+When the **product version** in `app/MinimizeEffect.rc` changes on the **`stable`** branch, GitHub Actions:
 
 1. Builds **Release | x64**
-2. Packs `GenieEffect.exe` + `GenieHookPost.dll` into `GenieEffect-windows-x64.zip`
+2. Packs `MinimizeEffect.exe` + `GenieHookPost.dll` into `MinimizeEffect-windows-x64.zip`
 3. Creates or updates the GitHub Release for tag `vX.Y.Z` and uploads the ZIP
 
 Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
 
 ### Cut a new release
 
-1. On `dev` (or a branch), bump the version macros in `app/GenieEffect.rc`:
+1. On `dev` (or a branch), bump the version macros in `app/MinimizeEffect.rc`:
 
    ```c
    #define GENIE_FILE_VERSION      1,3,0,0
@@ -261,7 +261,7 @@ Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
    git push origin stable
    ```
 
-3. Actions runs automatically (because `GenieEffect.rc` changed). Check the **Actions** tab, then **Releases**.
+3. Actions runs automatically (because `MinimizeEffect.rc` changed). Check the **Actions** tab, then **Releases**.
 
 Manual run: **Actions → Release → Run workflow** (optional version override).
 
@@ -294,7 +294,7 @@ Contributions are welcome. A good PR:
 ```powershell
 git checkout -b feature/my-change
 # … edit …
-MSBuild.exe GenieEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
+MSBuild.exe MinimizeEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 # format changed sources with clang-format
 git commit
 ```
@@ -309,7 +309,7 @@ Please include:
 - GPU / driver if graphics-related
 - Elevated vs normal process
 - Steps to reproduce
-- Relevant lines from `genie_debug.log` (Debug builds) if available
+- Relevant lines from `minimize_debug.log` (Debug builds) if available
 
 ---
 
@@ -318,11 +318,11 @@ Please include:
 | Symptom | Things to try |
 | --- | --- |
 | No animation at all | Confirm effect is **On** in settings; check Repair page (Hook / Renderer / D3D). |
-| Elevated apps ignore effect | Run Genie Effect **as Administrator**. |
+| Elevated apps ignore effect | Run Minimize Effect **as Administrator**. |
 | Wrong suck target | Set `GENIE_TASKBAR_RECT` or check taskbar edge (top/bottom/left/right). |
 | Black / stuck overlay | Restart app; check device-lost path; update GPU drivers. |
 | Hook not installed | Ensure `GenieHookPost.dll` sits next to the EXE; rebuild both projects. |
-| Settings not saving | Check write access to `%LOCALAPPDATA%\GenieEffect\`. |
+| Settings not saving | Check write access to `%LOCALAPPDATA%\MinimizeEffect\`. |
 
 ---
 
@@ -351,4 +351,4 @@ You are free to use, modify, and distribute the software, including commercially
 
 ## Disclaimer
 
-Genie Effect interacts with window management, accessibility-style event hooks, and desktop capture. Use at your own risk. Behavior may change with Windows updates. Do not use this software to bypass security boundaries or capture content you are not allowed to access.
+Minimize Effect interacts with window management, accessibility-style event hooks, and desktop capture. Use at your own risk. Behavior may change with Windows updates. Do not use this software to bypass security boundaries or capture content you are not allowed to access.

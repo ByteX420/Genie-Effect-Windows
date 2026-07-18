@@ -41,9 +41,9 @@ void AboutPage::Render(::genie::ui::SettingsWindow& window, components::PageLayo
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "PRODUCT");
   layout.BeginGroup();
   layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightHero);
-  layout.RowTitle(window.font_medium_, kSectionTitleTextSize, "Genie Effect", kPrimaryTextColor);
-  layout.RowSubtitle(window.font_small_, kHelperTextSize, "Native genie minimize for Windows",
-                     kSecondaryTextColor);
+  layout.RowTitle(window.font_medium_, kSectionTitleTextSize, "Minimize Effect", kPrimaryTextColor);
+  layout.RowSubtitle(window.font_small_, kHelperTextSize,
+                     "Custom minimize and restore for Windows", kSecondaryTextColor);
   layout.EndRow();
   layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
   layout.ReserveControl(layout.content_width() * 0.55f);

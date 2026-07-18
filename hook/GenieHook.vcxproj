@@ -45,7 +45,7 @@
     <OutDir>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\build\obj\Hook\$(Platform)\$(Configuration)\</IntDir>
     <TargetName>GenieHookPost</TargetName>
-    <LocalDebuggerCommand>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\GenieEffect.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommand>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\MinimizeEffect.exe</LocalDebuggerCommand>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <ItemDefinitionGroup>
@@ -68,8 +68,8 @@
       <AdditionalDependencies>user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>cmd /c "taskkill /IM GenieEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"</Command>
-      <Message>Stopping a running GenieEffect instance before rebuilding the hook...</Message>
+      <Command>cmd /c "taskkill /IM MinimizeEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"</Command>
+      <Message>Stopping a running MinimizeEffect instance before rebuilding the hook...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">

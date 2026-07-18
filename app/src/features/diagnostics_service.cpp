@@ -133,7 +133,7 @@ DiagnosticsSnapshot DiagnosticsService::Build(const DiagnosticsContext& context)
                                    "x" + std::to_string(virtual_screen.bottom - virtual_screen.top);
 
   std::ostringstream report;
-  report << "Genie Effect Diagnostics\r\n"
+  report << "Minimize Effect Diagnostics\r\n"
          << "Version: " << snapshot.version << "\r\n"
          << "Windows: " << snapshot.windows_version << "\r\n"
          << "Graphics adapter: " << snapshot.graphics_adapter << "\r\n"

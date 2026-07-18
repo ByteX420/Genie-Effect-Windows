@@ -27,7 +27,7 @@
 namespace genie::ui {
 namespace {
 
-constexpr wchar_t kSettingsWindowClass[] = L"GenieEffectImGuiSettings";
+constexpr wchar_t kSettingsWindowClass[] = L"MinimizeEffectImGuiSettings";
 constexpr int kWindowWidth = static_cast<int>(theme::Metrics::kWindowWidth);
 constexpr int kWindowHeight = static_cast<int>(theme::Metrics::kWindowHeight);
 constexpr int kMinimumWindowWidth = kWindowWidth;
@@ -285,7 +285,7 @@ bool SettingsWindow::CreateRenderWindow(HINSTANCE instance) {
   const UINT dpi = GetDpiForSystem();
   const int width = MulDiv(kWindowWidth, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
   const int height = MulDiv(kWindowHeight, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
-  hwnd_ = CreateWindowExW(WS_EX_APPWINDOW, kSettingsWindowClass, L"Genie Effect",
+  hwnd_ = CreateWindowExW(WS_EX_APPWINDOW, kSettingsWindowClass, L"Minimize Effect",
                           WS_POPUP | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU, CW_USEDEFAULT,
                           CW_USEDEFAULT, width, height, nullptr, nullptr, instance, this);
   if (old_context != nullptr) SetThreadDpiAwarenessContext(old_context);

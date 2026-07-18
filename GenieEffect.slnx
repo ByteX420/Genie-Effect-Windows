@@ -3,7 +3,7 @@
     <Platform Name="x64" />
   </Configurations>
   <Properties>
-    <Property Name="StartupProject" Value="app/GenieEffect.vcxproj" />
+    <Property Name="StartupProject" Value="app/MinimizeEffect.vcxproj" />
   </Properties>
-  <Project Path="app/GenieEffect.vcxproj" Id="778ab494-05e4-417f-b10a-bd4d620b0c00" />
+  <Project Path="app/MinimizeEffect.vcxproj" Id="778ab494-05e4-417f-b10a-bd4d620b0c00" />
 </Solution>

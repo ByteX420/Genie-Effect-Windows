@@ -8,7 +8,7 @@
 # - Fork PRs cannot publish releases with write access to this repo.
 #
 # How to cut a release:
-# 1. Bump GENIE_* version macros in app/GenieEffect.rc
+# 1. Bump GENIE_* version macros in app/MinimizeEffect.rc
 # 2. Merge to `stable` and push
 # 3. This workflow builds, zips, and creates/updates tag vX.Y.Z + Release asset
 
@@ -18,14 +18,14 @@ on:
   push:
     branches: [stable]
     paths:
-      - "app/GenieEffect.rc"
-      - "app/GenieEffect.vcxproj"
+      - "app/MinimizeEffect.rc"
+      - "app/MinimizeEffect.vcxproj"
       - "hook/GenieHook.vcxproj"
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
       force_version:
-        description: "Optional override (e.g. 1.0.1). Leave empty to read from GenieEffect.rc"
+        description: "Optional override (e.g. 1.0.1). Leave empty to read from MinimizeEffect.rc"
         required: false
         default: ""
 
@@ -58,10 +58,10 @@ jobs:
           if ($override -and $override.Trim().Length -gt 0) {
             $ver = $override.Trim().TrimStart('v', 'V')
           } else {
-            $rc = Get-Content -Raw "app/GenieEffect.rc"
+            $rc = Get-Content -Raw "app/MinimizeEffect.rc"
             $m = [regex]::Match($rc, 'GENIE_PRODUCT_VERSION_STR\s+"([^"\\]+)')
             if (-not $m.Success) {
-              throw "Could not parse GENIE_PRODUCT_VERSION_STR from app/GenieEffect.rc"
+              throw "Could not parse GENIE_PRODUCT_VERSION_STR from app/MinimizeEffect.rc"
             }
             $ver = $m.Groups[1].Value.Trim()
           }
@@ -107,7 +107,7 @@ jobs:
           Write-Host "MSBuild PlatformToolset=$toolset CharacterSet=MultiByte (project defaults + shipping flags)"
           # Match stable shipping flags from the vcxproj. Explicit /p overrides keep CI honest
           # if a local user.props tries to weaken optimisations.
-          msbuild GenieEffect.slnx `
+          msbuild MinimizeEffect.slnx `
             /restore `
             /p:Configuration=Release `
             /p:Platform=x64 `
@@ -133,7 +133,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $bin = "build\bin\x64\Release"
-          if (-not (Test-Path "$bin\GenieEffect.exe")) { throw "Missing GenieEffect.exe" }
+          if (-not (Test-Path "$bin\MinimizeEffect.exe")) { throw "Missing MinimizeEffect.exe" }
           if (-not (Test-Path "$bin\GenieHookPost.dll")) { throw "Missing GenieHookPost.dll" }
           Get-ChildItem $bin -File | Format-Table Name, Length
 
@@ -144,10 +144,10 @@ jobs:
           $bin = "build\bin\x64\Release"
           $out = "build\dist"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
-          $zipName = "GenieEffect-windows-x64.zip"
+          $zipName = "MinimizeEffect-windows-x64.zip"
           $zip = Join-Path $out $zipName
           if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path "$bin\GenieEffect.exe", "$bin\GenieHookPost.dll" -DestinationPath $zip -Force
+          Compress-Archive -Path "$bin\MinimizeEffect.exe", "$bin\GenieHookPost.dll" -DestinationPath $zip -Force
           $item = Get-Item $zip
           "path=$($item.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -157,35 +157,35 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Genie Effect ${{ steps.version.outputs.tag }}
+          name: Minimize Effect ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           # Create if missing; replace assets if the same tag is re-published (e.g. rebuild)
           files: ${{ steps.package.outputs.path }}
           fail_on_unmatched_files: true
           generate_release_notes: true
           body: |
-            ## Genie Effect ${{ steps.version.outputs.tag }}
+            ## Minimize Effect ${{ steps.version.outputs.tag }}
 
             Automated **stable** release build (Windows x64, MultiByte, LTCG /O2).
 
             ### Highlights
-            - **Displays page** — multi-monitor arrangement in Settings; disable Genie per display and persist via `excludedDisplays` in settings.json
+            - **Displays page** — multi-monitor arrangement in Settings; disable the effect per display and persist via `excludedDisplays` in settings.json
             - **Smart skip under load** — fall back to native minimize when capture/GPU pressure is high, with hysteresis, decay, and abort after unusually slow captures
             - **Iconic seed on startup** — already-minimized windows get snapshots one at a time after the settings enter motion settles (no mid-open freeze)
-            - **Cleaner exit** — Genie-minimized windows stay minimized when the app exits (no mass un-minimize)
+            - **Cleaner exit** — windows finished with a custom minimize stay minimized when the app exits (no mass un-minimize)
             - **Motion Reset** — one atomic write restores every Motion-tab field to defaults (including fade default **No fade**)
             - **Import / export profiles** — JSON settings backup; cancel vs hard failure are distinguished; failed startup registration after import is reported without a false success toast
             - **UI motion** — sidebar nav selection/hover matches the rest of the settings motion system
-            - **Settings shell** — Effect, Motion, Apps, Displays, System, Hotkeys, Repair, About
+            - **Settings pages** — Effect, Motion, Apps, Displays, System, Hotkeys, Repair, About
 
             ### Install
-            1. Download **GenieEffect-windows-x64.zip**
+            1. Download **MinimizeEffect-windows-x64.zip**
             2. Extract (keep both files in the same folder)
-            3. Run `GenieEffect.exe`
+            3. Run `MinimizeEffect.exe`
             4. Optional: run as Administrator for elevated windows
 
             ### Package
-            - `GenieEffect.exe`
+            - `MinimizeEffect.exe`
             - `GenieHookPost.dll`
 
             Product version: **${{ steps.version.outputs.version }}**  
