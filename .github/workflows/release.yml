@@ -8,9 +8,9 @@
 # - Fork PRs cannot publish releases with write access to this repo.
 #
 # How to cut a release:
-# 1. Bump GENIE_* version macros in app/MinimizeEffect.rc
+# 1. Bump GENIE_* version macros in app/GenieEffect.rc (file name is legacy; product is Minimize Effect)
 # 2. Merge to `stable` and push
-# 3. This workflow builds, zips, and creates/updates tag vX.Y.Z + Release asset
+# 3. This workflow builds MinimizeEffect.exe, zips, and creates/updates tag vX.Y.Z + Release asset
 
 name: Release
 
@@ -18,14 +18,14 @@ on:
   push:
     branches: [stable]
     paths:
-      - "app/MinimizeEffect.rc"
-      - "app/MinimizeEffect.vcxproj"
+      - "app/GenieEffect.rc"
+      - "app/GenieEffect.vcxproj"
       - "hook/GenieHook.vcxproj"
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:
       force_version:
-        description: "Optional override (e.g. 1.0.1). Leave empty to read from MinimizeEffect.rc"
+        description: "Optional override (e.g. 1.0.1). Leave empty to read from app/GenieEffect.rc"
         required: false
         default: ""
 
@@ -58,10 +58,10 @@ jobs:
           if ($override -and $override.Trim().Length -gt 0) {
             $ver = $override.Trim().TrimStart('v', 'V')
           } else {
-            $rc = Get-Content -Raw "app/MinimizeEffect.rc"
+            $rc = Get-Content -Raw "app/GenieEffect.rc"
             $m = [regex]::Match($rc, 'GENIE_PRODUCT_VERSION_STR\s+"([^"\\]+)')
             if (-not $m.Success) {
-              throw "Could not parse GENIE_PRODUCT_VERSION_STR from app/MinimizeEffect.rc"
+              throw "Could not parse GENIE_PRODUCT_VERSION_STR from app/GenieEffect.rc"
             }
             $ver = $m.Groups[1].Value.Trim()
           }
@@ -107,7 +107,7 @@ jobs:
           Write-Host "MSBuild PlatformToolset=$toolset CharacterSet=MultiByte (project defaults + shipping flags)"
           # Match stable shipping flags from the vcxproj. Explicit /p overrides keep CI honest
           # if a local user.props tries to weaken optimisations.
-          msbuild MinimizeEffect.slnx `
+          msbuild GenieEffect.slnx `
             /restore `
             /p:Configuration=Release `
             /p:Platform=x64 `
