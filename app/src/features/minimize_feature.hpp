@@ -82,6 +82,10 @@ public:
   [[nodiscard]] bool IsAnimating(HWND window) const;
   void UpdatePreMinimizeSnapshot(HWND window, HWND overlay, rendering::DesktopCapture* capture,
                                  bool renderer_recovering);
+  // Startup seed: flash-restore iconic windows, cache real pixels, re-minimize (one quick blip).
+  void SeedSnapshotsForIconicWindows(HWND overlay, rendering::DesktopCapture* capture,
+                                     platform::TaskbarTargetProvider* taskbar_targets,
+                                     bool renderer_recovering);
   void CompletePendingNativeMinimize(int run_index,
                                      const std::function<void(int, runtime::RunState)>& set_state,
                                      const std::function<void(int)>& abort);

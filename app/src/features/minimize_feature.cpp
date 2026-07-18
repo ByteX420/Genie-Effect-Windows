@@ -6,6 +6,7 @@
 #include <chrono>
 #include <iostream>
 #include <utility>
+#include <vector>
 
 #include "animation/geometry.hpp"
 #include "core/logger.hpp"
@@ -357,6 +358,127 @@ void MinimizeFeature::UpdatePreMinimizeSnapshot(HWND window, HWND overlay,
   snapshots_.PreMinimize()[window] = std::move(snapshot);
   snapshots_.Prune();
   core::LogTrace(L"Minimize", L"Pre-minimize snapshot updated");
+}
+
+void MinimizeFeature::SeedSnapshotsForIconicWindows(HWND overlay,
+                                                    rendering::DesktopCapture* capture,
+                                                    platform::TaskbarTargetProvider* taskbar_targets,
+                                                    bool renderer_recovering) {
+  // Fast startup seed: briefly unminimize iconic windows (one shared flicker), snapshot real
+  // window pixels, then re-minimize. Cloaking is intentionally avoided — it produced empty
+  // captures. Transitions stay disabled so show/hide is a single-frame blip.
+  if (capture == nullptr || renderer_recovering || taskbar_targets == nullptr) return;
+
+  struct Candidate {
+    HWND window = nullptr;
+    WINDOWPLACEMENT placement{};
+    RECT normal{};
+    bool was_maximized = false;
+  };
+
+  std::vector<Candidate> candidates;
+  candidates.reserve(16);
+  for (HWND window : platform::EnumerateTopLevelWindows(overlay)) {
+    if (window == nullptr || !IsWindow(window) || IsIconic(window) == FALSE) continue;
+    if (!platform::IsInterestingTopLevelWindow(window, overlay)) continue;
+    const auto executable = platform::GetWindowExecutableName(window);
+    if (executable.has_value() && policy_.IsExcluded(*executable)) continue;
+    if (snapshots_.Restore().count(window) > 0 &&
+        snapshots_.Restore()[window].texture.shader_resource_view != nullptr) {
+      continue;
+    }
+
+    WINDOWPLACEMENT placement{};
+    placement.length = sizeof(placement);
+    if (!GetWindowPlacement(window, &placement)) continue;
+    RECT normal = placement.rcNormalPosition;
+    if (!IsUsableRect(normal)) continue;
+
+    candidates.push_back(Candidate{
+        .window = window,
+        .placement = placement,
+        .normal = normal,
+        .was_maximized = (placement.flags & WPF_RESTORETOMAXIMIZED) != 0,
+    });
+  }
+  if (candidates.empty()) return;
+
+  // Phase 1 — restore every candidate at once (native path, no Genie intercept).
+  for (Candidate& candidate : candidates) {
+    platform::SetDwmTransitionsDisabled(candidate.window, true);
+    SetPropW(candidate.window, platform::windows::properties::kAllowRestore,
+             reinterpret_cast<HANDLE>(1));
+    // SW_SHOWNOACTIVATE keeps focus; placement still restores maximized windows when
+    // WPF_RESTORETOMAXIMIZED is set.
+    WINDOWPLACEMENT placement = candidate.placement;
+    placement.showCmd = SW_SHOWNOACTIVATE;
+    SetWindowPlacement(candidate.window, &placement);
+  }
+
+  // One compositor tick + short yield so target apps can paint once.
+  DwmFlush();
+  Sleep(16);
+  DwmFlush();
+
+  // Phase 2 — capture real content (PrintWindow first; DXGI only as fallback).
+  struct CapturedCandidate {
+    Candidate* candidate = nullptr;
+    RECT bounds{};
+    rendering::CapturedTexture texture;
+    bool ok = false;
+  };
+  std::vector<CapturedCandidate> captures;
+  captures.reserve(candidates.size());
+  for (Candidate& candidate : candidates) {
+    CapturedCandidate entry{.candidate = &candidate};
+    RECT live{};
+    if (!GetWindowRect(candidate.window, &live) || !IsUsableRect(live)) live = candidate.normal;
+    const std::optional<RECT> frame = platform::GetExtendedFrameBounds(candidate.window);
+    entry.bounds = (frame.has_value() && IsUsableRect(*frame)) ? *frame : live;
+
+    RECT captured_window_bounds{};
+    entry.ok = capture->CaptureWindow(candidate.window, entry.bounds, &entry.texture,
+                                      &captured_window_bounds);
+    if (entry.ok && IsUsableRect(captured_window_bounds)) {
+      entry.bounds = captured_window_bounds;
+    } else if (!entry.ok) {
+      entry.ok = capture->CaptureRegion(entry.bounds, &entry.texture);
+    }
+    if (!entry.ok || entry.texture.shader_resource_view == nullptr) {
+      core::LogDebug(L"Minimize", L"Startup seed capture failed for iconic window");
+      entry.ok = false;
+    }
+    captures.push_back(std::move(entry));
+  }
+
+  // Phase 3 — re-minimize everything that was iconic, store successful snapshots.
+  for (CapturedCandidate& entry : captures) {
+    Candidate& candidate = *entry.candidate;
+    SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
+             reinterpret_cast<HANDLE>(1));
+    WINDOWPLACEMENT placement = candidate.placement;
+    placement.showCmd = SW_SHOWMINNOACTIVE;
+    SetWindowPlacement(candidate.window, &placement);
+    RemovePropW(candidate.window, platform::windows::properties::kAllowMinimize);
+    RemovePropW(candidate.window, platform::windows::properties::kAllowRestore);
+    platform::SetDwmTransitionsDisabled(candidate.window, false);
+
+    if (!entry.ok) continue;
+
+    runtime::CachedSnapshot snapshot;
+    snapshot.window = candidate.window;
+    snapshot.bounds = entry.bounds;
+    snapshot.texture = std::move(entry.texture);
+    snapshot.target = taskbar_targets->GetTargetForWindow(candidate.window, entry.bounds);
+    snapshot.original_placement = candidate.normal;
+    snapshot.was_maximized = candidate.was_maximized;
+    snapshot.process_id = platform::WindowProcessId(candidate.window);
+    snapshot.captured_at_ms = GetTickCount64();
+    snapshots_.PreMinimize()[candidate.window] = snapshot;
+    snapshots_.Restore()[candidate.window] = std::move(snapshot);
+    core::LogDebug(L"Minimize", L"Seeded snapshot for already-minimized window");
+  }
+  snapshots_.Prune();
 }
 
 void MinimizeFeature::CompletePendingNativeMinimize(

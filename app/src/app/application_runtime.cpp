@@ -101,6 +101,11 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
     return false;
   }
 
+  // Capture already-minimized windows so later restores can still play Genie content.
+  minimize_feature_.SeedSnapshotsForIconicWindows(GetOverlayWindow(), desktop_capture_.get(),
+                                                  &taskbar_target_provider_,
+                                                  renderer_recovery_.pending());
+
   std::wcout << L"Genie minimize monitor is running.\n";
   genie::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");
   std::wcout << L"Set GENIE_TASKBAR_RECT=left,top,right,bottom to aim at a "

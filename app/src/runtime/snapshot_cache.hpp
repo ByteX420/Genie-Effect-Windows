@@ -27,7 +27,7 @@ public:
   [[nodiscard]] Contents TakeAll();
 
 private:
-  static constexpr std::size_t kMaximumPreMinimizeSnapshots = 4;
+  static constexpr std::size_t kMaximumPreMinimizeSnapshots = 16;
   Map pre_minimize_;
   Map restore_;
 };
