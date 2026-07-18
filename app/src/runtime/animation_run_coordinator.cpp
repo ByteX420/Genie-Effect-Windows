@@ -276,6 +276,8 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
   shutting_down_.store(true, std::memory_order_release);
 
   genie::core::LogDebug(L"App", L"CleanupAndRestoreAll starting");
+  seed_iconic_snapshots_pending_ = false;
+  minimize_feature_.CancelSeedSnapshotsForIconicWindows();
   UnregisterAllHotkeys();
   effect_controller_.Stop();
   cbt_hook_manager_.Uninstall();

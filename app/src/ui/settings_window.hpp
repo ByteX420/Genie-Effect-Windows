@@ -48,6 +48,9 @@ public:
   void ForceRender();
   [[nodiscard]] HWND hwnd() const { return hwnd_; }
   [[nodiscard]] bool WantsContinuousRendering() const;
+  // True while the open/enter motion for shell + sidebar + first page content is still running.
+  // Used to defer heavy startup work (e.g. iconic seed) until the UI is fully settled.
+  [[nodiscard]] bool IsStartupEnterMotionActive() const { return startup_enter_motion_active_; }
 
 private:
   friend class SettingsShell;
@@ -76,6 +79,8 @@ private:
   void FlushPendingSpeedSave();
   void RecordSaveResult(bool saved);
   void HandleCloseRequest();
+  void UpdateStartupEnterMotionGate();
+  [[nodiscard]] bool DetectStartupEnterMotionActive() const;
 
   HWND hwnd_ = nullptr;
   ui::rendering::ImguiRenderer renderer_;
@@ -111,6 +116,9 @@ private:
   ui::TrayIcon tray_icon_;
   bool render_requested_ = false;
   ULONGLONG shown_at_ms_ = 0;
+  // Gates deferred startup work until window/sidebar/page enter animations finish.
+  bool startup_enter_motion_active_ = false;
+  bool startup_enter_motion_seen_ = false;
   UINT current_dpi_ = USER_DEFAULT_SCREEN_DPI;
   float ui_scale_ = 1.0f;
   ImFont* font_small_ = nullptr;

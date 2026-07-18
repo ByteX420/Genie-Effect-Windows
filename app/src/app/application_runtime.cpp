@@ -83,8 +83,6 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
   hotkey_controller_.SetWindow(settings_window_.hwnd());
   RegisterConfiguredHotkeys();
   settings_window_.UpdatePauseState(false, false);
-  settings_window_.Show(!settings_service_.Get().start_minimized ||
-                        settings_service_.Get().close_behavior != "tray");
   UpdateFullscreenSuppression(true);
   UpdatePowerState(true);
   RefreshEffectRuntimeState();
@@ -101,10 +99,11 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
     return false;
   }
 
-  // Capture already-minimized windows so later restores can still play Genie content.
-  minimize_feature_.SeedSnapshotsForIconicWindows(GetOverlayWindow(), desktop_capture_.get(),
-                                                  &taskbar_target_provider_,
-                                                  renderer_recovery_.pending());
+  // Show the UI only after hooks/renderer are ready, and only once the message loop is
+  // about to start — never while still blocked in Initialize after SW_SHOW.
+  settings_window_.Show(!settings_service_.Get().start_minimized ||
+                        settings_service_.Get().close_behavior != "tray");
+  seed_iconic_snapshots_pending_ = true;
 
   std::wcout << L"Genie minimize monitor is running.\n";
   genie::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");

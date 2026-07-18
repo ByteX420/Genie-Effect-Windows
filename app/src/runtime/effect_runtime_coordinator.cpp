@@ -107,6 +107,22 @@ void ApplicationRuntime::UpdateRuntime() {
   UpdateFullscreenSuppression();
   UpdatePowerState();
   CheckAnimationTimeouts();
+
+  // After shell/sidebar/page enter motion settles, seed iconic windows one-per-tick.
+  if (!shutting_down_.load(std::memory_order_acquire)) {
+    const bool settings_enter_busy =
+        settings_window_.hwnd() != nullptr && IsWindowVisible(settings_window_.hwnd()) &&
+        settings_window_.IsStartupEnterMotionActive();
+    if (seed_iconic_snapshots_pending_ && !settings_enter_busy) {
+      seed_iconic_snapshots_pending_ = false;
+      minimize_feature_.BeginSeedSnapshotsForIconicWindows(
+          GetOverlayWindow(), desktop_capture_.get(), &taskbar_target_provider_,
+          renderer_recovery_.pending());
+    }
+    if (minimize_feature_.SeedSnapshotsInProgress()) {
+      (void)minimize_feature_.TickSeedSnapshotsForIconicWindows();
+    }
+  }
 }
 
 void ApplicationRuntime::HandleDisplayChange() {

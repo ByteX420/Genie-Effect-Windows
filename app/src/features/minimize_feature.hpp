@@ -3,6 +3,7 @@
 #include <functional>
 #include <optional>
 #include <unordered_set>
+#include <vector>
 #include <windows.h>
 
 #include "runtime/run_state.hpp"
@@ -84,10 +85,15 @@ public:
   [[nodiscard]] bool IsAnimating(HWND window) const;
   void UpdatePreMinimizeSnapshot(HWND window, HWND overlay, rendering::DesktopCapture* capture,
                                  bool renderer_recovering);
-  // Startup seed: flash-restore iconic windows, cache real pixels, re-minimize (one quick blip).
-  void SeedSnapshotsForIconicWindows(HWND overlay, rendering::DesktopCapture* capture,
-                                     platform::TaskbarTargetProvider* taskbar_targets,
-                                     bool renderer_recovering);
+  // Startup seed spread across frames so the settings enter animation never hitch-blocks.
+  // Begin restores all candidates; Tick captures/re-minimizes one window per call.
+  void BeginSeedSnapshotsForIconicWindows(HWND overlay, rendering::DesktopCapture* capture,
+                                          platform::TaskbarTargetProvider* taskbar_targets,
+                                          bool renderer_recovering);
+  // Returns true while more seed work remains.
+  [[nodiscard]] bool TickSeedSnapshotsForIconicWindows();
+  void CancelSeedSnapshotsForIconicWindows();
+  [[nodiscard]] bool SeedSnapshotsInProgress() const;
   void CompletePendingNativeMinimize(int run_index,
                                      const std::function<void(int, runtime::RunState)>& set_state,
                                      const std::function<void(int)>& abort);
@@ -96,11 +102,29 @@ private:
   friend class Transaction;
   void HandOff(HWND window);
 
+  struct SeedCandidate {
+    HWND window = nullptr;
+    WINDOWPLACEMENT placement{};
+    RECT normal{};
+    bool was_maximized = false;
+  };
+
   EffectPolicy& policy_;
   WindowRecoveryService& recovery_;
   runtime::AnimationRunPool& runs_;
   runtime::SnapshotCache& snapshots_;
   std::unordered_set<HWND> active_;
+
+  enum class SeedPhase {
+    kIdle,
+    kWaitPaint,
+    kCapture,
+  };
+  SeedPhase seed_phase_ = SeedPhase::kIdle;
+  std::vector<SeedCandidate> seed_candidates_;
+  std::size_t seed_index_ = 0;
+  rendering::DesktopCapture* seed_capture_ = nullptr;
+  platform::TaskbarTargetProvider* seed_targets_ = nullptr;
 };
 
 }  // namespace genie::features

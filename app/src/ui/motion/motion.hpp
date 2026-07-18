@@ -89,6 +89,9 @@ public:
 
   [[nodiscard]] bool IsActive(std::string_view key) const;
   [[nodiscard]] bool IsActive(const MotionKey& key) const;
+  // True if any track whose key starts with prefix is currently animating.
+  [[nodiscard]] bool AnyActiveWithPrefix(std::string_view prefix) const;
+  [[nodiscard]] bool HasActiveTracks() const;
   [[nodiscard]] MotionStats GetStats() const;
 
 private:
@@ -117,6 +120,13 @@ private:
 
   template <typename T>
   [[nodiscard]] bool IsTrackActive(const TrackMap<T>& tracks, std::string_view key) const;
+
+  template <typename T>
+  [[nodiscard]] bool AnyTrackActiveWithPrefix(const TrackMap<T>& tracks,
+                                              std::string_view prefix) const;
+
+  template <typename T>
+  [[nodiscard]] bool AnyTrackActive(const TrackMap<T>& tracks) const;
 
   template <typename T>
   void CleanupTracks(TrackMap<T>& tracks);

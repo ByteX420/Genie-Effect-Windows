@@ -88,6 +88,9 @@ void SettingsWindow::Show(bool show) {
   if (show) {
     motion_system_.Set(ui::motion::MotionKey("window", "settings", "alpha"), 0.0f);
     motion_system_.Set(ui::motion::MotionKey("window", "settings", "offset"), ImVec2(0.0f, 6.0f));
+    // Block deferred startup work until shell/sidebar/page enter tracks settle.
+    startup_enter_motion_active_ = true;
+    startup_enter_motion_seen_ = false;
     if (IsIconic(hwnd_)) {
       ShowWindow(hwnd_, SW_RESTORE);
     }
@@ -308,12 +311,39 @@ void SettingsWindow::UpdateReducedMotion() {
       reduced ? ui::motion::MotionTokens::Reduced() : ui::motion::MotionTokens::Default();
 }
 
+bool SettingsWindow::DetectStartupEnterMotionActive() const {
+  const auto& motion = motion_system_;
+  // Window shell enter, first page content enter, brand/status, sidebar item reveals,
+  // and staggered page-layout reveals — not hover/press (sidebar-main / controls).
+  if (motion.IsActive(ui::motion::MotionKey("window", "settings", "alpha"))) return true;
+  if (motion.IsActive(ui::motion::MotionKey("window", "settings", "offset"))) return true;
+  if (motion.IsActive(ui::motion::MotionKey("page", "content", "alpha"))) return true;
+  if (motion.IsActive(ui::motion::MotionKey("page", "content", "offset"))) return true;
+  if (motion.AnyActiveWithPrefix("shell/")) return true;
+  if (motion.AnyActiveWithPrefix("layout/")) return true;
+  // Sidebar tab reveals use "sidebar/##settings_page_N/reveal" (not "sidebar-main/...").
+  if (motion.AnyActiveWithPrefix("sidebar/")) return true;
+  return false;
+}
+
+void SettingsWindow::UpdateStartupEnterMotionGate() {
+  if (!startup_enter_motion_active_) return;
+  if (DetectStartupEnterMotionActive()) {
+    startup_enter_motion_seen_ = true;
+    return;
+  }
+  // Wait until enter tracks have started at least once, then fully settled.
+  if (startup_enter_motion_seen_) {
+    startup_enter_motion_active_ = false;
+  }
+}
+
 void SettingsWindow::Render() {
   animation_preview_.Update(hwnd_, controller_->view_model().minimize_duration,
                             controller_->view_model().restore_duration);
   if (!IsWindowVisible(hwnd_)) return;
   const ULONGLONG now_ms = GetTickCount64();
-  const bool is_animating = (now_ms - shown_at_ms_ < 500);
+  const bool is_animating = startup_enter_motion_active_ || (now_ms - shown_at_ms_ < 500);
   const bool is_active = (GetForegroundWindow() == hwnd_);
   const bool feedback_active = !save_feedback_.empty() && now_ms < save_feedback_until_ms_;
   if (!is_animating && !is_active && !animation_preview_.active() && !feedback_active &&
@@ -326,6 +356,7 @@ void SettingsWindow::Render() {
   }
   motion_system_.BeginFrame(ImGui::GetIO().DeltaTime);
   SettingsShell::Render(*this);
+  UpdateStartupEnterMotionGate();
   renderer_.EndFrame();
 }
 
@@ -335,9 +366,9 @@ bool SettingsWindow::WantsContinuousRendering() const {
   if (!renderer_.ready() || hwnd_ == nullptr || !IsWindowVisible(hwnd_)) {
     return false;
   }
-  const bool appearance_active = GetTickCount64() - shown_at_ms_ < 500;
-  return appearance_active || animation_preview_.active() || GetForegroundWindow() == hwnd_ ||
-         motion_system_.GetStats().active_tracks > 0 || render_requested_;
+  return startup_enter_motion_active_ || animation_preview_.active() ||
+         GetForegroundWindow() == hwnd_ || motion_system_.GetStats().active_tracks > 0 ||
+         render_requested_;
 }
 
 }  // namespace genie::ui

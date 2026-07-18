@@ -143,6 +143,8 @@ private:
   float last_capture_duration_ms_ = 0.0f;
   bool device_recovery_test_pending_ = false;
   std::string startup_repair_status_ = "Not checked";
+  // Defer startup iconic capture until settings enter motion (shell/sidebar/page) finishes.
+  bool seed_iconic_snapshots_pending_ = false;
   genie::settings::SettingsService settings_service_;
   genie::features::HotkeyController hotkey_controller_{settings_service_, hotkey_manager_};
   genie::features::SettingsMutationService settings_mutations_{settings_service_};

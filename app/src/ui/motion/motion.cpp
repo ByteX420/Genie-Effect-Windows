@@ -238,6 +238,17 @@ bool MotionSystem::IsActive(std::string_view key) const {
 
 bool MotionSystem::IsActive(const MotionKey& key) const { return IsActive(key.GetValue()); }
 
+bool MotionSystem::AnyActiveWithPrefix(std::string_view prefix) const {
+  return AnyTrackActiveWithPrefix(scalar_tracks_, prefix) ||
+         AnyTrackActiveWithPrefix(vector_tracks_, prefix) ||
+         AnyTrackActiveWithPrefix(color_tracks_, prefix);
+}
+
+bool MotionSystem::HasActiveTracks() const {
+  return AnyTrackActive(scalar_tracks_) || AnyTrackActive(vector_tracks_) ||
+         AnyTrackActive(color_tracks_);
+}
+
 MotionStats MotionSystem::GetStats() const {
   MotionStats result{};
   result.scalar_tracks = scalar_tracks_.size();
@@ -369,6 +380,25 @@ template <typename T>
 bool MotionSystem::IsTrackActive(const TrackMap<T>& tracks, std::string_view key) const {
   const auto it = tracks.find(std::string(key));
   return it != tracks.end() && it->second.active;
+}
+
+template <typename T>
+bool MotionSystem::AnyTrackActiveWithPrefix(const TrackMap<T>& tracks,
+                                            std::string_view prefix) const {
+  for (const auto& [key, track] : tracks) {
+    if (!track.active) continue;
+    if (key.size() >= prefix.size() && key.compare(0, prefix.size(), prefix) == 0) return true;
+  }
+  return false;
+}
+
+template <typename T>
+bool MotionSystem::AnyTrackActive(const TrackMap<T>& tracks) const {
+  for (const auto& [key, track] : tracks) {
+    (void)key;
+    if (track.active) return true;
+  }
+  return false;
 }
 
 template <typename T>
