@@ -249,23 +249,57 @@ std::wstring PickSettingsFile(HWND owner, bool save) {
 
 }  // namespace
 
-bool ApplicationRuntime::ExportSettings() {
+ui::SettingsFileOperationResult ApplicationRuntime::ExportSettings() {
   const std::wstring path = PickSettingsFile(settings_window_.hwnd(), true);
-  if (path.empty()) return false;
-  const bool saved = settings_mutations_.ExportSettingsToFile(path);
-  return saved;
+  if (path.empty()) {
+    return ui::SettingsFileOperationResult{.result = ui::SettingsFileResult::kCancelled};
+  }
+  if (!settings_mutations_.ExportSettingsToFile(path)) {
+    return ui::SettingsFileOperationResult{
+        .result = ui::SettingsFileResult::kFailed,
+        .message = "Could not export settings",
+        .is_error = true,
+    };
+  }
+  return ui::SettingsFileOperationResult{
+      .result = ui::SettingsFileResult::kSuccess,
+      .message = "Settings exported",
+  };
 }
 
-bool ApplicationRuntime::ImportSettings() {
+ui::SettingsFileOperationResult ApplicationRuntime::ImportSettings() {
   const std::wstring path = PickSettingsFile(settings_window_.hwnd(), false);
-  if (path.empty()) return false;
-  const bool loaded = settings_mutations_.ImportSettingsFromFile(path, [this] {
-    effect_policy_.Configure(settings_service_.Get());
-    RegisterConfiguredHotkeys();
-    RefreshEffectRuntimeState();
-  });
+  if (path.empty()) {
+    return ui::SettingsFileOperationResult{.result = ui::SettingsFileResult::kCancelled};
+  }
+  bool startup_registration_failed = false;
+  const bool loaded = settings_mutations_.ImportSettingsFromFile(
+      path,
+      [this] {
+        effect_policy_.Configure(settings_service_.Get());
+        RegisterConfiguredHotkeys();
+        RefreshEffectRuntimeState();
+      },
+      &startup_registration_failed);
   settings_window_.UpdateState(settings_service_.Get());
-  return loaded;
+  if (!loaded) {
+    return ui::SettingsFileOperationResult{
+        .result = ui::SettingsFileResult::kFailed,
+        .message = "Could not import settings",
+        .is_error = true,
+    };
+  }
+  if (startup_registration_failed) {
+    return ui::SettingsFileOperationResult{
+        .result = ui::SettingsFileResult::kSuccess,
+        .message = "Settings imported, startup registration failed",
+        .is_error = true,
+    };
+  }
+  return ui::SettingsFileOperationResult{
+      .result = ui::SettingsFileResult::kSuccess,
+      .message = "Settings imported",
+  };
 }
 
 }  // namespace genie::app

@@ -78,6 +78,7 @@ private:
   void UpdateReducedMotion();
   void FlushPendingSpeedSave();
   void RecordSaveResult(bool saved);
+  void RecordFileOperationResult(const SettingsFileOperationResult& result);
   void HandleCloseRequest();
   void UpdateStartupEnterMotionGate();
   [[nodiscard]] bool DetectStartupEnterMotionActive() const;

@@ -182,7 +182,9 @@ bool SettingsMutationService::SetApplicationExcluded(const std::string& executab
 }
 
 bool SettingsMutationService::ImportSettingsFromFile(const std::wstring& path,
-                                                     const std::function<void()>& applied) {
+                                                     const std::function<void()>& applied,
+                                                     bool* out_startup_registration_failed) {
+  if (out_startup_registration_failed) *out_startup_registration_failed = false;
   if (path.empty()) return false;
   std::ifstream input(std::filesystem::path(path), std::ios::binary);
   if (!input) {
@@ -211,10 +213,19 @@ bool SettingsMutationService::ImportSettingsFromFile(const std::wstring& path,
   }
 
   const bool previous_startup = settings_.Get().run_at_startup;
+  const bool desired_startup = proposed.run_at_startup;
   if (!settings_.Update(std::move(proposed))) return false;
-  if (settings_.Get().run_at_startup != previous_startup &&
-      !platform::windows::ConfigureRunAtStartup(settings_.Get().run_at_startup)) {
-    core::LogDebug(L"Settings", L"Import applied but startup registration failed");
+
+  if (desired_startup != previous_startup &&
+      !platform::windows::ConfigureRunAtStartup(desired_startup)) {
+    // Keep stored settings consistent with the real Windows registration state.
+    auto rolled_back = settings_.Get();
+    rolled_back.run_at_startup = previous_startup;
+    if (!settings_.Update(std::move(rolled_back))) {
+      core::LogDebug(L"Settings", L"Import applied but failed to roll back runAtStartup");
+    }
+    if (out_startup_registration_failed) *out_startup_registration_failed = true;
+    core::LogDebug(L"Settings", L"Import applied but startup registration failed; rolled back");
   }
   if (applied) applied();
   return true;

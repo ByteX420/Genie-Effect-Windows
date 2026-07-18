@@ -227,6 +227,30 @@ void SettingsWindow::RecordSaveResult(bool saved) {
   ForceRender();
 }
 
+void SettingsWindow::RecordFileOperationResult(const SettingsFileOperationResult& result) {
+  if (result.result == SettingsFileResult::kCancelled) {
+    // User closed the picker — silent, not an error toast.
+    return;
+  }
+  auto& motion = motion_system_;
+  motion.Set(ui::motion::MotionKey("toast", "save", "show"), 0.0f);
+  if (result.result == SettingsFileResult::kSuccess) {
+    persistence_error_.clear();
+    save_feedback_ = result.message.empty() ? "Saved" : result.message;
+    save_feedback_until_ms_ = GetTickCount64() + (result.is_error ? 5500 : 2200);
+    save_feedback_error_ = result.is_error;
+  } else {
+    persistence_error_ = result.message.empty()
+                             ? "Could not save settings. Check folder permissions or disk space."
+                             : result.message;
+    save_feedback_ = result.message.empty() ? "Could not save settings" : result.message;
+    save_feedback_until_ms_ = GetTickCount64() + 5500;
+    save_feedback_error_ = true;
+    genie::core::LogDebug(L"Settings", L"Settings file operation failed");
+  }
+  ForceRender();
+}
+
 void SettingsWindow::HandleCloseRequest() {
   // close_behavior "tray" only hides the window. Everything else must exit the
   // process (same contract as 795f55b2 — close button exits the app).

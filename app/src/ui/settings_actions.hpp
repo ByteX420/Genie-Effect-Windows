@@ -23,6 +23,19 @@ enum class HotkeyUpdateResult {
   kSaveFailed,
 };
 
+enum class SettingsFileResult {
+  kSuccess,
+  kCancelled,
+  kFailed,
+};
+
+struct SettingsFileOperationResult {
+  SettingsFileResult result = SettingsFileResult::kFailed;
+  // Optional toast override (e.g. import succeeded with a non-fatal warning).
+  std::string message;
+  bool is_error = false;
+};
+
 class SettingsActions {
 public:
   virtual ~SettingsActions() = default;
@@ -43,8 +56,8 @@ public:
   virtual bool SetCloseBehavior(const std::string& behavior) = 0;
   virtual bool SetStartupOptions(bool run_at_startup, bool start_minimized) = 0;
   virtual bool SetApplicationExcluded(const std::string& executable, bool excluded) = 0;
-  virtual bool ExportSettings() = 0;
-  virtual bool ImportSettings() = 0;
+  virtual SettingsFileOperationResult ExportSettings() = 0;
+  virtual SettingsFileOperationResult ImportSettings() = 0;
   virtual void SetTemporaryPause(TemporaryPauseAction action) = 0;
   virtual HotkeyUpdateResult SetHotkey(settings::HotkeyAction action,
                                        settings::HotkeyBinding binding) = 0;

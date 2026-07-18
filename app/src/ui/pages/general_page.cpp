@@ -117,7 +117,7 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   if (ui::components::CompactButton(motion, "##export_settings", "Export",
                                     ImVec2(button_width, button_height), window.font_body_, scale,
                                     alpha)) {
-    window.RecordSaveResult(window.controller_->actions().ExportSettings());
+    window.RecordFileOperationResult(window.controller_->actions().ExportSettings());
   }
   layout.EndRow();
   layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
@@ -130,7 +130,7 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   if (ui::components::CompactButton(motion, "##import_settings", "Import",
                                     ImVec2(button_width, button_height), window.font_body_, scale,
                                     alpha)) {
-    window.RecordSaveResult(window.controller_->actions().ImportSettings());
+    window.RecordFileOperationResult(window.controller_->actions().ImportSettings());
   }
   layout.EndRow();
   layout.EndGroup();
