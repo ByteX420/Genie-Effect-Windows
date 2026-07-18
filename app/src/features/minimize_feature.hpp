@@ -77,8 +77,10 @@ public:
   [[nodiscard]] bool Execute(HWND window, const MinimizeExecutionContext& context);
   [[nodiscard]] std::optional<Transaction> Begin(const MinimizeRequest& request);
   void Complete(HWND window);
-  void Cancel(HWND window);
-  void CancelAll();
+  void Cancel(HWND window, bool force_show_if_iconic = true);
+  void CancelAll(bool force_show_if_iconic = true);
+  // Drop tracking without touching the window (used on shutdown after ReleaseWithoutShowing).
+  void ReleaseAll();
   [[nodiscard]] bool IsAnimating(HWND window) const;
   void UpdatePreMinimizeSnapshot(HWND window, HWND overlay, rendering::DesktopCapture* capture,
                                  bool renderer_recovering);

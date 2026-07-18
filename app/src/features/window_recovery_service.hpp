@@ -14,6 +14,9 @@ public:
   explicit WindowRecoveryService(runtime::SnapshotCache& snapshots);
 
   void Restore(HWND window, bool force_show_if_iconic = true);
+  // Drop Genie cloak/transparency/props without unminimizing. When finish_as_minimized is
+  // true, mid-minimize (cloaked but still visible) windows are native-minimized first.
+  void ReleaseWithoutShowing(HWND window, bool finish_as_minimized = false);
   [[nodiscard]] std::size_t HealLeftovers();
   void HealUntrackedWindows();
   [[nodiscard]] bool restoring() const { return restoring_; }

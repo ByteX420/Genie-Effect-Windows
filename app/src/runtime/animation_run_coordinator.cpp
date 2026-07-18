@@ -286,26 +286,56 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
     PostMessageW(GetOverlayWindow(), WM_CLOSE, 0, 0);
   }
 
+  // Tear down in-flight animations without unminimizing windows that Genie already
+  // put in the taskbar. Mid-minimize finishes as minimized; mid-restore only clears
+  // cloak/transparency and leaves iconic windows iconic.
   for (int index = 0; index < static_cast<int>(runs_.size()); ++index) {
     runtime::AnimationRun& run = runs_[index];
-    if (run.animating_window != nullptr || run.pending_native_minimize_window != nullptr ||
-        run.overlay.active()) {
-      CleanupRun(index, RunCleanupOutcome::kAborted);
+    if (run.animating_window == nullptr && run.pending_native_minimize_window == nullptr &&
+        !run.overlay.active()) {
+      continue;
     }
+    HWND window = run.animating_window != nullptr ? run.animating_window
+                                                  : run.pending_native_minimize_window;
+    const bool was_restoring = run.animating_restore;
+    if (run.state != runtime::RunState::kIdle) {
+      SetRunState(index, runtime::RunState::kCleaningUp);
+    }
+    run.animating_window = nullptr;
+    run.pending_native_minimize_window = nullptr;
+    run.animating_restore = false;
+    run.live_animation_capture_enabled = false;
+    if (window != nullptr && IsWindow(window)) {
+      if (was_restoring) {
+        window_recovery_service_.ReleaseWithoutShowing(window, false);
+      } else {
+        window_recovery_service_.ReleaseWithoutShowing(window, true);
+      }
+      snapshot_cache_.Restore().erase(window);
+      snapshot_cache_.PreMinimize().erase(window);
+    }
+    if (run.overlay.active()) run.overlay.CancelAnimation();
+    run.animation_monitor = nullptr;
+    run.animation_frame_interval = std::chrono::steady_clock::duration::zero();
+    SetRunState(index, runtime::RunState::kIdle);
   }
-  minimize_feature_.CancelAll();
-  restore_feature_.CancelAll();
+  minimize_feature_.ReleaseAll();
+  restore_feature_.ReleaseAll();
   runtime::SnapshotCache::Contents snapshots = snapshot_cache_.TakeAll();
 
-  window_recovery_service_.HealUntrackedWindows();
-
-  // Also restore any tracked windows from our maps.
+  // Snapshots of Genie-minimized windows first (finish_as_minimized), while Genie props still exist.
   for (const auto& [hwnd, snapshot] : snapshots.restore) {
-    RestoreWindowFromGenieState(hwnd);
+    (void)snapshot;
+    window_recovery_service_.ReleaseWithoutShowing(hwnd, true);
   }
+  // Pre-minimize cache is for still-visible windows — only clear props, never force minimize.
   for (const auto& [hwnd, snapshot] : snapshots.pre_minimize) {
-    RestoreWindowFromGenieState(hwnd);
+    (void)snapshot;
+    window_recovery_service_.ReleaseWithoutShowing(hwnd, false);
   }
+
+  // Safety net: any remaining Genie cloak/props on the desktop, still without SW_RESTORE.
+  window_recovery_service_.HealUntrackedWindows();
 
   runs_.ShutdownOverlays();
   settings_window_.Shutdown();

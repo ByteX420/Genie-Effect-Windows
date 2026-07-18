@@ -38,6 +38,29 @@ void WindowRecoveryService::Restore(HWND window, bool force_show_if_iconic) {
   restoring_ = false;
 }
 
+void WindowRecoveryService::ReleaseWithoutShowing(HWND window, bool finish_as_minimized) {
+  if (!IsWindow(window)) return;
+  restoring_ = true;
+
+  (void)platform::SetOwnedWindowRegion(window, nullptr, true);
+
+  // Mid-minimize: Genie has cloaked/transparent the window but native minimize may not have
+  // finished. On shutdown we must finish as minimized — never SW_RESTORE those windows.
+  if (finish_as_minimized && IsIconic(window) == FALSE &&
+      platform::windows::properties::HasGenieState(window)) {
+    platform::SetDwmTransitionsDisabled(window, true);
+    SetPropW(window, platform::windows::properties::kAllowMinimize, reinterpret_cast<HANDLE>(1));
+    ShowWindow(window, SW_SHOWMINNOACTIVE);
+    RemovePropW(window, platform::windows::properties::kAllowMinimize);
+    platform::SetDwmTransitionsDisabled(window, false);
+  }
+
+  platform::SetWindowCloaked(window, false);
+  platform::windows::properties::RestoreTransparency(window);
+  platform::windows::properties::ClearGenieState(window);
+  restoring_ = false;
+}
+
 std::size_t WindowRecoveryService::HealLeftovers() {
   core::LogDebug(L"Recovery", L"Checking for leftover Genie windows");
   std::size_t repaired_count = 0;

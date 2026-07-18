@@ -213,11 +213,13 @@ void RestoreFeature::Cancel(HWND window, bool force_show_if_iconic) {
   recovery_.Restore(window, force_show_if_iconic);
 }
 
-void RestoreFeature::CancelAll() {
+void RestoreFeature::CancelAll(bool force_show_if_iconic) {
   const auto active = std::move(active_);
   active_.clear();
-  for (HWND window : active) recovery_.Restore(window, true);
+  for (HWND window : active) recovery_.Restore(window, force_show_if_iconic);
 }
+
+void RestoreFeature::ReleaseAll() { active_.clear(); }
 
 bool RestoreFeature::PreservePlacementAndMarkOffscreen(HWND window,
                                                        runtime::CachedSnapshot* snapshot) const {

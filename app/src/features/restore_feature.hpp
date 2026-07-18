@@ -74,7 +74,8 @@ public:
   [[nodiscard]] std::optional<Transaction> Begin(const RestoreRequest& request);
   void Complete(HWND window);
   void Cancel(HWND window, bool force_show_if_iconic = false);
-  void CancelAll();
+  void CancelAll(bool force_show_if_iconic = true);
+  void ReleaseAll();
   [[nodiscard]] bool PreservePlacementAndMarkOffscreen(HWND window,
                                                        runtime::CachedSnapshot* snapshot) const;
   [[nodiscard]] bool IsWindowRestored(HWND window) const;

@@ -285,16 +285,18 @@ void MinimizeFeature::HandOff(HWND window) { active_.insert(window); }
 
 void MinimizeFeature::Complete(HWND window) { active_.erase(window); }
 
-void MinimizeFeature::Cancel(HWND window) {
+void MinimizeFeature::Cancel(HWND window, bool force_show_if_iconic) {
   active_.erase(window);
-  recovery_.Restore(window, true);
+  recovery_.Restore(window, force_show_if_iconic);
 }
 
-void MinimizeFeature::CancelAll() {
+void MinimizeFeature::CancelAll(bool force_show_if_iconic) {
   const auto active = std::move(active_);
   active_.clear();
-  for (HWND window : active) recovery_.Restore(window, true);
+  for (HWND window : active) recovery_.Restore(window, force_show_if_iconic);
 }
+
+void MinimizeFeature::ReleaseAll() { active_.clear(); }
 
 bool MinimizeFeature::IsAnimating(HWND window) const {
   return std::any_of(runs_.begin(), runs_.end(), [window](const runtime::AnimationRun& run) {
