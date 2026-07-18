@@ -36,6 +36,32 @@ bool EffectPolicy::IsExcluded(std::string_view executable_name) const {
   return settings::ContainsExcludedApplication(settings_.excluded_applications, executable_name);
 }
 
+bool EffectPolicy::ShouldSkipAnimationForLoad(const RenderingPressure& pressure) const {
+  if (!settings_.smart_skip_under_load) return false;
+  int score = 0;
+  if (pressure.renderer_recovering || pressure.recent_device_failures > 0) score += 3;
+  if (pressure.active_animations >= 2) {
+    score += 2;
+  } else if (pressure.active_animations == 1) {
+    ++score;
+  }
+  if (pressure.last_capture_duration_ms >= 28.0f) {
+    score += 3;
+  } else if (pressure.last_capture_duration_ms >= 18.0f) {
+    score += 2;
+  } else if (pressure.last_capture_duration_ms >= 12.0f) {
+    ++score;
+  }
+  if (pressure.recent_missed_frames >= 12) {
+    score += 3;
+  } else if (pressure.recent_missed_frames >= 6) {
+    score += 2;
+  } else if (pressure.recent_missed_frames >= 3) {
+    ++score;
+  }
+  return score >= 4;
+}
+
 int EffectPolicy::SelectMeshSegmentCount(int width, int height,
                                          const RenderingPressure& rendering) const {
   if (settings_.quality_mode == "best_quality") return 50;

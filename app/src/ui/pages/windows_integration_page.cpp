@@ -46,6 +46,24 @@ void WindowsIntegrationPage::Render(::genie::ui::SettingsWindow& window,
     window.RecordSaveResult(saved);
   }
   layout.EndRow();
+
+  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.ReserveControl(toggle_width);
+  layout.RowTitle(window.font_body_, kLabelTextSize, "Smart skip under load", kPrimaryTextColor);
+  layout.RowSubtitle(window.font_small_, kHelperTextSize,
+                     "Fall back to native minimize when capture/GPU load is high",
+                     kSecondaryTextColor);
+  const bool previous_smart_skip = model.smart_skip_under_load;
+  cursor = layout.ControlCursor(toggle_width, toggle_height);
+  layout.SetCursor(cursor.x, cursor.y);
+  if (ui::components::Toggle(motion, "##smart_skip_under_load", &model.smart_skip_under_load,
+                             scale, alpha)) {
+    const bool saved =
+        window.controller_->actions().SetSmartSkipUnderLoad(model.smart_skip_under_load);
+    if (!saved) model.smart_skip_under_load = previous_smart_skip;
+    window.RecordSaveResult(saved);
+  }
+  layout.EndRow();
   layout.EndGroup();
 
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "POWER");

@@ -117,8 +117,8 @@ public:
       } else if (key == "linkSpeeds" || key == "adaptiveDuration" ||
                  key == "disableAnimationsFullscreen" || key == "reduceEffectsOnBattery" ||
                  key == "disableEffectsBatterySaver" || key == "showTargetIndicator" ||
-                 key == "followWindowsAnimationPreference" || key == "startMinimized" ||
-                 key == "runAtStartup") {
+                 key == "smartSkipUnderLoad" || key == "followWindowsAnimationPreference" ||
+                 key == "startMinimized" || key == "runAtStartup") {
         bool value = false;
         value_valid = ParseBoolean(&value);
         if (value_valid) {
@@ -130,6 +130,7 @@ public:
             settings->disable_effects_battery_saver = value;
           }
           if (key == "showTargetIndicator") settings->show_target_indicator = value;
+          if (key == "smartSkipUnderLoad") settings->smart_skip_under_load = value;
           if (key == "startMinimized") settings->start_minimized = value;
           if (key == "runAtStartup") settings->run_at_startup = value;
         }
@@ -515,6 +516,7 @@ std::string SettingsSerializer::Serialize(const AppSettings& settings) {
          << "  \"genieStrength\": " << settings.genie_strength << ",\n"
          << "  \"fadeStrength\": \"" << EscapeJsonString(settings.fade_strength) << "\",\n"
          << "  \"showTargetIndicator\": " << settings.show_target_indicator << ",\n"
+         << "  \"smartSkipUnderLoad\": " << settings.smart_skip_under_load << ",\n"
          << "  \"closeBehavior\": \"" << EscapeJsonString(settings.close_behavior) << "\",\n"
          << "  \"startMinimized\": " << settings.start_minimized << ",\n"
          << "  \"runAtStartup\": " << settings.run_at_startup << ",\n";

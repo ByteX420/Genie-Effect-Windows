@@ -39,6 +39,7 @@ public:
   virtual bool SetGenieStrength(float strength, bool save) = 0;
   virtual bool SetFadeStrength(const std::string& strength) = 0;
   virtual bool SetTargetIndicator(bool enabled) = 0;
+  virtual bool SetSmartSkipUnderLoad(bool enabled) = 0;
   virtual bool SetCloseBehavior(const std::string& behavior) = 0;
   virtual bool SetStartupOptions(bool run_at_startup, bool start_minimized) = 0;
   virtual bool SetApplicationExcluded(const std::string& executable, bool excluded) = 0;

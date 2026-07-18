@@ -109,6 +109,11 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
     platform::SetDwmTransitionsDisabled(window, false);
     return false;
   }
+  if (policy_.ShouldSkipAnimationForLoad(*context.rendering_pressure)) {
+    core::LogDebug(L"Minimize", L"Smart-skip: native minimize under load");
+    platform::SetDwmTransitionsDisabled(window, false);
+    return false;
+  }
 
   int run_index = context.find_run(window);
   if (run_index != -1) {

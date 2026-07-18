@@ -28,6 +28,7 @@ struct AppSettings {
   float genie_strength = 1.0f;
   std::string fade_strength = "Subtle";
   bool show_target_indicator = false;
+  bool smart_skip_under_load = true;
   std::string close_behavior = "exit";
   bool start_minimized = false;
   bool run_at_startup = false;

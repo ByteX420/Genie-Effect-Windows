@@ -197,6 +197,14 @@ bool ApplicationRuntime::SetTargetIndicator(bool enabled) {
   return result;
 }
 
+bool ApplicationRuntime::SetSmartSkipUnderLoad(bool enabled) {
+  const bool result = settings_mutations_.SetSmartSkipUnderLoad(enabled, [this] {
+    effect_policy_.Configure(settings_service_.Get());
+  });
+  settings_window_.UpdateState(settings_service_.Get());
+  return result;
+}
+
 bool ApplicationRuntime::SetCloseBehavior(const std::string& close_behavior) {
   const bool result = settings_mutations_.SetCloseBehavior(close_behavior);
   settings_window_.UpdateState(settings_service_.Get());

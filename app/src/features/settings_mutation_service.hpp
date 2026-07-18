@@ -24,6 +24,7 @@ public:
   bool SetGenieStrength(float strength, bool save);
   bool SetFadeStrength(const std::string& strength);
   bool SetTargetIndicator(bool enabled);
+  bool SetSmartSkipUnderLoad(bool enabled, const std::function<void()>& applied);
   bool SetCloseBehavior(const std::string& behavior);
   bool SetStartupOptions(bool run_at_startup, bool start_minimized);
   bool SetApplicationExcluded(const std::string& executable, bool excluded,

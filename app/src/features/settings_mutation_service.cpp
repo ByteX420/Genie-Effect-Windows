@@ -124,6 +124,15 @@ bool SettingsMutationService::SetTargetIndicator(bool enabled) {
   return settings_.Update(std::move(proposed));
 }
 
+bool SettingsMutationService::SetSmartSkipUnderLoad(bool enabled,
+                                                    const std::function<void()>& applied) {
+  auto proposed = settings_.Get();
+  proposed.smart_skip_under_load = enabled;
+  if (!settings_.Update(std::move(proposed))) return false;
+  if (applied) applied();
+  return true;
+}
+
 bool SettingsMutationService::SetCloseBehavior(const std::string& behavior) {
   if (behavior != "exit" && behavior != "tray") return false;
   auto proposed = settings_.Get();

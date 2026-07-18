@@ -20,6 +20,7 @@ void SettingsViewModel::Apply(const settings::AppSettings& settings) {
   genie_strength = settings.genie_strength;
   fade_strength = settings.fade_strength;
   show_target_indicator = settings.show_target_indicator;
+  smart_skip_under_load = settings.smart_skip_under_load;
   close_behavior = settings.close_behavior;
   run_at_startup = settings.run_at_startup;
   start_minimized = settings.start_minimized;

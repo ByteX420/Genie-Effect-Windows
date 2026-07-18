@@ -25,6 +25,9 @@ public:
 
   [[nodiscard]] bool IsActive(bool temporarily_paused) const;
   [[nodiscard]] bool IsExcluded(std::string_view executable_name) const;
+  // When smart-skip is enabled and recent capture/device pressure is high, prefer native
+  // minimize/restore instead of a stuttering Genie path.
+  [[nodiscard]] bool ShouldSkipAnimationForLoad(const RenderingPressure& pressure) const;
   [[nodiscard]] int SelectMeshSegmentCount(int width, int height,
                                            const RenderingPressure& pressure) const;
   [[nodiscard]] bool on_battery() const { return on_battery_; }

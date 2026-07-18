@@ -63,6 +63,7 @@ public:
   bool SetGenieStrength(float strength, bool save) override;
   bool SetFadeStrength(const std::string& strength) override;
   bool SetTargetIndicator(bool enabled) override;
+  bool SetSmartSkipUnderLoad(bool enabled) override;
   bool SetCloseBehavior(const std::string& close_behavior) override;
   bool SetStartupOptions(bool run_at_startup, bool start_minimized) override;
   bool SetApplicationExcluded(const std::string& executable_name, bool excluded) override;
