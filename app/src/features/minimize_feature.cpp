@@ -198,6 +198,18 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
   if (context.record_capture_duration) context.record_capture_duration(capture_duration);
   topmost.RestoreNow();
 
+  // Capture cost is known only after this sample — if it was already too slow, abort Genie
+  // for this minimize and latch smart-skip so subsequent events stay native while pressure cools.
+  constexpr float kAbortCaptureMs = 28.0f;
+  if (!already_minimized && capture_duration >= kAbortCaptureMs) {
+    core::LogDebug(L"Minimize", L"Smart-skip: abort after slow capture (" +
+                                    std::to_wstring(capture_duration) + L" ms)");
+    policy_.NoteSmartSkip(now_ms);
+    context.set_state(run_index, runtime::RunState::kIdle);
+    platform::SetDwmTransitionsDisabled(window, false);
+    return false;
+  }
+
   if (captured_texture.shader_resource_view == nullptr) {
     context.set_state(run_index, runtime::RunState::kIdle);
     return false;
