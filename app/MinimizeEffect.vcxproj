@@ -337,7 +337,7 @@
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="GenieEffect.rc" />
+    <ResourceCompile Include="MinimizeEffect.rc" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\genie_mesh.hlsl" />

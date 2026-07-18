@@ -157,10 +157,10 @@ Debug builds write diagnostics to:
 
 ```text
 Minimize-Effect-Windows/
-|-- GenieEffect.slnx              # solution file name (legacy); product is Minimize Effect
+|-- MinimizeEffect.slnx
 |-- app/
-|   |-- GenieEffect.vcxproj       # builds MinimizeEffect.exe
-|   |-- GenieEffect.rc
+|   |-- MinimizeEffect.vcxproj
+|   |-- MinimizeEffect.rc
 |   |-- assets/fonts/
 |   |-- shaders/
 |   |-- src/
@@ -247,10 +247,10 @@ Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
 1. On `dev` (or a branch), bump the version macros in `app/MinimizeEffect.rc`:
 
    ```c
-   #define GENIE_FILE_VERSION      1,3,0,0
-   #define GENIE_PRODUCT_VERSION   1,3,0,0
-   #define GENIE_FILE_VERSION_STR  "1.3.0\0"
-   #define GENIE_PRODUCT_VERSION_STR "1.3.0\0"
+   #define MINIMIZE_FILE_VERSION      1,3,0,0
+   #define MINIMIZE_PRODUCT_VERSION   1,3,0,0
+   #define MINIMIZE_FILE_VERSION_STR  "1.3.0\0"
+   #define MINIMIZE_PRODUCT_VERSION_STR "1.3.0\0"
    ```
 
 2. Merge into **`stable`** and push:

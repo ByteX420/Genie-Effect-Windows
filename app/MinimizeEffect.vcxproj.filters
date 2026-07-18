@@ -634,7 +634,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="GenieEffect.rc">
+    <ResourceCompile Include="MinimizeEffect.rc">
       <Filter>Project</Filter>
     </ResourceCompile>
   </ItemGroup>

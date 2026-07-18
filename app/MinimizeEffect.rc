@@ -2,14 +2,14 @@
 #include "src/app/resource.hpp"
 
 // Product version embedded in the PE — About/Build reads this at runtime.
-#define GENIE_FILE_VERSION      1,3,0,0
-#define GENIE_PRODUCT_VERSION   1,3,0,0
-#define GENIE_FILE_VERSION_STR  "1.3.0\0"
-#define GENIE_PRODUCT_VERSION_STR "1.3.0\0"
+#define MINIMIZE_FILE_VERSION      1,3,0,0
+#define MINIMIZE_PRODUCT_VERSION   1,3,0,0
+#define MINIMIZE_FILE_VERSION_STR  "1.3.0\0"
+#define MINIMIZE_PRODUCT_VERSION_STR "1.3.0\0"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION    GENIE_FILE_VERSION
-PRODUCTVERSION GENIE_PRODUCT_VERSION
+FILEVERSION    MINIMIZE_FILE_VERSION
+PRODUCTVERSION MINIMIZE_PRODUCT_VERSION
 FILEFLAGSMASK  VS_FFI_FILEFLAGSMASK
 #ifdef _DEBUG
 FILEFLAGS      VS_FF_DEBUG
@@ -26,12 +26,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName",      "Minimize Effect\0"
       VALUE "FileDescription",  "Minimize Effect\0"
-      VALUE "FileVersion",      GENIE_FILE_VERSION_STR
+      VALUE "FileVersion",      MINIMIZE_FILE_VERSION_STR
       VALUE "InternalName",     "MinimizeEffect\0"
       VALUE "LegalCopyright",   "\0"
       VALUE "OriginalFilename", "MinimizeEffect.exe\0"
       VALUE "ProductName",      "Minimize Effect\0"
-      VALUE "ProductVersion",   GENIE_PRODUCT_VERSION_STR
+      VALUE "ProductVersion",   MINIMIZE_PRODUCT_VERSION_STR
     END
   END
   BLOCK "VarFileInfo"
