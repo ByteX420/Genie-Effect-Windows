@@ -56,7 +56,7 @@ AppSettings SettingsValidator::Normalize(AppSettings settings) {
   }
   if (settings.fade_strength != "No fade" && settings.fade_strength != "Subtle" &&
       settings.fade_strength != "Strong") {
-    settings.fade_strength = "No fade";
+    settings.fade_strength = "Subtle";
   }
   if (settings.close_behavior != "exit" && settings.close_behavior != "tray") {
     settings.close_behavior = "exit";

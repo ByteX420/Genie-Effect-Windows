@@ -36,6 +36,7 @@ public:
                                            const RenderingPressure& pressure) const;
   [[nodiscard]] bool on_battery() const { return on_battery_; }
   [[nodiscard]] bool battery_saver_active() const { return battery_saver_active_; }
+  [[nodiscard]] bool smart_skip_enabled() const { return settings_.smart_skip_under_load; }
   [[nodiscard]] bool smart_skip_latched() const { return smart_skip_latched_; }
 
 private:

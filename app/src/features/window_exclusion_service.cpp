@@ -10,6 +10,8 @@
 namespace genie::features {
 namespace {
 
+constexpr wchar_t kWindowExclusionMarker[] = L"GenieEffect.PerWindowExclusion";
+
 std::string WideToUtf8(std::wstring_view value) {
   if (value.empty()) return {};
   const int size = WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
@@ -22,6 +24,8 @@ std::string WideToUtf8(std::wstring_view value) {
 }
 
 }  // namespace
+
+WindowExclusionService::~WindowExclusionService() { Clear(); }
 
 std::string WindowExclusionService::MonitorDeviceName(HMONITOR monitor) {
   if (monitor == nullptr) return {};
@@ -41,6 +45,9 @@ bool WindowExclusionService::SetExcluded(HWND window, bool excluded) {
     return true;
   }
 
+  if (!SetPropW(window, kWindowExclusionMarker, reinterpret_cast<HANDLE>(this))) {
+    return false;
+  }
   excluded_windows_[window] = Entry{.window = window, .process_id = process_id};
   core::LogDebug(L"WindowExclude",
                  L"Excluded hwnd=0x" +
@@ -63,9 +70,12 @@ bool WindowExclusionService::IsExcluded(HWND window) const {
   if (it == excluded_windows_.end()) return false;
 
   const DWORD live_pid = platform::WindowProcessId(window);
-  if (live_pid == 0 || live_pid != it->second.process_id) {
+  const HANDLE expected_marker =
+      reinterpret_cast<HANDLE>(const_cast<WindowExclusionService*>(this));
+  if (live_pid == 0 || live_pid != it->second.process_id ||
+      GetPropW(window, kWindowExclusionMarker) != expected_marker) {
     excluded_windows_.erase(it);
-    core::LogDebug(L"WindowExclude", L"Dropped stale exclusion (HWND reuse or dead process)");
+    core::LogDebug(L"WindowExclude", L"Dropped stale exclusion (window instance changed)");
     return false;
   }
   return true;
@@ -73,13 +83,18 @@ bool WindowExclusionService::IsExcluded(HWND window) const {
 
 void WindowExclusionService::Remove(HWND window) {
   if (window == nullptr) return;
+  if (IsWindow(window) &&
+      GetPropW(window, kWindowExclusionMarker) == reinterpret_cast<HANDLE>(this)) {
+    RemovePropW(window, kWindowExclusionMarker);
+  }
   excluded_windows_.erase(window);
 }
 
 void WindowExclusionService::PruneInvalidWindows() {
   for (auto it = excluded_windows_.begin(); it != excluded_windows_.end();) {
     const HWND window = it->first;
-    if (!IsWindow(window) || platform::WindowProcessId(window) != it->second.process_id) {
+    if (!IsWindow(window) || platform::WindowProcessId(window) != it->second.process_id ||
+        GetPropW(window, kWindowExclusionMarker) != reinterpret_cast<HANDLE>(this)) {
       it = excluded_windows_.erase(it);
     } else {
       ++it;
@@ -88,6 +103,13 @@ void WindowExclusionService::PruneInvalidWindows() {
 }
 
 void WindowExclusionService::Clear() {
+  for (const auto& [window, entry] : excluded_windows_) {
+    (void)entry;
+    if (IsWindow(window) &&
+        GetPropW(window, kWindowExclusionMarker) == reinterpret_cast<HANDLE>(this)) {
+      RemovePropW(window, kWindowExclusionMarker);
+    }
+  }
   excluded_windows_.clear();
   excluded_display_devices_.clear();
   excluded_display_lookup_.clear();

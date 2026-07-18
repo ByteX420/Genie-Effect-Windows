@@ -4,6 +4,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <string_view>
@@ -116,25 +117,43 @@ void ApplicationRuntime::NoteCaptureDuration(float duration_ms) {
 }
 
 void ApplicationRuntime::DecayRenderingPressure(ULONGLONG now_ms) {
-  // Missed-frame debt must cool even when smart-skip prevents further animations.
   constexpr ULONGLONG kMissedDecayIntervalMs = 250;
+  constexpr ULONGLONG kDeviceFailureHoldMs = 30000;
+  constexpr float kCapturePressureHalfLifeMs = 1000.0f;
   const int active_animations = static_cast<int>(
       std::count_if(runs_.begin(), runs_.end(),
                     [](const runtime::AnimationRun& run) { return run.overlay.active(); }));
-  if (active_animations == 0 && recent_missed_frames_ > 0 &&
-      now_ms - last_missed_frame_decay_ms_ >= kMissedDecayIntervalMs) {
-    --recent_missed_frames_;
+
+  // Missed-frame debt must cool even when smart-skip prevents further animations.
+  if (last_missed_frame_decay_ms_ == 0 || active_animations != 0 ||
+      recent_missed_frames_ == 0) {
     last_missed_frame_decay_ms_ = now_ms;
+  } else {
+    const ULONGLONG elapsed_ms = now_ms - last_missed_frame_decay_ms_;
+    const ULONGLONG decay_steps = elapsed_ms / kMissedDecayIntervalMs;
+    if (decay_steps > 0) {
+      const unsigned int decrement = static_cast<unsigned int>(
+          std::min<ULONGLONG>(decay_steps, recent_missed_frames_));
+      recent_missed_frames_ -= decrement;
+      last_missed_frame_decay_ms_ += decay_steps * kMissedDecayIntervalMs;
+    }
   }
+
   // Device failures stop counting after 30s without a new loss.
-  constexpr ULONGLONG kDeviceFailureHoldMs = 30000;
   if (recent_device_failures_ > 0 && last_device_failure_ms_ != 0 &&
       now_ms - last_device_failure_ms_ >= kDeviceFailureHoldMs) {
     recent_device_failures_ = 0;
   }
-  // Gentle drift of capture EMA toward "healthy" when idle.
-  if (active_animations == 0 && avg_capture_duration_ms_ > 0.0f) {
-    avg_capture_duration_ms_ *= 0.98f;
+
+  // Time-based half-life keeps capture pressure independent of message-loop frequency.
+  if (last_capture_decay_ms_ == 0) last_capture_decay_ms_ = now_ms;
+  const ULONGLONG capture_elapsed_ms = now_ms - last_capture_decay_ms_;
+  last_capture_decay_ms_ = now_ms;
+  if (active_animations == 0 && avg_capture_duration_ms_ > 0.0f &&
+      capture_elapsed_ms > 0) {
+    const float decay =
+        std::exp2(-static_cast<float>(capture_elapsed_ms) / kCapturePressureHalfLifeMs);
+    avg_capture_duration_ms_ *= decay;
     if (avg_capture_duration_ms_ < 1.0f) avg_capture_duration_ms_ = 0.0f;
   }
 }

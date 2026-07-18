@@ -150,6 +150,7 @@ private:
   float avg_capture_duration_ms_ = 0.0f;
   ULONGLONG last_device_failure_ms_ = 0;
   ULONGLONG last_missed_frame_decay_ms_ = 0;
+  ULONGLONG last_capture_decay_ms_ = 0;
   void NoteCaptureDuration(float duration_ms);
   void DecayRenderingPressure(ULONGLONG now_ms);
   bool device_recovery_test_pending_ = false;

@@ -26,7 +26,7 @@ struct AppSettings {
   std::string animation_style = "Gienie classic";
   std::string quality_mode = "automatic";
   float genie_strength = 1.0f;
-  std::string fade_strength = "No fade";
+  std::string fade_strength = "Subtle";
   bool show_target_indicator = false;
   bool smart_skip_under_load = true;
   std::string close_behavior = "exit";

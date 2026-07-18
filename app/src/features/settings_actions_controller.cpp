@@ -319,7 +319,13 @@ bool ApplicationRuntime::SetDisplayGenieExcluded(const std::string& device_name,
 
 namespace {
 
-std::wstring PickSettingsFile(HWND owner, bool save) {
+struct SettingsFilePickerResult {
+  ui::SettingsFileResult result = ui::SettingsFileResult::kFailed;
+  std::wstring path;
+  DWORD extended_error = 0;
+};
+
+SettingsFilePickerResult PickSettingsFile(HWND owner, bool save) {
   wchar_t path[MAX_PATH]{};
   OPENFILENAMEW ofn{};
   ofn.lStructSize = sizeof(ofn);
@@ -332,17 +338,38 @@ std::wstring PickSettingsFile(HWND owner, bool save) {
               (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
   ofn.lpstrTitle = save ? L"Export Genie Effect settings" : L"Import Genie Effect settings";
   const BOOL ok = save ? GetSaveFileNameW(&ofn) : GetOpenFileNameW(&ofn);
-  return ok ? std::wstring(path) : std::wstring{};
+  if (ok != FALSE && path[0] != L'\0') {
+    return SettingsFilePickerResult{
+        .result = ui::SettingsFileResult::kSuccess,
+        .path = path,
+    };
+  }
+
+  const DWORD extended_error = CommDlgExtendedError();
+  return SettingsFilePickerResult{
+      .result = extended_error == 0 ? ui::SettingsFileResult::kCancelled
+                                   : ui::SettingsFileResult::kFailed,
+      .extended_error = extended_error,
+  };
 }
 
 }  // namespace
 
 ui::SettingsFileOperationResult ApplicationRuntime::ExportSettings() {
-  const std::wstring path = PickSettingsFile(settings_window_.hwnd(), true);
-  if (path.empty()) {
+  const SettingsFilePickerResult picker = PickSettingsFile(settings_window_.hwnd(), true);
+  if (picker.result == ui::SettingsFileResult::kCancelled) {
     return ui::SettingsFileOperationResult{.result = ui::SettingsFileResult::kCancelled};
   }
-  if (!settings_mutations_.ExportSettingsToFile(path)) {
+  if (picker.result == ui::SettingsFileResult::kFailed) {
+    core::LogDebug(L"Settings", L"Export dialog failed error=" +
+                                    std::to_wstring(picker.extended_error));
+    return ui::SettingsFileOperationResult{
+        .result = ui::SettingsFileResult::kFailed,
+        .message = "Could not open the export dialog",
+        .is_error = true,
+    };
+  }
+  if (!settings_mutations_.ExportSettingsToFile(picker.path)) {
     return ui::SettingsFileOperationResult{
         .result = ui::SettingsFileResult::kFailed,
         .message = "Could not export settings",
@@ -356,13 +383,22 @@ ui::SettingsFileOperationResult ApplicationRuntime::ExportSettings() {
 }
 
 ui::SettingsFileOperationResult ApplicationRuntime::ImportSettings() {
-  const std::wstring path = PickSettingsFile(settings_window_.hwnd(), false);
-  if (path.empty()) {
+  const SettingsFilePickerResult picker = PickSettingsFile(settings_window_.hwnd(), false);
+  if (picker.result == ui::SettingsFileResult::kCancelled) {
     return ui::SettingsFileOperationResult{.result = ui::SettingsFileResult::kCancelled};
+  }
+  if (picker.result == ui::SettingsFileResult::kFailed) {
+    core::LogDebug(L"Settings", L"Import dialog failed error=" +
+                                    std::to_wstring(picker.extended_error));
+    return ui::SettingsFileOperationResult{
+        .result = ui::SettingsFileResult::kFailed,
+        .message = "Could not open the import dialog",
+        .is_error = true,
+    };
   }
   bool startup_registration_failed = false;
   const bool loaded = settings_mutations_.ImportSettingsFromFile(
-      path,
+      picker.path,
       [this] {
         effect_policy_.Configure(settings_service_.Get());
         window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);

@@ -12,6 +12,8 @@ namespace genie::features {
 // Display exclusions use MONITORINFOEX.szDevice and are stored in settings.json.
 class WindowExclusionService final {
 public:
+  ~WindowExclusionService();
+
   bool SetExcluded(HWND window, bool excluded);
   [[nodiscard]] bool IsExcluded(HWND window) const;
   void Remove(HWND window);

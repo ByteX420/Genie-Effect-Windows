@@ -254,16 +254,17 @@ bool SettingsMutationService::ImportSettingsFromFile(const std::wstring& path,
   const bool desired_startup = proposed.run_at_startup;
   if (!settings_.Update(std::move(proposed))) return false;
 
-  if (desired_startup != previous_startup &&
-      !platform::windows::ConfigureRunAtStartup(desired_startup)) {
-    // Keep stored settings consistent with the real Windows registration state.
+  // Reconcile the Windows entry even when the imported value matches the previous setting.
+  // The registry entry may have been removed or damaged outside the application.
+  if (!platform::windows::ConfigureRunAtStartup(desired_startup)) {
     auto rolled_back = settings_.Get();
     rolled_back.run_at_startup = previous_startup;
     if (!settings_.Update(std::move(rolled_back))) {
       core::LogDebug(L"Settings", L"Import applied but failed to roll back runAtStartup");
     }
     if (out_startup_registration_failed) *out_startup_registration_failed = true;
-    core::LogDebug(L"Settings", L"Import applied but startup registration failed; rolled back");
+    core::LogDebug(L"Settings",
+                   L"Import applied but startup registration failed; previous preference restored");
   }
   if (applied) applied();
   return true;

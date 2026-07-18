@@ -213,7 +213,8 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
   // Capture cost is known only after this sample — if it was already too slow, abort Genie
   // for this minimize and latch smart-skip so subsequent events stay native while pressure cools.
   constexpr float kAbortCaptureMs = 28.0f;
-  if (!already_minimized && capture_duration >= kAbortCaptureMs) {
+  if (policy_.smart_skip_enabled() && !already_minimized &&
+      capture_duration >= kAbortCaptureMs) {
     core::LogDebug(L"Minimize", L"Smart-skip: abort after slow capture (" +
                                     std::to_wstring(capture_duration) + L" ms)");
     policy_.NoteSmartSkip(now_ms);
@@ -397,13 +398,15 @@ void MinimizeFeature::CancelSeedSnapshotsForIconicWindows() {
   // Only the current window may be restored; re-minimize it if needed.
   if (seed_index_ < seed_candidates_.size()) {
     SeedCandidate& candidate = seed_candidates_[seed_index_];
-    if (candidate.window != nullptr && IsWindow(candidate.window) &&
-        IsIconic(candidate.window) == FALSE) {
-      SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
-               reinterpret_cast<HANDLE>(1));
-      WINDOWPLACEMENT placement = candidate.placement;
-      placement.showCmd = SW_SHOWMINNOACTIVE;
-      SetWindowPlacement(candidate.window, &placement);
+    if (candidate.window != nullptr && IsWindow(candidate.window)) {
+      if (IsIconic(candidate.window) == FALSE) {
+        SetPropW(candidate.window, platform::windows::properties::kAllowMinimize,
+                 reinterpret_cast<HANDLE>(1));
+        WINDOWPLACEMENT placement = candidate.placement;
+        placement.showCmd = SW_SHOWMINNOACTIVE;
+        SetWindowPlacement(candidate.window, &placement);
+      }
+      // Always clear temporary state. Restore may have failed and left the window iconic.
       RemovePropW(candidate.window, platform::windows::properties::kAllowMinimize);
       RemovePropW(candidate.window, platform::windows::properties::kAllowRestore);
       platform::SetDwmTransitionsDisabled(candidate.window, false);
@@ -502,7 +505,6 @@ bool MinimizeFeature::TickSeedSnapshotsForIconicWindows() {
     // One message-loop frame so this single restored window can paint.
     DwmFlush();
     seed_phase_ = SeedPhase::kCaptureCurrent;
-    return true;
   }
 
   // kCaptureCurrent — capture then immediately re-minimize this window only.
