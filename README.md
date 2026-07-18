@@ -35,7 +35,7 @@ It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished
 
 Windows does **not** expose a public API that means “replace this DWM minimize animation before the compositor runs it.” Minimize Effect uses the strongest **documented** path available:
 
-1. **Detect** minimize/restore via WinEvents and a **CBT hook DLL** (`GenieHookPost.dll`).
+1. **Detect** minimize/restore via WinEvents and a **CBT hook DLL** (`MinimizeEffectHook.dll`).
 2. **Policy** decides whether the effect applies (enabled, pause, fullscreen, battery saver, exclusions).
 3. **Suppress** the stock transition with `DwmSetWindowAttribute(DWMWA_TRANSITIONS_FORCEDISABLED)` and temporary `SystemParametersInfo(SPI_SETANIMATION)` changes (restored on exit).
 4. **Capture** the visible window region via **DXGI Desktop Duplication** into an `ID3D11Texture2D`.
@@ -87,12 +87,12 @@ MSBuild.exe MinimizeEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 
 | Path | Contents |
 | --- | --- |
-| `build\bin\x64\Release\` | `MinimizeEffect.exe`, `GenieHookPost.dll` (+ PDBs) |
+| `build\bin\x64\Release\` | `MinimizeEffect.exe`, `MinimizeEffectHook.dll` (+ PDBs) |
 | `build\bin\x64\Debug\` | Debug binaries |
 | `build\obj\App\x64\<Config>\` | App intermediates |
 | `build\obj\Hook\x64\<Config>\` | Hook intermediates |
 
-**Runtime:** keep `MinimizeEffect.exe` and `GenieHookPost.dll` in the **same folder**. Release builds can also use the embedded hook resource when configured with `GENIE_EMBED_RELEASE_HOOK`.
+**Runtime:** keep `MinimizeEffect.exe` and `MinimizeEffectHook.dll` in the **same folder**. Release builds can also use the embedded hook resource when configured with `GENIE_EMBED_RELEASE_HOOK`.
 
 ---
 
@@ -180,7 +180,7 @@ Minimize-Effect-Windows/
 |   |       |-- motion/           # UI motion system
 |   |       `-- rendering/        # ImGui/D3D settings renderer
 |   `-- third_party/              # Vendored ImGui + FreeType
-|-- hook/                         # GenieHookPost.dll (CBTProc)
+|-- hook/                         # MinimizeEffectHook.dll (CBTProc)
 |-- docs/
 |   `-- architecture.md
 |-- LICENSE.txt
@@ -237,7 +237,7 @@ See [`docs/architecture.md`](docs/architecture.md) for ownership, state machine,
 When the **product version** in `app/MinimizeEffect.rc` changes on the **`stable`** branch, GitHub Actions:
 
 1. Builds **Release | x64**
-2. Packs `MinimizeEffect.exe` + `GenieHookPost.dll` into `MinimizeEffect-windows-x64.zip`
+2. Packs `MinimizeEffect.exe` + `MinimizeEffectHook.dll` into `MinimizeEffect-windows-x64.zip`
 3. Creates or updates the GitHub Release for tag `vX.Y.Z` and uploads the ZIP
 
 Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
@@ -321,7 +321,7 @@ Please include:
 | Elevated apps ignore effect | Run Minimize Effect **as Administrator**. |
 | Wrong suck target | Set `GENIE_TASKBAR_RECT` or check taskbar edge (top/bottom/left/right). |
 | Black / stuck overlay | Restart app; check device-lost path; update GPU drivers. |
-| Hook not installed | Ensure `GenieHookPost.dll` sits next to the EXE; rebuild both projects. |
+| Hook not installed | Ensure `MinimizeEffectHook.dll` sits next to the EXE; rebuild both projects. |
 | Settings not saving | Check write access to `%LOCALAPPDATA%\MinimizeEffect\`. |
 
 ---

@@ -134,7 +134,7 @@ jobs:
 
           $bin = "build\bin\x64\Release"
           if (-not (Test-Path "$bin\MinimizeEffect.exe")) { throw "Missing MinimizeEffect.exe" }
-          if (-not (Test-Path "$bin\GenieHookPost.dll")) { throw "Missing GenieHookPost.dll" }
+          if (-not (Test-Path "$bin\MinimizeEffectHook.dll")) { throw "Missing MinimizeEffectHook.dll" }
           Get-ChildItem $bin -File | Format-Table Name, Length
 
       - name: Package ZIP
@@ -147,7 +147,7 @@ jobs:
           $zipName = "MinimizeEffect-windows-x64.zip"
           $zip = Join-Path $out $zipName
           if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path "$bin\MinimizeEffect.exe", "$bin\GenieHookPost.dll" -DestinationPath $zip -Force
+          Compress-Archive -Path "$bin\MinimizeEffect.exe", "$bin\MinimizeEffectHook.dll" -DestinationPath $zip -Force
           $item = Get-Item $zip
           "path=$($item.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -180,7 +180,7 @@ jobs:
 
             ### Package
             - `MinimizeEffect.exe`
-            - `GenieHookPost.dll`
+            - `MinimizeEffectHook.dll`
 
             Product version: **${{ steps.version.outputs.version }}**  
             Commit: `${{ github.sha }}`

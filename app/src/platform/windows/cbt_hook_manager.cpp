@@ -14,7 +14,7 @@
 namespace genie::platform::windows {
 namespace {
 
-constexpr wchar_t kHookDllName[] = L"GenieHookPost.dll";
+constexpr wchar_t kHookDllName[] = L"MinimizeEffectHook.dll";
 constexpr char kCbtProcName[] = "CBTProc";
 constexpr char kDecoratedCbtProcName[] = "_CBTProc@12";
 
@@ -86,7 +86,7 @@ std::wstring ExtractEmbeddedHookDll() {
   if (error) return {};
 
   const std::filesystem::path destination =
-      directory / std::format(L"GenieHookPost-{:016x}.dll", ResourceFingerprint(hook));
+      directory / std::format(L"MinimizeEffectHook-{:016x}.dll", ResourceFingerprint(hook));
   if (FileMatchesResource(destination, hook)) return destination.wstring();
 
   const std::filesystem::path temporary =

@@ -44,7 +44,7 @@
   <PropertyGroup Condition="'$(Platform)'=='x64'">
     <OutDir>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)..\build\obj\Hook\$(Platform)\$(Configuration)\</IntDir>
-    <TargetName>GenieHookPost</TargetName>
+    <TargetName>MinimizeEffectHook</TargetName>
     <LocalDebuggerCommand>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\MinimizeEffect.exe</LocalDebuggerCommand>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)..\build\bin\$(Platform)\$(Configuration)\</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
