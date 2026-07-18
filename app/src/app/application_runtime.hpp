@@ -67,6 +67,8 @@ public:
   bool SetCloseBehavior(const std::string& close_behavior) override;
   bool SetStartupOptions(bool run_at_startup, bool start_minimized) override;
   bool SetApplicationExcluded(const std::string& executable_name, bool excluded) override;
+  bool ExportSettings() override;
+  bool ImportSettings() override;
   void SetTemporaryPause(ui::TemporaryPauseAction action) override;
   ui::HotkeyUpdateResult SetHotkey(settings::HotkeyAction action,
                                    settings::HotkeyBinding binding) override;

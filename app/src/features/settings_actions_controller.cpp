@@ -11,6 +11,9 @@
 #include "app/application_runtime.hpp"
 #include "core/environment.hpp"
 #include "core/logger.hpp"
+
+#include <commdlg.h>
+#pragma comment(lib, "comdlg32.lib")
 #include "platform/windows/app_container_permissions.hpp"
 #include "platform/windows/display_info.hpp"
 #include "platform/windows/power_status.hpp"
@@ -224,6 +227,45 @@ bool ApplicationRuntime::SetApplicationExcluded(const std::string& executable_na
   });
   settings_window_.UpdateState(settings_service_.Get());
   return result;
+}
+
+namespace {
+
+std::wstring PickSettingsFile(HWND owner, bool save) {
+  wchar_t path[MAX_PATH]{};
+  OPENFILENAMEW ofn{};
+  ofn.lStructSize = sizeof(ofn);
+  ofn.hwndOwner = owner;
+  ofn.lpstrFilter = L"JSON settings (*.json)\0*.json\0All files (*.*)\0*.*\0";
+  ofn.lpstrFile = path;
+  ofn.nMaxFile = static_cast<DWORD>(std::size(path));
+  ofn.lpstrDefExt = L"json";
+  ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY |
+              (save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
+  ofn.lpstrTitle = save ? L"Export Genie Effect settings" : L"Import Genie Effect settings";
+  const BOOL ok = save ? GetSaveFileNameW(&ofn) : GetOpenFileNameW(&ofn);
+  return ok ? std::wstring(path) : std::wstring{};
+}
+
+}  // namespace
+
+bool ApplicationRuntime::ExportSettings() {
+  const std::wstring path = PickSettingsFile(settings_window_.hwnd(), true);
+  if (path.empty()) return false;
+  const bool saved = settings_mutations_.ExportSettingsToFile(path);
+  return saved;
+}
+
+bool ApplicationRuntime::ImportSettings() {
+  const std::wstring path = PickSettingsFile(settings_window_.hwnd(), false);
+  if (path.empty()) return false;
+  const bool loaded = settings_mutations_.ImportSettingsFromFile(path, [this] {
+    effect_policy_.Configure(settings_service_.Get());
+    RegisterConfiguredHotkeys();
+    RefreshEffectRuntimeState();
+  });
+  settings_window_.UpdateState(settings_service_.Get());
+  return loaded;
 }
 
 }  // namespace genie::app

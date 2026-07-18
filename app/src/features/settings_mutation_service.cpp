@@ -4,11 +4,16 @@
 
 #include <algorithm>
 #include <array>
+#include <filesystem>
+#include <fstream>
 #include <string_view>
 
 #include "core/logger.hpp"
+#include "settings/settings_repository.hpp"
 #include "platform/windows/startup_manager.hpp"
 #include "settings/exclusion_rules.hpp"
+#include "settings/settings_serializer.hpp"
+#include "settings/settings_validator.hpp"
 
 namespace genie::features {
 
@@ -174,6 +179,55 @@ bool SettingsMutationService::SetApplicationExcluded(const std::string& executab
   if (!settings_.Update(std::move(proposed))) return false;
   if (applied) applied();
   return true;
+}
+
+bool SettingsMutationService::ImportSettingsFromFile(const std::wstring& path,
+                                                     const std::function<void()>& applied) {
+  if (path.empty()) return false;
+  std::ifstream input(std::filesystem::path(path), std::ios::binary);
+  if (!input) {
+    core::LogDebug(L"Settings", L"Import failed: could not open file");
+    return false;
+  }
+  std::string json((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+  if (json.empty() || json.size() > 1024 * 1024) {
+    core::LogDebug(L"Settings", L"Import failed: empty or oversized file");
+    return false;
+  }
+  auto decoded = settings::SettingsSerializer::Deserialize(json);
+  if (!decoded.has_value()) {
+    core::LogDebug(L"Settings", L"Import failed: invalid JSON");
+    return false;
+  }
+  auto proposed = settings::SettingsValidator::Normalize(std::move(*decoded));
+
+  // Backup current settings next to the live file before overwriting.
+  const std::wstring live = settings::SettingsRepository::Path();
+  if (!live.empty()) {
+    const std::filesystem::path backup = std::filesystem::path(live).wstring() + L".bak";
+    std::error_code error;
+    std::filesystem::copy_file(live, backup, std::filesystem::copy_options::overwrite_existing,
+                               error);
+  }
+
+  const bool previous_startup = settings_.Get().run_at_startup;
+  if (!settings_.Update(std::move(proposed))) return false;
+  if (settings_.Get().run_at_startup != previous_startup &&
+      !platform::windows::ConfigureRunAtStartup(settings_.Get().run_at_startup)) {
+    core::LogDebug(L"Settings", L"Import applied but startup registration failed");
+  }
+  if (applied) applied();
+  return true;
+}
+
+bool SettingsMutationService::ExportSettingsToFile(const std::wstring& path) const {
+  if (path.empty()) return false;
+  std::ofstream output(std::filesystem::path(path), std::ios::binary | std::ios::trunc);
+  if (!output) return false;
+  output << settings::SettingsSerializer::Serialize(
+      settings::SettingsValidator::Normalize(settings_.Get()));
+  output.flush();
+  return static_cast<bool>(output);
 }
 
 }  // namespace genie::features

@@ -29,6 +29,8 @@ public:
   bool SetStartupOptions(bool run_at_startup, bool start_minimized);
   bool SetApplicationExcluded(const std::string& executable, bool excluded,
                               const std::function<void()>& applied);
+  bool ImportSettingsFromFile(const std::wstring& path, const std::function<void()>& applied);
+  bool ExportSettingsToFile(const std::wstring& path) const;
 
 private:
   settings::SettingsService& settings_;

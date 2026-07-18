@@ -102,6 +102,38 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   }
   layout.EndRow();
   layout.EndGroup();
+
+  layout.SectionCaption(window.font_small_, kCaptionTextSize, "BACKUP");
+  layout.BeginGroup();
+  const float button_width = 108.0f * scale;
+  const float button_height = ::genie::ui::theme::Metrics::kButtonHeight * scale;
+  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.ReserveControl(button_width);
+  layout.RowTitle(window.font_body_, kLabelTextSize, "Export settings", kPrimaryTextColor);
+  layout.RowSubtitle(window.font_small_, kHelperTextSize, "Save a JSON profile you can share",
+                     kSecondaryTextColor);
+  cursor = layout.ControlCursor(button_width, button_height);
+  layout.SetCursor(cursor.x, cursor.y);
+  if (ui::components::CompactButton(motion, "##export_settings", "Export",
+                                    ImVec2(button_width, button_height), window.font_body_, scale,
+                                    alpha)) {
+    window.RecordSaveResult(window.controller_->actions().ExportSettings());
+  }
+  layout.EndRow();
+  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.ReserveControl(button_width);
+  layout.RowTitle(window.font_body_, kLabelTextSize, "Import settings", kPrimaryTextColor);
+  layout.RowSubtitle(window.font_small_, kHelperTextSize,
+                     "Load a profile (current file is backed up first)", kSecondaryTextColor);
+  cursor = layout.ControlCursor(button_width, button_height);
+  layout.SetCursor(cursor.x, cursor.y);
+  if (ui::components::CompactButton(motion, "##import_settings", "Import",
+                                    ImVec2(button_width, button_height), window.font_body_, scale,
+                                    alpha)) {
+    window.RecordSaveResult(window.controller_->actions().ImportSettings());
+  }
+  layout.EndRow();
+  layout.EndGroup();
 }
 
 }  // namespace genie::ui::pages
