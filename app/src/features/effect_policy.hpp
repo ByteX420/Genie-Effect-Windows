@@ -9,7 +9,8 @@ namespace genie::features {
 
 struct RenderingPressure {
   int active_animations = 0;
-  float last_capture_duration_ms = 0.0f;
+  // Exponential moving average of recent capture times (preferred over a single sample).
+  float avg_capture_duration_ms = 0.0f;
   unsigned int recent_missed_frames = 0;
   unsigned int recent_device_failures = 0;
   bool renderer_recovering = false;
@@ -25,19 +26,27 @@ public:
 
   [[nodiscard]] bool IsActive(bool temporarily_paused) const;
   [[nodiscard]] bool IsExcluded(std::string_view executable_name) const;
-  // When smart-skip is enabled and recent capture/device pressure is high, prefer native
-  // minimize/restore instead of a stuttering Genie path.
-  [[nodiscard]] bool ShouldSkipAnimationForLoad(const RenderingPressure& pressure) const;
+  // Hysteresis smart-skip: enter at score >= 5, exit at score <= 2, with post-skip cooldown.
+  // now_ms drives cooldown / latch timing (GetTickCount64).
+  [[nodiscard]] bool ShouldSkipAnimationForLoad(const RenderingPressure& pressure,
+                                                std::uint64_t now_ms);
+  // After a skip (including post-capture abort), keep native path for a short cooldown.
+  void NoteSmartSkip(std::uint64_t now_ms);
   [[nodiscard]] int SelectMeshSegmentCount(int width, int height,
                                            const RenderingPressure& pressure) const;
   [[nodiscard]] bool on_battery() const { return on_battery_; }
   [[nodiscard]] bool battery_saver_active() const { return battery_saver_active_; }
+  [[nodiscard]] bool smart_skip_latched() const { return smart_skip_latched_; }
 
 private:
+  [[nodiscard]] int ScoreLoad(const RenderingPressure& pressure) const;
+
   settings::AppSettings settings_;
   bool fullscreen_suppressed_ = false;
   bool on_battery_ = false;
   bool battery_saver_active_ = false;
+  bool smart_skip_latched_ = false;
+  std::uint64_t last_smart_skip_ms_ = 0;
 };
 
 }  // namespace genie::features

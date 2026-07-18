@@ -140,7 +140,11 @@ private:
   ULONGLONG last_power_check_ms_ = 0;
   unsigned int recent_missed_frames_ = 0;
   unsigned int recent_device_failures_ = 0;
-  float last_capture_duration_ms_ = 0.0f;
+  float avg_capture_duration_ms_ = 0.0f;
+  ULONGLONG last_device_failure_ms_ = 0;
+  ULONGLONG last_missed_frame_decay_ms_ = 0;
+  void NoteCaptureDuration(float duration_ms);
+  void DecayRenderingPressure(ULONGLONG now_ms);
   bool device_recovery_test_pending_ = false;
   std::string startup_repair_status_ = "Not checked";
   // Defer startup iconic capture until settings enter motion (shell/sidebar/page) finishes.

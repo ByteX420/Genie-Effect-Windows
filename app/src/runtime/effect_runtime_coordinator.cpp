@@ -57,6 +57,7 @@ void ApplicationRuntime::BeginAnimationRendererRecovery() {
   }
 
   recent_device_failures_ = std::min(recent_device_failures_ + 1u, 8u);
+  last_device_failure_ms_ = GetTickCount64();
   genie::core::LogDebug(L"App", L"Animation renderer device lost; rebuilding D3D resources");
   native_animation_blocker_.Disable();
 
@@ -102,11 +103,48 @@ bool ApplicationRuntime::TryRecoverAnimationRenderer() {
   return false;
 }
 
+void ApplicationRuntime::NoteCaptureDuration(float duration_ms) {
+  duration_ms = std::max(0.0f, duration_ms);
+  // EMA so a single slow capture raises pressure without permanent sticky peaks.
+  constexpr float kAlpha = 0.35f;
+  if (avg_capture_duration_ms_ <= 0.0f) {
+    avg_capture_duration_ms_ = duration_ms;
+  } else {
+    avg_capture_duration_ms_ =
+        avg_capture_duration_ms_ * (1.0f - kAlpha) + duration_ms * kAlpha;
+  }
+}
+
+void ApplicationRuntime::DecayRenderingPressure(ULONGLONG now_ms) {
+  // Missed-frame debt must cool even when smart-skip prevents further animations.
+  constexpr ULONGLONG kMissedDecayIntervalMs = 250;
+  const int active_animations = static_cast<int>(
+      std::count_if(runs_.begin(), runs_.end(),
+                    [](const runtime::AnimationRun& run) { return run.overlay.active(); }));
+  if (active_animations == 0 && recent_missed_frames_ > 0 &&
+      now_ms - last_missed_frame_decay_ms_ >= kMissedDecayIntervalMs) {
+    --recent_missed_frames_;
+    last_missed_frame_decay_ms_ = now_ms;
+  }
+  // Device failures stop counting after 30s without a new loss.
+  constexpr ULONGLONG kDeviceFailureHoldMs = 30000;
+  if (recent_device_failures_ > 0 && last_device_failure_ms_ != 0 &&
+      now_ms - last_device_failure_ms_ >= kDeviceFailureHoldMs) {
+    recent_device_failures_ = 0;
+  }
+  // Gentle drift of capture EMA toward "healthy" when idle.
+  if (active_animations == 0 && avg_capture_duration_ms_ > 0.0f) {
+    avg_capture_duration_ms_ *= 0.98f;
+    if (avg_capture_duration_ms_ < 1.0f) avg_capture_duration_ms_ = 0.0f;
+  }
+}
+
 void ApplicationRuntime::UpdateRuntime() {
   UpdateTemporaryPause();
   UpdateFullscreenSuppression();
   UpdatePowerState();
   CheckAnimationTimeouts();
+  DecayRenderingPressure(GetTickCount64());
 
   // After shell/sidebar/page enter motion settles, seed iconic windows one-per-tick.
   if (!shutting_down_.load(std::memory_order_acquire)) {
@@ -397,7 +435,7 @@ features::RenderingPressure ApplicationRuntime::GetRenderingPressure() const {
                     [](const runtime::AnimationRun& run) { return run.overlay.active(); }));
   return features::RenderingPressure{
       .active_animations = active_animations,
-      .last_capture_duration_ms = last_capture_duration_ms_,
+      .avg_capture_duration_ms = avg_capture_duration_ms_,
       .recent_missed_frames = recent_missed_frames_,
       .recent_device_failures = recent_device_failures_,
       .renderer_recovering = renderer_recovery_.pending(),

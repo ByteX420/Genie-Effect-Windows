@@ -7,6 +7,13 @@
 #include "settings/exclusion_rules.hpp"
 
 namespace genie::features {
+namespace {
+
+constexpr int kSmartSkipEnterScore = 5;
+constexpr int kSmartSkipExitScore = 2;
+constexpr std::uint64_t kSmartSkipCooldownMs = 1500;
+
+}  // namespace
 
 void EffectPolicy::Configure(const settings::AppSettings& settings) { settings_ = settings; }
 
@@ -36,8 +43,7 @@ bool EffectPolicy::IsExcluded(std::string_view executable_name) const {
   return settings::ContainsExcludedApplication(settings_.excluded_applications, executable_name);
 }
 
-bool EffectPolicy::ShouldSkipAnimationForLoad(const RenderingPressure& pressure) const {
-  if (!settings_.smart_skip_under_load) return false;
+int EffectPolicy::ScoreLoad(const RenderingPressure& pressure) const {
   int score = 0;
   if (pressure.renderer_recovering || pressure.recent_device_failures > 0) score += 3;
   if (pressure.active_animations >= 2) {
@@ -45,11 +51,11 @@ bool EffectPolicy::ShouldSkipAnimationForLoad(const RenderingPressure& pressure)
   } else if (pressure.active_animations == 1) {
     ++score;
   }
-  if (pressure.last_capture_duration_ms >= 28.0f) {
+  if (pressure.avg_capture_duration_ms >= 28.0f) {
     score += 3;
-  } else if (pressure.last_capture_duration_ms >= 18.0f) {
+  } else if (pressure.avg_capture_duration_ms >= 18.0f) {
     score += 2;
-  } else if (pressure.last_capture_duration_ms >= 12.0f) {
+  } else if (pressure.avg_capture_duration_ms >= 12.0f) {
     ++score;
   }
   if (pressure.recent_missed_frames >= 12) {
@@ -59,7 +65,39 @@ bool EffectPolicy::ShouldSkipAnimationForLoad(const RenderingPressure& pressure)
   } else if (pressure.recent_missed_frames >= 3) {
     ++score;
   }
-  return score >= 4;
+  return score;
+}
+
+void EffectPolicy::NoteSmartSkip(std::uint64_t now_ms) {
+  smart_skip_latched_ = true;
+  last_smart_skip_ms_ = now_ms;
+}
+
+bool EffectPolicy::ShouldSkipAnimationForLoad(const RenderingPressure& pressure,
+                                              std::uint64_t now_ms) {
+  if (!settings_.smart_skip_under_load) {
+    smart_skip_latched_ = false;
+    return false;
+  }
+
+  const int score = ScoreLoad(pressure);
+
+  if (smart_skip_latched_) {
+    // Cooldown keeps us on native for a beat after a skip so pressure can cool.
+    if (now_ms - last_smart_skip_ms_ < kSmartSkipCooldownMs) return true;
+    if (score <= kSmartSkipExitScore) {
+      smart_skip_latched_ = false;
+      return false;
+    }
+    last_smart_skip_ms_ = now_ms;
+    return true;
+  }
+
+  if (score >= kSmartSkipEnterScore) {
+    NoteSmartSkip(now_ms);
+    return true;
+  }
+  return false;
 }
 
 int EffectPolicy::SelectMeshSegmentCount(int width, int height,
@@ -80,9 +118,9 @@ int EffectPolicy::SelectMeshSegmentCount(int width, int height,
   } else if (rendering.active_animations == 1) {
     ++pressure;
   }
-  if (rendering.last_capture_duration_ms >= 25.0f) {
+  if (rendering.avg_capture_duration_ms >= 25.0f) {
     pressure += 2;
-  } else if (rendering.last_capture_duration_ms >= 12.0f) {
+  } else if (rendering.avg_capture_duration_ms >= 12.0f) {
     ++pressure;
   }
   if (rendering.recent_missed_frames >= 10) {

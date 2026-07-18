@@ -220,7 +220,7 @@ bool ApplicationRuntime::OnMinimizeStart(HWND window) {
           .abort_run = [this](int index) { CleanupRun(index, RunCleanupOutcome::kAborted); },
           .complete_restore = [this](HWND target) { restore_feature_.Complete(target); },
           .record_capture_duration =
-              [this](float duration_ms) { last_capture_duration_ms_ = duration_ms; },
+              [this](float duration_ms) { NoteCaptureDuration(duration_ms); },
       });
 }
 
