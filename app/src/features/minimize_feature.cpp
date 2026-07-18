@@ -12,6 +12,7 @@
 #include "core/logger.hpp"
 #include "features/animation_configuration.hpp"
 #include "features/effect_policy.hpp"
+#include "features/window_exclusion_service.hpp"
 #include "features/window_recovery_service.hpp"
 #include "platform/windows/display_info.hpp"
 #include "platform/windows/native_animation_blocker.hpp"
@@ -93,8 +94,13 @@ void MinimizeFeature::Transaction::HandOff() {
 }
 
 MinimizeFeature::MinimizeFeature(EffectPolicy& policy, WindowRecoveryService& recovery,
-                                 runtime::AnimationRunPool& runs, runtime::SnapshotCache& snapshots)
-    : policy_(policy), recovery_(recovery), runs_(runs), snapshots_(snapshots) {}
+                                 runtime::AnimationRunPool& runs, runtime::SnapshotCache& snapshots,
+                                 WindowExclusionService& window_exclusions)
+    : policy_(policy),
+      recovery_(recovery),
+      runs_(runs),
+      snapshots_(snapshots),
+      window_exclusions_(window_exclusions) {}
 
 bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& context) {
   if (!context.effect_active || context.renderer_recovering || context.shutting_down ||
@@ -103,6 +109,12 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
       context.animation_configuration == nullptr || context.rendering_pressure == nullptr ||
       window == nullptr || !IsWindow(window) || window == context.overlay ||
       recovery_.restoring() || !platform::IsInterestingTopLevelWindow(window, context.overlay)) {
+    return false;
+  }
+  // Per-window session exclusion (before any capture / cloak).
+  if (window_exclusions_.IsExcluded(window)) {
+    core::LogDebug(L"Minimize", L"Skipping Genie: per-window exclusion");
+    platform::SetDwmTransitionsDisabled(window, false);
     return false;
   }
   const auto executable = platform::GetWindowExecutableName(window);
@@ -324,6 +336,7 @@ void MinimizeFeature::UpdatePreMinimizeSnapshot(HWND window, HWND overlay,
       !IsWindow(window) || IsIconic(window) || !IsWindowVisible(window)) {
     return;
   }
+  if (window_exclusions_.IsExcluded(window)) return;
   const auto executable = platform::GetWindowExecutableName(window);
   if (executable.has_value() && policy_.IsExcluded(*executable)) return;
   for (const runtime::AnimationRun& run : runs_) {
@@ -415,6 +428,7 @@ void MinimizeFeature::BeginSeedSnapshotsForIconicWindows(
   for (HWND window : platform::EnumerateTopLevelWindows(overlay)) {
     if (window == nullptr || !IsWindow(window) || IsIconic(window) == FALSE) continue;
     if (!platform::IsInterestingTopLevelWindow(window, overlay)) continue;
+    if (window_exclusions_.IsExcluded(window)) continue;
     const auto executable = platform::GetWindowExecutableName(window);
     if (executable.has_value() && policy_.IsExcluded(*executable)) continue;
     if (snapshots_.Restore().count(window) > 0 &&

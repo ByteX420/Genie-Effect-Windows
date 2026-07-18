@@ -31,6 +31,8 @@ public:
   bool SetStartupOptions(bool run_at_startup, bool start_minimized);
   bool SetApplicationExcluded(const std::string& executable, bool excluded,
                               const std::function<void()>& applied);
+  bool SetDisplayGenieExcluded(const std::string& device_name, bool excluded,
+                               const std::function<void()>& applied);
   // applied runs after a successful settings write. When startup registration fails,
   // applied still runs but out_startup_registration_failed is set so the host can warn.
   bool ImportSettingsFromFile(const std::wstring& path, const std::function<void()>& applied,

@@ -179,6 +179,24 @@ bool SettingsMutationService::SetStartupOptions(bool run_at_startup, bool start_
   return true;
 }
 
+bool SettingsMutationService::SetDisplayGenieExcluded(const std::string& device_name, bool excluded,
+                                                      const std::function<void()>& applied) {
+  if (device_name.empty()) return false;
+  auto proposed = settings_.Get();
+  auto& displays = proposed.excluded_displays;
+  const auto existing = std::find(displays.begin(), displays.end(), device_name);
+  if (excluded) {
+    if (existing == displays.end()) displays.push_back(device_name);
+  } else if (existing != displays.end()) {
+    displays.erase(existing);
+  } else {
+    return true;
+  }
+  if (!settings_.Update(std::move(proposed))) return false;
+  if (applied) applied();
+  return true;
+}
+
 bool SettingsMutationService::SetApplicationExcluded(const std::string& executable, bool excluded,
                                                      const std::function<void()>& applied) {
   std::optional<std::string> normalized = settings::NormalizeExecutableName(executable);

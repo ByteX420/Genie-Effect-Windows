@@ -10,6 +10,7 @@
 #include "features/animation_configuration.hpp"
 #include "features/effect_policy.hpp"
 #include "features/minimize_feature.hpp"
+#include "features/window_exclusion_service.hpp"
 #include "features/window_recovery_service.hpp"
 #include "platform/windows/native_animation_blocker.hpp"
 #include "platform/windows/process_info.hpp"
@@ -61,12 +62,13 @@ void RestoreFeature::Transaction::HandOff() {
 
 RestoreFeature::RestoreFeature(EffectPolicy& policy, WindowRecoveryService& recovery,
                                runtime::SnapshotCache& snapshots, runtime::AnimationRunPool& runs,
-                               MinimizeFeature& minimize)
+                               MinimizeFeature& minimize, WindowExclusionService& window_exclusions)
     : policy_(policy),
       recovery_(recovery),
       snapshots_(snapshots),
       runs_(runs),
-      minimize_(minimize) {}
+      minimize_(minimize),
+      window_exclusions_(window_exclusions) {}
 
 bool RestoreFeature::Execute(HWND window, const RestoreExecutionContext& context) {
   if (!context.effect_active || context.renderer_recovering || context.shutting_down ||
@@ -76,8 +78,7 @@ bool RestoreFeature::Execute(HWND window, const RestoreExecutionContext& context
     return false;
   }
 
-  const auto executable = platform::GetWindowExecutableName(window);
-  if (executable.has_value() && policy_.IsExcluded(*executable)) {
+  auto clean_excluded = [&] {
     platform::SetDwmTransitionsDisabled(window, false);
     const int run_index = context.find_run(window);
     if (run_index != -1) context.finish_run(run_index);
@@ -90,6 +91,16 @@ bool RestoreFeature::Execute(HWND window, const RestoreExecutionContext& context
       snapshots_.Restore().erase(window);
       snapshots_.PreMinimize().erase(window);
     }
+  };
+
+  if (window_exclusions_.IsExcluded(window)) {
+    clean_excluded();
+    return false;
+  }
+
+  const auto executable = platform::GetWindowExecutableName(window);
+  if (executable.has_value() && policy_.IsExcluded(*executable)) {
+    clean_excluded();
     return false;
   }
   if (recovery_.restoring() || window == context.overlay ||

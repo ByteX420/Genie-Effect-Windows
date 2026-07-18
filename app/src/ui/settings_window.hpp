@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include "features/diagnostics_service.hpp"
+#include "features/open_windows_service.hpp"
 #include "settings/app_settings.hpp"
 #include "ui/animation_preview.hpp"
 #include "ui/application_list_provider.hpp"
@@ -25,6 +26,7 @@ class ApplicationsPage;
 class DiagnosticsPage;
 class GeneralPage;
 class HotkeysPage;
+class DisplaysPage;
 class WindowsIntegrationPage;
 }  // namespace genie::ui::pages
 
@@ -51,6 +53,7 @@ public:
   // True while the open/enter motion for shell + sidebar + first page content is still running.
   // Used to defer heavy startup work (e.g. iconic seed) until the UI is fully settled.
   [[nodiscard]] bool IsStartupEnterMotionActive() const { return startup_enter_motion_active_; }
+  void InvalidateOpenWindowsSnapshot() { open_windows_snapshot_valid_ = false; }
 
 private:
   friend class SettingsShell;
@@ -60,11 +63,13 @@ private:
   friend class ui::pages::DiagnosticsPage;
   friend class ui::pages::GeneralPage;
   friend class ui::pages::HotkeysPage;
+  friend class ui::pages::DisplaysPage;
   friend class ui::pages::WindowsIntegrationPage;
   enum class Page {
     kGeneral,
     kAnimation,
     kApplications,
+    kDisplays,
     kWindowsIntegration,
     kHotkeys,
     kDiagnostics,
@@ -100,6 +105,10 @@ private:
   std::string exclusion_error_;
   ULONGLONG last_active_apps_refresh_ms_ = 0;
   std::vector<std::string> cached_active_apps_;
+  features::OpenWindowsSnapshot cached_open_windows_{};
+  ULONGLONG last_open_windows_refresh_ms_ = 0;
+  bool open_windows_snapshot_valid_ = false;
+  int selected_display_index_ = 0;  // Display 1 (primary) by default
   std::string persistence_error_;
   std::string save_feedback_;
   ULONGLONG save_feedback_until_ms_ = 0;

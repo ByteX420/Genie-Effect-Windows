@@ -165,6 +165,8 @@ void ApplicationRuntime::UpdateRuntime() {
 
 void ApplicationRuntime::HandleDisplayChange() {
   for (auto& run : runs_) run.animation_monitor = nullptr;
+  settings_window_.InvalidateOpenWindowsSnapshot();
+  settings_window_.ForceRender();
 }
 
 MessageLoopWait ApplicationRuntime::TickRuntime() {

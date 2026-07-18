@@ -16,9 +16,11 @@
 #include "features/effect_policy.hpp"
 #include "features/hotkey_controller.hpp"
 #include "features/minimize_feature.hpp"
+#include "features/open_windows_service.hpp"
 #include "features/pause_controller.hpp"
 #include "features/restore_feature.hpp"
 #include "features/settings_mutation_service.hpp"
+#include "features/window_exclusion_service.hpp"
 #include "features/window_recovery_service.hpp"
 #include "platform/windows/cbt_hook_manager.hpp"
 #include "platform/windows/global_hotkey_manager.hpp"
@@ -68,6 +70,10 @@ public:
   bool SetCloseBehavior(const std::string& close_behavior) override;
   bool SetStartupOptions(bool run_at_startup, bool start_minimized) override;
   bool SetApplicationExcluded(const std::string& executable_name, bool excluded) override;
+  bool SetWindowGenieExcluded(HWND window, bool excluded) override;
+  bool SetDisplayGenieExcluded(const std::string& device_name, bool excluded) override;
+  [[nodiscard]] features::OpenWindowsSnapshot GetOpenWindowsSnapshot() override;
+  bool FocusOpenWindow(HWND window) override;
   ui::SettingsFileOperationResult ExportSettings() override;
   ui::SettingsFileOperationResult ImportSettings() override;
   void SetTemporaryPause(ui::TemporaryPauseAction action) override;
@@ -159,10 +165,14 @@ private:
   genie::features::DiagnosticsService diagnostics_service_;
   genie::features::PauseController pause_controller_;
   genie::features::WindowRecoveryService window_recovery_service_{snapshot_cache_};
+  genie::features::WindowExclusionService window_exclusion_service_;
+  genie::features::OpenWindowsService open_windows_service_{window_exclusion_service_};
   genie::features::MinimizeFeature minimize_feature_{effect_policy_, window_recovery_service_,
-                                                     runs_, snapshot_cache_};
-  genie::features::RestoreFeature restore_feature_{effect_policy_, window_recovery_service_,
-                                                   snapshot_cache_, runs_, minimize_feature_};
+                                                     runs_, snapshot_cache_,
+                                                     window_exclusion_service_};
+  genie::features::RestoreFeature restore_feature_{
+      effect_policy_, window_recovery_service_, snapshot_cache_, runs_, minimize_feature_,
+      window_exclusion_service_};
   genie::features::EffectController effect_controller_{effect_policy_, pause_controller_,
                                                        minimize_feature_, restore_feature_};
   std::atomic<bool> shutting_down_{false};

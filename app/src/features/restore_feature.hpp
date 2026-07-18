@@ -12,6 +12,7 @@ namespace genie::features {
 class EffectPolicy;
 class AnimationConfiguration;
 class MinimizeFeature;
+class WindowExclusionService;
 class WindowRecoveryService;
 struct RenderingPressure;
 }  // namespace genie::features
@@ -68,7 +69,7 @@ public:
 
   RestoreFeature(EffectPolicy& policy, WindowRecoveryService& recovery,
                  runtime::SnapshotCache& snapshots, runtime::AnimationRunPool& runs,
-                 MinimizeFeature& minimize);
+                 MinimizeFeature& minimize, WindowExclusionService& window_exclusions);
 
   [[nodiscard]] bool Execute(HWND window, const RestoreExecutionContext& context);
   [[nodiscard]] std::optional<Transaction> Begin(const RestoreRequest& request);
@@ -89,6 +90,7 @@ private:
   runtime::SnapshotCache& snapshots_;
   runtime::AnimationRunPool& runs_;
   MinimizeFeature& minimize_;
+  WindowExclusionService& window_exclusions_;
   std::unordered_set<HWND> active_;
 };
 

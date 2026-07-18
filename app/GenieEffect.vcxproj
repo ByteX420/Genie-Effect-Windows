@@ -138,6 +138,8 @@
     <ClCompile Include="src\features\restore_feature.cpp" />
     <ClCompile Include="src\features\settings_actions_controller.cpp" />
     <ClCompile Include="src\features\settings_mutation_service.cpp" />
+    <ClCompile Include="src\features\window_exclusion_service.cpp" />
+    <ClCompile Include="src\features\open_windows_service.cpp" />
     <ClCompile Include="src\features\window_recovery_service.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -191,6 +193,7 @@
     <ClCompile Include="src\ui\pages\about_page.cpp" />
     <ClCompile Include="src\ui\pages\animation_page.cpp" />
     <ClCompile Include="src\ui\pages\applications_page.cpp" />
+    <ClCompile Include="src\ui\pages\displays_page.cpp" />
     <ClCompile Include="src\ui\pages\diagnostics_page.cpp" />
     <ClCompile Include="src\ui\pages\general_page.cpp" />
     <ClCompile Include="src\ui\pages\hotkeys_page.cpp" />
@@ -253,6 +256,8 @@
     <ClInclude Include="src\features\pause_controller.hpp" />
     <ClInclude Include="src\features\restore_feature.hpp" />
     <ClInclude Include="src\features\settings_mutation_service.hpp" />
+    <ClInclude Include="src\features\window_exclusion_service.hpp" />
+    <ClInclude Include="src\features\open_windows_service.hpp" />
     <ClInclude Include="src\features\window_recovery_service.hpp" />
     <ClInclude Include="src\pch.h" />
     <ClInclude Include="src\pch.hpp" />
@@ -307,6 +312,7 @@
     <ClInclude Include="src\ui\pages\about_page.hpp" />
     <ClInclude Include="src\ui\pages\animation_page.hpp" />
     <ClInclude Include="src\ui\pages\applications_page.hpp" />
+    <ClInclude Include="src\ui\pages\displays_page.hpp" />
     <ClInclude Include="src\ui\pages\diagnostics_page.hpp" />
     <ClInclude Include="src\ui\pages\general_page.hpp" />
     <ClInclude Include="src\ui\pages\hotkeys_page.hpp" />

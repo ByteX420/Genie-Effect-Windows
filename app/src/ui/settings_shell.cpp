@@ -15,6 +15,7 @@
 #include "ui/pages/diagnostics_page.hpp"
 #include "ui/pages/general_page.hpp"
 #include "ui/pages/hotkeys_page.hpp"
+#include "ui/pages/displays_page.hpp"
 #include "ui/pages/windows_integration_page.hpp"
 #include "ui/settings_window.hpp"
 #include "ui/theme/theme.hpp"
@@ -103,6 +104,7 @@ void SettingsShell::Render(SettingsWindow& window) {
       PageEntry{SettingsWindow::Page::kGeneral, "Effect", false},
       PageEntry{SettingsWindow::Page::kAnimation, "Motion", false},
       PageEntry{SettingsWindow::Page::kApplications, "Apps", false},
+      PageEntry{SettingsWindow::Page::kDisplays, "Displays", false},
       PageEntry{SettingsWindow::Page::kWindowsIntegration, "System", true},
       PageEntry{SettingsWindow::Page::kHotkeys, "Hotkeys", false},
       PageEntry{SettingsWindow::Page::kDiagnostics, "Repair", false},
@@ -243,6 +245,9 @@ void SettingsShell::Render(SettingsWindow& window) {
     case SettingsWindow::Page::kApplications:
       page_scope = "apps";
       break;
+    case SettingsWindow::Page::kDisplays:
+      page_scope = "displays";
+      break;
     case SettingsWindow::Page::kWindowsIntegration:
       page_scope = "system";
       break;
@@ -271,6 +276,11 @@ void SettingsShell::Render(SettingsWindow& window) {
   // ── Apps ────────────────────────────────────────────────────────────────
   if (window.selected_page_ == SettingsWindow::Page::kApplications) {
     ui::pages::ApplicationsPage::Render(window, layout, widget_motion, scale, content_alpha);
+  }
+
+  // ── Displays ────────────────────────────────────────────────────────────
+  if (window.selected_page_ == SettingsWindow::Page::kDisplays) {
+    ui::pages::DisplaysPage::Render(window, layout, widget_motion, scale, content_alpha);
   }
 
   // ── System ──────────────────────────────────────────────────────────────

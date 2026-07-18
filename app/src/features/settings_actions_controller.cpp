@@ -235,6 +235,88 @@ bool ApplicationRuntime::SetApplicationExcluded(const std::string& executable_na
   return result;
 }
 
+bool ApplicationRuntime::SetWindowGenieExcluded(HWND window, bool excluded) {
+  if (window == nullptr || !IsWindow(window)) return false;
+
+  if (excluded) {
+    if (!window_exclusion_service_.SetExcluded(window, true)) return false;
+
+    const int run_index = FindRunForWindow(window);
+    if (run_index != -1) {
+      runtime::AnimationRun& run = runs_[run_index];
+      const bool was_restoring = run.animating_restore;
+      // Tear down Genie ownership without leaving cloak/transparency behind.
+      if (run.state != runtime::RunState::kIdle) {
+        SetRunState(run_index, runtime::RunState::kCleaningUp);
+      }
+      run.animating_window = nullptr;
+      run.pending_native_minimize_window = nullptr;
+      run.animating_restore = false;
+      run.live_animation_capture_enabled = false;
+      minimize_feature_.Complete(window);
+      restore_feature_.Complete(window);
+      if (was_restoring) {
+        window_recovery_service_.Restore(window, true);
+      } else {
+        window_recovery_service_.ReleaseWithoutShowing(window, true);
+      }
+      snapshot_cache_.Restore().erase(window);
+      snapshot_cache_.PreMinimize().erase(window);
+      if (run.overlay.active()) run.overlay.CancelAnimation();
+      run.animation_monitor = nullptr;
+      run.animation_frame_interval = std::chrono::steady_clock::duration::zero();
+      SetRunState(run_index, runtime::RunState::kIdle);
+    } else {
+      const bool has_state =
+          snapshot_cache_.Restore().count(window) != 0 ||
+          GetPropW(window, platform::windows::properties::kIsMinimizing) != nullptr ||
+          GetPropW(window, platform::windows::properties::kMovedOffscreen) != nullptr ||
+          platform::windows::properties::HasGenieState(window);
+      if (has_state) {
+        // Already minimized by Genie: uncloak/clear props, keep minimized.
+        window_recovery_service_.ReleaseWithoutShowing(window, IsIconic(window) == FALSE);
+        snapshot_cache_.Restore().erase(window);
+        snapshot_cache_.PreMinimize().erase(window);
+      }
+    }
+    platform::SetDwmTransitionsDisabled(window, false);
+    core::LogDebug(L"WindowExclude", L"Per-window Genie disabled for selected window");
+  } else {
+    window_exclusion_service_.SetExcluded(window, false);
+    core::LogDebug(L"WindowExclude", L"Per-window Genie re-enabled for selected window");
+  }
+
+  settings_window_.ForceRender();
+  return true;
+}
+
+features::OpenWindowsSnapshot ApplicationRuntime::GetOpenWindowsSnapshot() {
+  return open_windows_service_.Capture(GetOverlayWindow(), settings_window_.hwnd());
+}
+
+bool ApplicationRuntime::FocusOpenWindow(HWND window) {
+  if (window == nullptr || !IsWindow(window)) return false;
+  if (IsIconic(window)) {
+    SetPropW(window, platform::windows::properties::kAllowRestore, reinterpret_cast<HANDLE>(1));
+    ShowWindow(window, SW_RESTORE);
+    RemovePropW(window, platform::windows::properties::kAllowRestore);
+  }
+  SetForegroundWindow(window);
+  BringWindowToTop(window);
+  return true;
+}
+
+bool ApplicationRuntime::SetDisplayGenieExcluded(const std::string& device_name, bool excluded) {
+  const bool result = settings_mutations_.SetDisplayGenieExcluded(device_name, excluded, [this] {
+    window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);
+  });
+  if (result) {
+    settings_window_.InvalidateOpenWindowsSnapshot();
+    settings_window_.ForceRender();
+  }
+  return result;
+}
+
 namespace {
 
 std::wstring PickSettingsFile(HWND owner, bool save) {
@@ -283,6 +365,7 @@ ui::SettingsFileOperationResult ApplicationRuntime::ImportSettings() {
       path,
       [this] {
         effect_policy_.Configure(settings_service_.Get());
+        window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);
         RegisterConfiguredHotkeys();
         RefreshEffectRuntimeState();
       },

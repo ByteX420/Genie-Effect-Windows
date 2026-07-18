@@ -175,6 +175,10 @@ public:
         std::vector<std::string> values;
         value_valid = ParseStringArray(&values);
         if (value_valid) settings->excluded_applications = std::move(values);
+      } else if (key == "excludedDisplays") {
+        std::vector<std::string> values;
+        value_valid = ParseStringArray(&values);
+        if (value_valid) settings->excluded_displays = std::move(values);
       } else if (const std::optional<HotkeyField> field = FindHotkeyField(key); field.has_value()) {
         double value = 0.0;
         value_valid = ParseNumber(&value);
@@ -534,6 +538,12 @@ std::string SettingsSerializer::Serialize(const AppSettings& settings) {
   for (size_t i = 0; i < excluded_applications.size(); ++i) {
     if (i != 0) output << ", ";
     output << '"' << EscapeJsonString(excluded_applications[i]) << '"';
+  }
+  output << "],\n";
+  output << "  \"excludedDisplays\": [";
+  for (size_t i = 0; i < settings.excluded_displays.size(); ++i) {
+    if (i != 0) output << ", ";
+    output << '"' << EscapeJsonString(settings.excluded_displays[i]) << '"';
   }
   output << "]\n}\n";
   return output.str();

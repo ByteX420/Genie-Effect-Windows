@@ -12,6 +12,7 @@ namespace genie::features {
 
 class AnimationConfiguration;
 class EffectPolicy;
+class WindowExclusionService;
 class WindowRecoveryService;
 struct RenderingPressure;
 }  // namespace genie::features
@@ -73,7 +74,8 @@ public:
   };
 
   MinimizeFeature(EffectPolicy& policy, WindowRecoveryService& recovery,
-                  runtime::AnimationRunPool& runs, runtime::SnapshotCache& snapshots);
+                  runtime::AnimationRunPool& runs, runtime::SnapshotCache& snapshots,
+                  WindowExclusionService& window_exclusions);
 
   [[nodiscard]] bool Execute(HWND window, const MinimizeExecutionContext& context);
   [[nodiscard]] std::optional<Transaction> Begin(const MinimizeRequest& request);
@@ -112,6 +114,7 @@ private:
   WindowRecoveryService& recovery_;
   runtime::AnimationRunPool& runs_;
   runtime::SnapshotCache& snapshots_;
+  WindowExclusionService& window_exclusions_;
   std::unordered_set<HWND> active_;
 
   enum class SeedPhase {

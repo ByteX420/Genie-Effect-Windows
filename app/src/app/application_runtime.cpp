@@ -34,6 +34,7 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
 #endif
   (void)settings_service_.Load();
   effect_policy_.Configure(settings_service_.Get());
+  window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);
   if (settings_service_.Get().run_at_startup && !platform::windows::ConfigureRunAtStartup(true)) {
     genie::core::LogDebug(L"Startup",
                           L"Could not repair the per-user startup entry; disabling the option");

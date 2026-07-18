@@ -33,6 +33,8 @@ struct AppSettings {
   bool start_minimized = false;
   bool run_at_startup = false;
   std::vector<std::string> excluded_applications;
+  // Persisted GDI device names (MONITORINFOEX.szDevice), e.g. "\\\\.\\DISPLAY1".
+  std::vector<std::string> excluded_displays;
   std::array<HotkeyBinding, static_cast<std::size_t>(HotkeyAction::kCount)> hotkeys = {
       HotkeyBinding{.modifiers = 0x0001u | 0x0002u, .virtual_key = 'G'},
       HotkeyBinding{},
