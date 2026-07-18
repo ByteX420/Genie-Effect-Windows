@@ -247,10 +247,10 @@ Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
 1. On `dev` (or a branch), bump the version macros in `app/GenieEffect.rc`:
 
    ```c
-   #define GENIE_FILE_VERSION      1,2,0,0
-   #define GENIE_PRODUCT_VERSION   1,2,0,0
-   #define GENIE_FILE_VERSION_STR  "1.2.0\0"
-   #define GENIE_PRODUCT_VERSION_STR "1.2.0\0"
+   #define GENIE_FILE_VERSION      1,3,0,0
+   #define GENIE_PRODUCT_VERSION   1,3,0,0
+   #define GENIE_FILE_VERSION_STR  "1.3.0\0"
+   #define GENIE_PRODUCT_VERSION_STR "1.3.0\0"
    ```
 
 2. Merge into **`stable`** and push:
