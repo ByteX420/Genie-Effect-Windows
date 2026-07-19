@@ -26,15 +26,20 @@ void WindowRecoveryService::Restore(HWND window, bool force_show_if_iconic) {
           ? snapshot->was_maximized
           : GetPropW(window, platform::windows::properties::kWasMaximized) != nullptr;
 
-  platform::SetWindowCloaked(window, false);
-  platform::windows::properties::RestoreTransparency(window);
-  platform::windows::properties::ClearGenieState(window);
-
   if (IsIconic(window) == FALSE || force_show_if_iconic) {
     SetPropW(window, platform::windows::properties::kAllowRestore, reinterpret_cast<HANDLE>(1));
     ShowWindow(window, was_maximized ? SW_SHOWMAXIMIZED : SW_RESTORE);
     RemovePropW(window, platform::windows::properties::kAllowRestore);
   }
+
+  // Keep the real window alpha-hidden while its restored placement and first composed frame
+  // settle. Layered Chromium windows can otherwise expose an incomplete fullscreen frame before
+  // the Genie overlay is removed.
+  platform::SetWindowCloaked(window, false);
+  RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
+  DwmFlush();
+  platform::windows::properties::ClearGenieState(window);
+  DwmFlush();
   restoring_ = false;
 }
 

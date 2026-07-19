@@ -125,6 +125,17 @@ void ApplicationRuntime::CleanupRun(int run_index, RunCleanupOutcome outcome) {
       snapshot_cache_.PreMinimize().erase(window);
     } else if (was_restoring) {
       restore_feature_.Complete(window);
+      constexpr ULONGLONG kPostRestoreMinimizeSuppressionMs = 150;
+      const ULONGLONG now = GetTickCount64();
+      for (auto iterator = minimize_suppressed_until_.begin();
+           iterator != minimize_suppressed_until_.end();) {
+        if (!IsWindow(iterator->first) || iterator->second <= now) {
+          iterator = minimize_suppressed_until_.erase(iterator);
+        } else {
+          ++iterator;
+        }
+      }
+      minimize_suppressed_until_[window] = now + kPostRestoreMinimizeSuppressionMs;
       RestoreWindowFromGenieState(window);
       slot.overlay.FinishRestoreAnimation();
       snapshot_cache_.Restore().erase(window);
@@ -191,6 +202,17 @@ HWND ApplicationRuntime::GetOverlayWindow() const {
 }
 
 bool ApplicationRuntime::OnMinimizeStart(HWND window) {
+  const ULONGLONG now = GetTickCount64();
+  const auto suppressed = minimize_suppressed_until_.find(window);
+  if (suppressed != minimize_suppressed_until_.end()) {
+    if (now < suppressed->second) {
+      genie::core::LogDebug(L"Minimize",
+                            L"Ignored delayed minimize immediately after restore");
+      return true;
+    }
+    minimize_suppressed_until_.erase(suppressed);
+  }
+
   const features::RenderingPressure pressure = GetRenderingPressure();
   return minimize_feature_.Execute(
       window,

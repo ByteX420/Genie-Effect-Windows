@@ -140,6 +140,7 @@ private:
   platform::windows::CbtHookManager cbt_hook_manager_;
   platform::windows::GlobalHotkeyManager hotkey_manager_;
   runtime::SnapshotCache snapshot_cache_;
+  std::unordered_map<HWND, ULONGLONG> minimize_suppressed_until_;
   ULONGLONG last_snapshot_refresh_ms_ = 0;
   runtime::RendererRecovery renderer_recovery_;
   bool effect_runtime_active_ = false;
