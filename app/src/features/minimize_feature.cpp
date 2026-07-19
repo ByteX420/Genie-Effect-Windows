@@ -139,6 +139,7 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
     if (context.complete_restore) context.complete_restore(window);
     run.animating_restore = false;
     run.overlay.ContinueMinimizeAnimation();
+    run.direction_started_ms = GetTickCount64();
     context.set_state(run_index, runtime::RunState::kAnimating);
     run.live_animation_capture_enabled = false;
     return true;
@@ -292,7 +293,7 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
     auto stored = snapshots_.Restore().find(window);
     if (stored != snapshots_.Restore().end()) stored->second.moved_offscreen = true;
   }
-  run.minimize_start_time_ms = GetTickCount64();
+  run.direction_started_ms = GetTickCount64();
   transaction->HandOff();
   return true;
 }

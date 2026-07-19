@@ -233,7 +233,7 @@ MessageLoopWait ApplicationRuntime::TickRuntime() {
           std::wcout << L"Target is minimized, starting animation clock.\n";
         } else {
           const ULONGLONG now = GetTickCount64();
-          if (now - slot.minimize_start_time_ms >= 800) {
+          if (now - slot.direction_started_ms >= 800) {
             HWND stalled_window = slot.animating_window;
             platform::windows::TraceWindowEvent(L"Run minimize timeout aborting stalled animation",
                                                 stalled_window);

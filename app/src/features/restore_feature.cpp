@@ -131,6 +131,7 @@ bool RestoreFeature::Execute(HWND window, const RestoreExecutionContext& context
     }
     run.animating_restore = true;
     run.overlay.ReverseAnimation();
+    run.direction_started_ms = GetTickCount64();
     context.set_state(run_index, runtime::RunState::kRestoring);
     run.live_animation_capture_enabled = false;
     if (IsIconic(window) == FALSE) {

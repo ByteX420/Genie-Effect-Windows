@@ -166,13 +166,7 @@ void ApplicationRuntime::CheckAnimationTimeouts() {
   for (int index = 0; index < static_cast<int>(runs_.size()); ++index) {
     runtime::AnimationRun& slot = runs_[index];
     if (slot.state == runtime::RunState::kIdle) continue;
-    ULONGLONG timeout_ms = 10000;
-    if (slot.state == runtime::RunState::kCapturing) timeout_ms = 2500;
-    if (slot.state == runtime::RunState::kWaitingForNativeMinimize) timeout_ms = 2000;
-    if (slot.state == runtime::RunState::kAborting ||
-        slot.state == runtime::RunState::kCleaningUp) {
-      timeout_ms = 1500;
-    }
+    const ULONGLONG timeout_ms = runtime::RunStateTimeoutMs(slot.state);
     const ULONGLONG elapsed = now - slot.state_entered_ms;
     if (elapsed <= timeout_ms) continue;
 
