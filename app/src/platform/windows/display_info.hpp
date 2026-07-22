@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 [[nodiscard]] RECT GetVirtualScreenRect();
 [[nodiscard]] std::optional<double> GetMonitorRefreshRateHz(HMONITOR monitor);
@@ -12,4 +12,4 @@ namespace genie::platform {
 [[nodiscard]] bool IsFullscreenForegroundWindow(HWND ignored_window = nullptr,
                                                 HWND second_ignored_window = nullptr);
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

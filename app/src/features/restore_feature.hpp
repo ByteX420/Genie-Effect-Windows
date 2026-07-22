@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <optional>
@@ -7,7 +7,7 @@
 
 #include "runtime/run_state.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 class EffectPolicy;
 class AnimationConfiguration;
@@ -15,16 +15,16 @@ class MinimizeFeature;
 class WindowExclusionService;
 class WindowRecoveryService;
 struct RenderingPressure;
-}  // namespace genie::features
-namespace genie::platform {
+}  // namespace minimize::features
+namespace minimize::platform {
 class NativeAnimationBlocker;
 }
-namespace genie::runtime {
+namespace minimize::runtime {
 class AnimationRunPool;
 struct CachedSnapshot;
 class SnapshotCache;
-}  // namespace genie::runtime
-namespace genie::features {
+}  // namespace minimize::runtime
+namespace minimize::features {
 
 struct RestoreRequest {
   HWND window = nullptr;
@@ -94,4 +94,4 @@ private:
   std::unordered_set<HWND> active_;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

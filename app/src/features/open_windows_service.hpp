@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <vector>
@@ -6,7 +6,7 @@
 
 #include "features/window_exclusion_service.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 struct OpenWindowInfo {
   HWND window = nullptr;
@@ -20,7 +20,7 @@ struct OpenWindowInfo {
   bool minimized = false;
   bool foreground = false;
   bool maximized = false;
-  bool genie_excluded = false;
+  bool minimize_excluded = false;
 };
 
 struct OpenMonitorInfo {
@@ -31,7 +31,7 @@ struct OpenMonitorInfo {
   std::string label;        // "1", "2", ...
   std::string device_name;  // MONITORINFOEX.szDevice (persisted exclusion key)
   bool is_primary = false;
-  bool genie_excluded = false;
+  bool minimize_excluded = false;
 };
 
 struct OpenWindowsSnapshot {
@@ -55,4 +55,4 @@ private:
   WindowExclusionService& exclusions_;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

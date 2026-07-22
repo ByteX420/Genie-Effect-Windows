@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/process_runtime.hpp"
 
 #include <mutex>
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 namespace {
 
 std::mutex g_handler_mutex;
@@ -55,4 +55,4 @@ void ProcessRuntime::Shutdown() {
   }
 }
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

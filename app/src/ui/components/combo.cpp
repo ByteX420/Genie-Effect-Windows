@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/components/combo.hpp"
 
@@ -10,11 +10,11 @@
 #include "ui/components/component_helpers.hpp"
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui::components {
-using ::genie::ui::motion::MotionContext;
+namespace minimize::ui::components {
+using ::minimize::ui::motion::MotionContext;
 namespace {
-using ::genie::ui::theme::CenteredTextTop;
-using ::genie::ui::theme::Metrics;
+using ::minimize::ui::theme::CenteredTextTop;
+using ::minimize::ui::theme::Metrics;
 std::unordered_map<ImGuiID, bool> g_combo_was_open;
 std::unordered_map<ImGuiID, bool> g_combo_closing;
 }  // namespace
@@ -376,4 +376,4 @@ bool Combo(const MotionContext& motion_context, const char* id, const char* labe
   return changed;
 }
 
-}  // namespace genie::ui::components
+}  // namespace minimize::ui::components

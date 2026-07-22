@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/hotkey_presenter.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 
 std::string FormatHotkey(const settings::HotkeyBinding& binding) {
   if (binding.virtual_key == 0) return "Disabled";
@@ -43,4 +43,4 @@ const char* HotkeyUpdateMessage(HotkeyUpdateResult result) {
   return "Hotkey could not be updated";
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

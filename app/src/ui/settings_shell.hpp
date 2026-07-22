@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 
-namespace genie::ui {
+namespace minimize::ui {
 
 class SettingsWindow;
 
@@ -9,4 +9,4 @@ public:
   static void Render(SettingsWindow& window);
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

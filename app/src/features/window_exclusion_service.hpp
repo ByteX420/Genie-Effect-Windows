@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -6,7 +6,7 @@
 #include <vector>
 #include <windows.h>
 
-namespace genie::features {
+namespace minimize::features {
 
 // Session per-window exclusions (HWND + PID) plus persisted display-device exclusions.
 // Display exclusions use MONITORINFOEX.szDevice and are stored in settings.json.
@@ -41,4 +41,4 @@ private:
   std::unordered_set<std::string> excluded_display_lookup_;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

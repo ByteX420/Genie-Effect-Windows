@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/single_instance_guard.hpp"
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 namespace {
 
 constexpr wchar_t kMutexName[] = L"Local\\MinimizeEffect.Windows.SingleInstance";
@@ -52,4 +52,4 @@ void SingleInstanceGuard::Release() {
   owns_mutex_ = false;
 }
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/about_page.hpp"
 
@@ -10,7 +10,7 @@
 #include "ui/settings_window.hpp"
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
@@ -20,13 +20,13 @@ constexpr float kLabelTextSize = 15.0f;
 constexpr float kValueTextSize = 13.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 }  // namespace
 
-void AboutPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                       const ::genie::ui::motion::MotionContext& motion, float scale, float alpha) {
+void AboutPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                       const ::minimize::ui::motion::MotionContext& motion, float scale, float alpha) {
   auto px = [scale](float value) { return value * scale; };
   const ULONGLONG now = GetTickCount64();
   auto& diagnostics = window.controller_->view_model().diagnostics;
@@ -40,22 +40,22 @@ void AboutPage::Render(::genie::ui::SettingsWindow& window, components::PageLayo
 
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "PRODUCT");
   layout.BeginGroup();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightHero);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightHero);
   layout.RowTitle(window.font_medium_, kSectionTitleTextSize, "Minimize Effect", kPrimaryTextColor);
   layout.RowSubtitle(window.font_small_, kHelperTextSize,
                      "Custom minimize and restore for Windows", kSecondaryTextColor);
   layout.EndRow();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
   layout.ReserveControl(layout.content_width() * 0.55f);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Build", kPrimaryTextColor);
   layout.RowValue(window.font_small_, kValueTextSize, version.c_str(), kSecondaryTextColor);
   layout.EndRow();
   layout.EndGroup();
 
-  const float button_height = ::genie::ui::theme::Metrics::kButtonHeight * scale;
+  const float button_height = ::minimize::ui::theme::Metrics::kButtonHeight * scale;
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "FONTS");
   layout.BeginGroup();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
   const float license_width = px(112.0f);
   layout.ReserveControl(license_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Inter", kPrimaryTextColor);
@@ -79,7 +79,7 @@ void AboutPage::Render(::genie::ui::SettingsWindow& window, components::PageLayo
                                  viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
                           ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(22.0f), px(20.0f)));
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, px(::genie::ui::theme::Metrics::kCardRounding));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, px(::minimize::ui::theme::Metrics::kCardRounding));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, std::max(1.0f, scale));
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(px(8.0f), px(8.0f)));
   ImGui::PushStyleColor(ImGuiCol_PopupBg, ui::theme::kPanelColor);
@@ -141,4 +141,4 @@ void AboutPage::Render(::genie::ui::SettingsWindow& window, components::PageLayo
   ImGui::PopStyleVar(4);
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

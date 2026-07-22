@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/hotkey_presenter.hpp"
 #include "ui/settings_window.hpp"
 #include "ui/theme/theme.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 namespace {
 
 constexpr int kMinimumWindowWidth = static_cast<int>(theme::Metrics::kWindowWidth);
@@ -33,7 +33,7 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
   }
 
   // Avoid DefWindowProc's modal caption-move loop. It blocks the application
-  // thread and freezes active Genie animations while the settings window is dragged.
+  // thread and freezes active Minimize animations while the settings window is dragged.
   if (settings != nullptr && message == WM_LBUTTONDOWN) {
     const POINT client_point{static_cast<short>(LOWORD(l_param)),
                              static_cast<short>(HIWORD(l_param))};
@@ -100,12 +100,12 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
     if ((GetKeyState(VK_LWIN) & 0x8000) != 0 || (GetKeyState(VK_RWIN) & 0x8000) != 0) {
       modifiers |= MOD_WIN;
     }
-    const genie::settings::HotkeyAction action =
-        static_cast<genie::settings::HotkeyAction>(settings->editing_hotkey_);
+    const minimize::settings::HotkeyAction action =
+        static_cast<minimize::settings::HotkeyAction>(settings->editing_hotkey_);
     const ui::HotkeyUpdateResult result =
         settings->controller_ != nullptr
             ? settings->controller_->actions().SetHotkey(
-                  action, genie::settings::HotkeyBinding{.modifiers = modifiers,
+                  action, minimize::settings::HotkeyBinding{.modifiers = modifiers,
                                                          .virtual_key = virtual_key})
             : ui::HotkeyUpdateResult::kInvalid;
     settings->hotkey_feedback_ = ui::HotkeyUpdateMessage(result);
@@ -191,10 +191,10 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
       if (settings != nullptr && settings->editing_hotkey_ >= 0) return 0;
       const int index = static_cast<int>(w_param) - kHotkeyBaseId;
       if (settings != nullptr && index >= 0 &&
-          index < static_cast<int>(genie::settings::HotkeyAction::kCount) &&
+          index < static_cast<int>(minimize::settings::HotkeyAction::kCount) &&
           settings->controller_ != nullptr) {
         settings->controller_->actions().ExecuteHotkeyAction(
-            static_cast<genie::settings::HotkeyAction>(index));
+            static_cast<minimize::settings::HotkeyAction>(index));
       }
       return 0;
     }
@@ -263,4 +263,4 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
   }
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

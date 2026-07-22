@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/components/page_layout.hpp"
 
@@ -8,9 +8,9 @@
 
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui::components {
-using namespace ::genie::ui::theme;
-using ::genie::ui::motion::MotionContext;
+namespace minimize::ui::components {
+using namespace ::minimize::ui::theme;
+using ::minimize::ui::motion::MotionContext;
 
 PageLayout::PageLayout(ImDrawList* draw, ImVec2 origin, float page_width, float scale, float alpha,
                        float y_start, MotionContext* motion, const char* page_scope)
@@ -274,4 +274,4 @@ void PageLayout::SetCursor(float x, float y) const {
   ImGui::SetCursorPos(ImVec2(x, y + motion_y_shift_));
 }
 
-}  // namespace genie::ui::components
+}  // namespace minimize::ui::components

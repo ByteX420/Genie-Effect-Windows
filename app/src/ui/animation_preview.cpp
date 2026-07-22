@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/animation_preview.hpp"
 
 #include <algorithm>
 
-namespace genie::ui {
+namespace minimize::ui {
 namespace {
 
 constexpr wchar_t kPreviewWindowClass[] = L"MinimizeEffectAnimationPreview";
@@ -154,4 +154,4 @@ LRESULT CALLBACK AnimationPreview::WindowProc(HWND window, UINT message, WPARAM 
   }
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/global_hotkey_manager.hpp"
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 namespace {
 
 constexpr int kHotkeyBaseIdentifier = 4100;
@@ -103,4 +103,4 @@ bool GlobalHotkeyManager::Register(settings::HotkeyAction action, settings::Hotk
   return registered;
 }
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

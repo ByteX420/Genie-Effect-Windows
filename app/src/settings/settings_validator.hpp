@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "settings/app_settings.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 class SettingsValidator final {
 public:
@@ -10,4 +10,4 @@ public:
   [[nodiscard]] static bool IsValid(const AppSettings& settings);
 };
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

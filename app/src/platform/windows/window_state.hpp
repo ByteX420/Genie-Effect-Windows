@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <vector>
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 [[nodiscard]] std::optional<RECT> GetExtendedFrameBounds(HWND window);
 [[nodiscard]] std::optional<WINDOWPLACEMENT> GetWindowPlacementSnapshot(HWND window);
@@ -16,4 +16,4 @@ void SetWindowCloaked(HWND window, bool cloaked);
 [[nodiscard]] bool BringWindowToCaptureForeground(HWND window);
 [[nodiscard]] bool IsExactForegroundWindow(HWND window, HWND ignored_window = nullptr);
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

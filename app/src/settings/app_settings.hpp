@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <string>
@@ -7,7 +7,7 @@
 #include "animation/easing.hpp"
 #include "settings/hotkey_binding.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 inline constexpr float kDefaultMinimizeDuration = 0.70f;
 inline constexpr float kDefaultRestoreDuration = 0.70f;
@@ -23,9 +23,9 @@ struct AppSettings {
   std::string restore_easing = "Ease In Out";
   animation::CubicBezier minimize_custom_bezier = animation::CubicBezier::EaseInOut();
   animation::CubicBezier restore_custom_bezier = animation::CubicBezier::EaseInOut();
-  std::string animation_style = "Gienie classic";
+  std::string animation_style = "Minimize classic";
   std::string quality_mode = "automatic";
-  float genie_strength = 1.0f;
+  float minimize_strength = 1.0f;
   std::string fade_strength = "Subtle";
   bool show_target_indicator = false;
   bool smart_skip_under_load = true;
@@ -44,4 +44,4 @@ struct AppSettings {
   bool operator==(const AppSettings&) const = default;
 };
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

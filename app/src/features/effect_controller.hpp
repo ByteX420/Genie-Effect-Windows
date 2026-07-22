@@ -1,24 +1,24 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <windows.h>
 
 #include "platform/windows/window_event_monitor.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 class EffectPolicy;
 class MinimizeFeature;
 class PauseController;
 class RestoreFeature;
-}  // namespace genie::features
-namespace genie::platform {
+}  // namespace minimize::features
+namespace minimize::platform {
 class NativeAnimationBlocker;
 }
-namespace genie::rendering {
+namespace minimize::rendering {
 class DesktopCapture;
 }
-namespace genie::features {
+namespace minimize::features {
 
 class EffectController final {
 public:
@@ -48,4 +48,4 @@ private:
   HWND last_foreground_window_ = nullptr;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

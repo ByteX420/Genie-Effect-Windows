@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/pause_controller.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 void PauseController::PauseFor(std::uint64_t duration_ms, std::uint64_t now_ms) {
   until_restart_ = false;
@@ -29,4 +29,4 @@ bool PauseController::IsPaused(std::uint64_t now_ms) const {
   return until_restart_ || (until_ms_ != 0 && now_ms < until_ms_);
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

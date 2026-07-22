@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/settings_view_model.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 
 void SettingsViewModel::Apply(const settings::AppSettings& settings) {
   enabled = settings.enabled;
@@ -17,7 +17,7 @@ void SettingsViewModel::Apply(const settings::AppSettings& settings) {
   restore_custom_bezier = settings.restore_custom_bezier;
   animation_style = settings.animation_style;
   quality_mode = settings.quality_mode;
-  genie_strength = settings.genie_strength;
+  minimize_strength = settings.minimize_strength;
   fade_strength = settings.fade_strength;
   show_target_indicator = settings.show_target_indicator;
   smart_skip_under_load = settings.smart_skip_under_load;
@@ -38,4 +38,4 @@ void SettingsViewModel::SetHotkeyAvailability(settings::HotkeyAction action, boo
   if (index < hotkey_available.size()) hotkey_available[index] = available;
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

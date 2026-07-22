@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 
 class CbtHookManager final {
 public:
@@ -21,4 +21,4 @@ private:
   HHOOK hook_ = nullptr;
 };
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/effect_controller.hpp"
 
@@ -13,7 +13,7 @@
 #include "platform/windows/window_state.hpp"
 #include "rendering/desktop_capture.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 EffectController::EffectController(EffectPolicy& policy, PauseController& pause,
                                    MinimizeFeature& minimize, RestoreFeature& restore)
@@ -82,4 +82,4 @@ void EffectController::HandleWindowSeen(HWND window, DWORD event, HWND overlay,
   }
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

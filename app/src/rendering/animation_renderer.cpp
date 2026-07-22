@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/animation_renderer.hpp"
 
 #include <algorithm>
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 void AnimationRenderer::SetEasing(animation::EasingCurve easing, animation::CubicBezier custom) {
   configured_easing_ = easing;
@@ -13,7 +13,7 @@ void AnimationRenderer::SetEasing(animation::EasingCurve easing, animation::Cubi
 }
 
 bool AnimationRenderer::Begin(CapturedTexture texture, const animation::RectF& source,
-                              const animation::RectF& target, animation::GenieEdge edge,
+                              const animation::RectF& target, animation::MinimizeEdge edge,
                               float start_progress, float target_progress) {
   if (texture.shader_resource_view == nullptr) return false;
   active_ = true;
@@ -28,7 +28,7 @@ bool AnimationRenderer::Begin(CapturedTexture texture, const animation::RectF& s
   easing_ = configured_easing_;
   custom_bezier_ = configured_custom_bezier_;
   style_ = configured_style_;
-  genie_strength_ = configured_genie_strength_;
+  minimize_strength_ = configured_minimize_strength_;
   fade_strength_ = configured_fade_strength_;
   return true;
 }
@@ -101,9 +101,9 @@ float AnimationRenderer::opacity(float rendered_progress) const {
 }
 
 bool AnimationRenderer::GenerateMesh(float viewport_height) {
-  mesh_generator_.SetStrength(genie_strength_);
-  return mesh_generator_.GenerateInto(source_, target_, edge_, animation::GenieDirection::kMinimize,
+  mesh_generator_.SetStrength(minimize_strength_);
+  return mesh_generator_.GenerateInto(source_, target_, edge_, animation::MinimizeDirection::kMinimize,
                                       style_, eased_progress(), viewport_height, &reusable_mesh_);
 }
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

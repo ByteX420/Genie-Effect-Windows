@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/desktop_capture.hpp"
 
@@ -9,7 +9,7 @@
 #include "rendering/capture_geometry.hpp"
 #include "rendering/window_capture_mask.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 namespace {
 
 bool IsDeviceLostError(HRESULT hr) { return D3dDevice::IsDeviceLostError(hr); }
@@ -139,7 +139,7 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
   DeleteDC(memory_dc);
 
   if (printed == FALSE) {
-    genie::core::LogTrace(L"DesktopCapture",
+    minimize::core::LogTrace(L"DesktopCapture",
                           L"CaptureWindow PrintWindow failed hwnd=0x" +
                               std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) +
                               L" error=" + std::to_wstring(GetLastError()));
@@ -167,7 +167,7 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
       MarkDeviceLost(L"CreateTexture2D PrintWindow capture", hr);
       return false;
     }
-    genie::core::LogTrace(L"DesktopCapture", L"CaptureWindow CreateTexture2D failed hr=0x" +
+    minimize::core::LogTrace(L"DesktopCapture", L"CaptureWindow CreateTexture2D failed hr=0x" +
                                                  std::to_wstring(static_cast<unsigned long>(hr)));
     return false;
   }
@@ -185,7 +185,7 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
       MarkDeviceLost(L"CreateShaderResourceView PrintWindow capture", hr);
       return false;
     }
-    genie::core::LogTrace(L"DesktopCapture",
+    minimize::core::LogTrace(L"DesktopCapture",
                           L"CaptureWindow CreateShaderResourceView failed "
                           L"hr=0x" +
                               std::to_wstring(static_cast<unsigned long>(hr)));
@@ -194,12 +194,12 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
 
   captured_texture->texture = texture;
   captured_texture->shader_resource_view = shader_resource_view;
-  captured_texture->size = genie::animation::SizeF{
+  captured_texture->size = minimize::animation::SizeF{
       .width = static_cast<float>(capture_width),
       .height = static_cast<float>(capture_height),
   };
   *captured_screen_rect = capture_rect;
-  genie::core::LogTrace(
+  minimize::core::LogTrace(
       L"DesktopCapture",
       L"CaptureWindow succeeded hwnd=0x" +
           std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) + L" size=" +
@@ -298,7 +298,7 @@ bool DesktopCapture::CopyRegionFromFrame(OutputCapture* output, const RECT& scre
 
     captured_texture->texture = copied_texture;
     captured_texture->shader_resource_view = shader_resource_view;
-    captured_texture->size = genie::animation::SizeF{
+    captured_texture->size = minimize::animation::SizeF{
         .width = static_cast<float>(width),
         .height = static_cast<float>(height),
     };
@@ -466,7 +466,7 @@ bool DesktopCapture::CopyRegionFromFrame(OutputCapture* output, const RECT& scre
 
   captured_texture->texture = copied_texture;
   captured_texture->shader_resource_view = shader_resource_view;
-  captured_texture->size = genie::animation::SizeF{
+  captured_texture->size = minimize::animation::SizeF{
       .width = static_cast<float>(W_dst),
       .height = static_cast<float>(H_dst),
   };
@@ -652,4 +652,4 @@ void DesktopCapture::MarkDeviceLost(const wchar_t* context, HRESULT hr) {
              << L", reason=0x" << reason << std::dec << L". Reinitializing renderer.\n";
 }
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

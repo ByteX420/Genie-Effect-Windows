@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/taskbar_target_provider.hpp"
 
@@ -18,7 +18,7 @@
 #pragma comment(lib, "uiautomationcore.lib")
 #pragma comment(lib, "version.lib")
 
-namespace genie::platform {
+namespace minimize::platform {
 namespace {
 
 std::wstring ToLower(std::wstring str) {
@@ -295,7 +295,7 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
       }
     }
 
-    genie::core::LogTrace(L"UIAutomation",
+    minimize::core::LogTrace(L"UIAutomation",
                           L"Checking button: '" + btn_name + L"' rect=" +
                               std::to_wstring(rect.left) + L"," + std::to_wstring(rect.top) + L"," +
                               std::to_wstring(rect.right) + L"," + std::to_wstring(rect.bottom) +
@@ -314,7 +314,7 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
   automation->Release();
 
   if (best_score > 0) {
-    genie::core::LogTrace(
+    minimize::core::LogTrace(
         L"UIAutomation",
         L"Matched best button for title='" + title + L"' proc='" + process_no_ext +
             L"' with score=" + std::to_wstring(best_score) + L" rect=" +
@@ -324,13 +324,13 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
     return true;
   }
 
-  genie::core::LogTrace(L"UIAutomation", L"Failed to match any button for title='" + title +
+  minimize::core::LogTrace(L"UIAutomation", L"Failed to match any button for title='" + title +
                                              L"' proc='" + process_no_ext + L"'");
   return false;
 }
 
-genie::animation::RectF ToRectF(const RECT& rect) {
-  return genie::animation::RectF{
+minimize::animation::RectF ToRectF(const RECT& rect) {
+  return minimize::animation::RectF{
       .left = static_cast<float>(rect.left),
       .top = static_cast<float>(rect.top),
       .right = static_cast<float>(rect.right),
@@ -389,8 +389,8 @@ TaskbarTarget TaskbarTargetProvider::GetTargetForWindow(HWND window,
     }
   }
 
-  genie::animation::GenieEdge edge = genie::animation::GenieEdge::kBottom;
-  genie::animation::RectF target{};
+  minimize::animation::MinimizeEdge edge = minimize::animation::MinimizeEdge::kBottom;
+  minimize::animation::RectF target{};
 
   RECT reference_taskbar = has_matched_button ? matched_rect : taskbar_rect;
   if (has_matched_button) {
@@ -408,18 +408,18 @@ TaskbarTarget TaskbarTargetProvider::GetTargetForWindow(HWND window,
   if (tb_width >= tb_height) {
     // Horizontal taskbar: either top or bottom
     if (taskbar_rect.top < monitor_info.rcMonitor.top + monitor_height / 2.0f) {
-      edge = genie::animation::GenieEdge::kTop;
+      edge = minimize::animation::MinimizeEdge::kTop;
     } else {
-      edge = genie::animation::GenieEdge::kBottom;
+      edge = minimize::animation::MinimizeEdge::kBottom;
     }
   } else {
     // Vertical taskbar: either left or right
     const float monitor_width =
         static_cast<float>(monitor_info.rcMonitor.right - monitor_info.rcMonitor.left);
     if (taskbar_rect.left < monitor_info.rcMonitor.left + monitor_width / 2.0f) {
-      edge = genie::animation::GenieEdge::kLeft;
+      edge = minimize::animation::MinimizeEdge::kLeft;
     } else {
-      edge = genie::animation::GenieEdge::kRight;
+      edge = minimize::animation::MinimizeEdge::kRight;
     }
   }
 
@@ -428,7 +428,7 @@ TaskbarTarget TaskbarTargetProvider::GetTargetForWindow(HWND window,
   } else {
     constexpr float kTargetWidth = 72.0f;
     constexpr float kTargetHeight = 48.0f;
-    const genie::animation::RectF taskbar = ToRectF(taskbar_rect);
+    const minimize::animation::RectF taskbar = ToRectF(taskbar_rect);
 
     if (tb_width >= tb_height) {
       const float center_x = static_cast<float>(taskbar_rect.left + taskbar_rect.right) * 0.5f;
@@ -454,7 +454,7 @@ TaskbarTarget TaskbarTargetProvider::GetTargetForWindow(HWND window,
 bool TaskbarTargetProvider::TryGetEnvironmentTarget(RECT* target_rect) const {
   wchar_t value[128]{};
   const DWORD length =
-      GetEnvironmentVariableW(L"GENIE_TASKBAR_RECT", value, static_cast<DWORD>(std::size(value)));
+      GetEnvironmentVariableW(L"MINIMIZE_TASKBAR_RECT", value, static_cast<DWORD>(std::size(value)));
   if (length == 0 || length >= std::size(value)) {
     return false;
   }
@@ -492,4 +492,4 @@ RECT TaskbarTargetProvider::GetShellTaskbarRect() const {
   };
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

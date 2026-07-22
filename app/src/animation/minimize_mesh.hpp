@@ -1,20 +1,20 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 #include <vector>
 
 #include "animation/geometry.hpp"
 
-namespace genie::animation {
+namespace minimize::animation {
 
-enum class GenieEdge {
+enum class MinimizeEdge {
   kTop,
   kBottom,
   kLeft,
   kRight,
 };
 
-enum class GenieDirection {
+enum class MinimizeDirection {
   kMinimize,
   kMaximize,
 };
@@ -32,25 +32,25 @@ struct MeshVertex {
   float v = 0.0f;
 };
 
-struct GenieMesh {
+struct MinimizeMesh {
   std::vector<MeshVertex> vertices;
   std::vector<std::uint16_t> indices;
 };
 
-class GenieMeshGenerator {
+class MinimizeMeshGenerator {
 public:
   void SetStrength(float strength);
   void SetLongGridSegmentCount(int segment_count);
 
   // Returns true when the index layout changed and must be uploaded again.
-  bool GenerateInto(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
-                    GenieDirection direction, AnimationStyle style, float progress,
-                    float viewport_height, GenieMesh* mesh);
+  bool GenerateInto(const RectF& source_rect, const RectF& target_rect, MinimizeEdge edge,
+                    MinimizeDirection direction, AnimationStyle style, float progress,
+                    float viewport_height, MinimizeMesh* mesh);
 
 private:
-  void GenerateClassicPositions(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
+  void GenerateClassicPositions(const RectF& source_rect, const RectF& target_rect, MinimizeEdge edge,
                                 float progress);
-  void GenerateCurvyPositions(const RectF& source_rect, const RectF& target_rect, GenieEdge edge,
+  void GenerateCurvyPositions(const RectF& source_rect, const RectF& target_rect, MinimizeEdge edge,
                               float progress);
   void GenerateSquashPositions(const RectF& source_rect, const RectF& target_rect, float progress);
 
@@ -62,4 +62,4 @@ private:
   float strength_ = 1.0f;
 };
 
-}  // namespace genie::animation
+}  // namespace minimize::animation

@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/power_status.hpp"
 
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 std::optional<PowerStatus> QueryPowerStatus() {
   SYSTEM_POWER_STATUS status{};
@@ -15,4 +15,4 @@ std::optional<PowerStatus> QueryPowerStatus() {
   };
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

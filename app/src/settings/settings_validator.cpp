@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "settings/settings_validator.hpp"
 
@@ -9,7 +9,7 @@
 
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 namespace {
 
 template <std::size_t Size>
@@ -28,10 +28,10 @@ bool IsValidEasing(std::string_view value) {
 
 bool IsValidStyle(std::string_view value) {
   constexpr std::array choices = {
-      std::string_view{"Gienie classic"},
-      std::string_view{"Gienie curvy"},
+      std::string_view{"Minimize classic"},
+      std::string_view{"Minimize curvy"},
       std::string_view{"Squash"},
-      std::string_view{"Classic Genie"},
+      std::string_view{"Classic Minimize"},
   };
   return IsOneOf(value, choices);
 }
@@ -41,15 +41,15 @@ bool IsValidStyle(std::string_view value) {
 AppSettings SettingsValidator::Normalize(AppSettings settings) {
   settings.minimize_duration = std::clamp(settings.minimize_duration, 0.10f, 2.00f);
   settings.restore_duration = std::clamp(settings.restore_duration, 0.10f, 2.00f);
-  settings.genie_strength = std::clamp(settings.genie_strength, 0.25f, 1.00f);
+  settings.minimize_strength = std::clamp(settings.minimize_strength, 0.25f, 1.00f);
   if (!IsValidEasing(settings.minimize_easing)) settings.minimize_easing = "Ease In Out";
   if (!IsValidEasing(settings.restore_easing)) settings.restore_easing = "Ease In Out";
   settings.minimize_custom_bezier.ClampHandles();
   settings.restore_custom_bezier.ClampHandles();
-  if (settings.animation_style == "Classic Genie") {
-    settings.animation_style = "Gienie classic";
+  if (settings.animation_style == "Classic Minimize") {
+    settings.animation_style = "Minimize classic";
   }
-  if (!IsValidStyle(settings.animation_style)) settings.animation_style = "Gienie classic";
+  if (!IsValidStyle(settings.animation_style)) settings.animation_style = "Minimize classic";
   if (settings.quality_mode != "automatic" && settings.quality_mode != "best_quality" &&
       settings.quality_mode != "power_saving") {
     settings.quality_mode = "automatic";
@@ -73,4 +73,4 @@ bool SettingsValidator::IsValid(const AppSettings& settings) {
   return SettingsValidator::Normalize(settings) == settings;
 }
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

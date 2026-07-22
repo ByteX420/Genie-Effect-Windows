@@ -1,17 +1,17 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
 #include "features/effect_policy.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 class OverlayWindow;
 }
-namespace genie::settings {
+namespace minimize::settings {
 class SettingsService;
 }
 
-namespace genie::features {
+namespace minimize::features {
 
 class AnimationConfiguration final {
 public:
@@ -25,4 +25,4 @@ private:
   const EffectPolicy& policy_;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

@@ -1,12 +1,12 @@
-#pragma once
+﻿#pragma once
 
 #include <chrono>
 
 #include "animation/easing.hpp"
-#include "animation/genie_mesh.hpp"
+#include "animation/minimize_mesh.hpp"
 #include "rendering/desktop_capture.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 class AnimationRenderer final {
 public:
@@ -20,11 +20,11 @@ public:
   void SetEasing(animation::EasingCurve easing, animation::CubicBezier custom);
   void SetStyle(animation::AnimationStyle style) { configured_style_ = style; }
   void SetMeshSegmentCount(int count) { mesh_generator_.SetLongGridSegmentCount(count); }
-  void SetGenieStrength(float strength) { configured_genie_strength_ = strength; }
+  void SetMinimizeStrength(float strength) { configured_minimize_strength_ = strength; }
   void SetFadeStrength(float strength) { configured_fade_strength_ = strength; }
 
   [[nodiscard]] bool Begin(CapturedTexture texture, const animation::RectF& source,
-                           const animation::RectF& target, animation::GenieEdge edge,
+                           const animation::RectF& target, animation::MinimizeEdge edge,
                            float start_progress, float target_progress);
   void StartClock();
   void ContinueMinimize();
@@ -42,7 +42,7 @@ public:
   [[nodiscard]] float eased_progress() const;
   [[nodiscard]] float opacity(float rendered_progress) const;
   [[nodiscard]] bool GenerateMesh(float viewport_height);
-  [[nodiscard]] const animation::GenieMesh& mesh() const { return reusable_mesh_; }
+  [[nodiscard]] const animation::MinimizeMesh& mesh() const { return reusable_mesh_; }
   [[nodiscard]] CapturedTexture* mutable_texture() { return &texture_; }
   [[nodiscard]] ID3D11ShaderResourceView* texture_view() const {
     return texture_.shader_resource_view.Get();
@@ -57,7 +57,7 @@ private:
   CapturedTexture texture_;
   animation::RectF source_;
   animation::RectF target_;
-  animation::GenieEdge edge_ = animation::GenieEdge::kBottom;
+  animation::MinimizeEdge edge_ = animation::MinimizeEdge::kBottom;
   std::chrono::steady_clock::time_point last_tick_time_{};
   float progress_ = 0.0f;
   float target_progress_ = 1.0f;
@@ -65,17 +65,17 @@ private:
   animation::EasingCurve easing_ = animation::EasingCurve::kLinear;
   animation::CubicBezier custom_bezier_ = animation::CubicBezier::EaseInOut();
   animation::AnimationStyle style_ = animation::AnimationStyle::kClassic;
-  float genie_strength_ = 1.0f;
+  float minimize_strength_ = 1.0f;
   float fade_strength_ = 0.0f;
 
   float configured_duration_seconds_ = 0.70f;
   animation::EasingCurve configured_easing_ = animation::EasingCurve::kLinear;
   animation::CubicBezier configured_custom_bezier_ = animation::CubicBezier::EaseInOut();
   animation::AnimationStyle configured_style_ = animation::AnimationStyle::kClassic;
-  float configured_genie_strength_ = 1.0f;
+  float configured_minimize_strength_ = 1.0f;
   float configured_fade_strength_ = 0.0f;
-  animation::GenieMeshGenerator mesh_generator_;
-  animation::GenieMesh reusable_mesh_;
+  animation::MinimizeMeshGenerator mesh_generator_;
+  animation::MinimizeMesh reusable_mesh_;
 };
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/d3d_device.hpp"
 
 #include <array>
 #include <iostream>
 
-namespace genie::rendering {
+namespace minimize::rendering {
 namespace {
 
 HRESULT CreateHardwareDevice(UINT flags, ID3D11Device** device, ID3D11DeviceContext** context) {
@@ -80,4 +80,4 @@ bool D3dDevice::IsDeviceLost(HRESULT operation_result) const {
   return IsDeviceLostError(operation_result) || FAILED(DeviceRemovedReason());
 }
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

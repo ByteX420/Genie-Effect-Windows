@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <string>
@@ -7,7 +7,7 @@
 
 #include "imgui.h"
 
-namespace genie::ui::motion {
+namespace minimize::ui::motion {
 enum class MotionEasing {
   kLinear,
   kEaseInQuad,
@@ -141,4 +141,4 @@ private:
   bool reduced_motion_ = false;
   unsigned active_track_count_ = 0;
 };
-}  // namespace genie::ui::motion
+}  // namespace minimize::ui::motion

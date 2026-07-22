@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/window_diagnostics.hpp"
 
@@ -7,7 +7,7 @@
 
 #include "core/logger.hpp"
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 namespace {
 
 std::wstring DescribeRect(const RECT& rect) {
@@ -49,4 +49,4 @@ void TraceWindowEvent(const std::wstring& event_name, HWND window) {
   core::LogTrace(L"App", event_name + L" " + DescribeWindow(window));
 }
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

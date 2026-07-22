@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/animation_configuration.hpp"
 
@@ -9,17 +9,17 @@
 #include "rendering/overlay_window.hpp"
 #include "settings/settings_service.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 animation::AnimationStyle AnimationStyleFromName(std::string_view style) {
-  if (style == "Gienie curvy") return animation::AnimationStyle::kCurvy;
+  if (style == "Minimize curvy") return animation::AnimationStyle::kCurvy;
   if (style == "Squash") return animation::AnimationStyle::kSquash;
   return animation::AnimationStyle::kClassic;
 }
 
 float AnimationStyleDurationScale(std::string_view style) {
-  if (style == "Gienie curvy") return 0.78f;
+  if (style == "Minimize curvy") return 0.78f;
   if (style == "Squash") return 0.55f;
   return 1.0f;
 }
@@ -43,7 +43,7 @@ float AnimationConfiguration::Apply(rendering::OverlayWindow& overlay, const REC
   overlay.SetAnimationStyle(AnimationStyleFromName(settings.animation_style));
   overlay.SetMeshSegmentCount(policy_.SelectMeshSegmentCount(source.right - source.left,
                                                              source.bottom - source.top, pressure));
-  overlay.SetGenieStrength(std::clamp(settings.genie_strength, 0.0f, 1.0f));
+  overlay.SetMinimizeStrength(std::clamp(settings.minimize_strength, 0.0f, 1.0f));
   overlay.SetFadeStrength(settings.fade_strength == "Strong"   ? 0.55f
                           : settings.fade_strength == "Subtle" ? 0.25f
                                                                : 0.0f);
@@ -51,4 +51,4 @@ float AnimationConfiguration::Apply(rendering::OverlayWindow& overlay, const REC
   return duration;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

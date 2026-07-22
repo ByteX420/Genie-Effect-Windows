@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/application_list_provider.hpp"
 
@@ -9,7 +9,7 @@
 #include "platform/windows/window_state.hpp"
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 
 std::vector<std::string> ApplicationListProvider::GetActiveApplications() const {
   std::unordered_set<std::string> unique_applications;
@@ -25,4 +25,4 @@ std::vector<std::string> ApplicationListProvider::GetActiveApplications() const 
   return result;
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

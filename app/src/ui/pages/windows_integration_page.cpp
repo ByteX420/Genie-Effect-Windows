@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/windows_integration_page.hpp"
 
 #include "ui/components/controls.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
@@ -13,24 +13,24 @@ constexpr float kPageSubtitleTextSize = 13.0f;
 constexpr float kLabelTextSize = 15.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 }  // namespace
 
-void WindowsIntegrationPage::Render(::genie::ui::SettingsWindow& window,
+void WindowsIntegrationPage::Render(::minimize::ui::SettingsWindow& window,
                                     components::PageLayout& layout,
-                                    const ::genie::ui::motion::MotionContext& motion, float scale,
+                                    const ::minimize::ui::motion::MotionContext& motion, float scale,
                                     float alpha) {
-  const float toggle_width = ::genie::ui::theme::Metrics::kToggleWidth * scale;
-  const float toggle_height = (::genie::ui::theme::Metrics::kToggleHeight + 4.0f) * scale;
+  const float toggle_width = ::minimize::ui::theme::Metrics::kToggleWidth * scale;
+  const float toggle_height = (::minimize::ui::theme::Metrics::kToggleHeight + 4.0f) * scale;
   auto& model = window.controller_->view_model();
 
   layout.Title(window.font_title_, kPageTitleTextSize, "System", window.font_small_,
                kPageSubtitleTextSize, "Fullscreen and power behavior");
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "WINDOWS");
   layout.BeginGroup();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
   layout.ReserveControl(toggle_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Pause in fullscreen", kPrimaryTextColor);
   layout.RowSubtitle(window.font_small_, kHelperTextSize,
@@ -47,7 +47,7 @@ void WindowsIntegrationPage::Render(::genie::ui::SettingsWindow& window,
   }
   layout.EndRow();
 
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
   layout.ReserveControl(toggle_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Smart skip under load", kPrimaryTextColor);
   layout.RowSubtitle(window.font_small_, kHelperTextSize,
@@ -68,7 +68,7 @@ void WindowsIntegrationPage::Render(::genie::ui::SettingsWindow& window,
 
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "POWER");
   layout.BeginGroup();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
   layout.ReserveControl(toggle_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Disable in battery saver", kPrimaryTextColor);
   bool proposed_battery_saver = model.disable_effects_battery_saver;
@@ -85,4 +85,4 @@ void WindowsIntegrationPage::Render(::genie::ui::SettingsWindow& window,
   layout.EndGroup();
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/desktop_duplication_session.hpp"
 
@@ -6,7 +6,7 @@
 
 #include "rendering/d3d_device.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 namespace {
 
 int RectWidth(const RECT& rect) { return static_cast<int>(rect.right - rect.left); }
@@ -149,4 +149,4 @@ void DesktopDuplicationSession::MarkDeviceLost(const wchar_t* context, HRESULT r
              << L", reason=0x" << reason << std::dec << L".\n";
 }
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

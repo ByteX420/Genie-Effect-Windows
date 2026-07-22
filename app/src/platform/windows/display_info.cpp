@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/display_info.hpp"
 
@@ -7,7 +7,7 @@
 #include "platform/windows/process_info.hpp"
 #include "platform/windows/window_state.hpp"
 
-namespace genie::platform {
+namespace minimize::platform {
 
 RECT GetVirtualScreenRect() {
   const int left = GetSystemMetrics(SM_XVIRTUALSCREEN);
@@ -109,4 +109,4 @@ bool IsFullscreenForegroundWindow(HWND ignored_window, HWND second_ignored_windo
   return (style & WS_CAPTION) == 0 || (style & WS_THICKFRAME) == 0;
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/general_page.hpp"
 
@@ -7,7 +7,7 @@
 #include "ui/components/controls.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
@@ -16,26 +16,26 @@ constexpr float kSectionTitleTextSize = 15.0f;
 constexpr float kLabelTextSize = 15.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 }  // namespace
 
-void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                         const ::genie::ui::motion::MotionContext& motion, float scale,
+void GeneralPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                         const ::minimize::ui::motion::MotionContext& motion, float scale,
                          float alpha) {
   using ui::components::SegmentSelector;
   using ui::components::Toggle;
-  const float toggle_width = ::genie::ui::theme::Metrics::kToggleWidth * scale;
-  const float toggle_height = (::genie::ui::theme::Metrics::kToggleHeight + 4.0f) * scale;
+  const float toggle_width = ::minimize::ui::theme::Metrics::kToggleWidth * scale;
+  const float toggle_height = (::minimize::ui::theme::Metrics::kToggleHeight + 4.0f) * scale;
 
   layout.Title(window.font_title_, kPageTitleTextSize, "Effect", window.font_small_,
                kPageSubtitleTextSize, "Master switch and how the app behaves");
 
   layout.BeginGroup();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightHero);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightHero);
   layout.ReserveControl(toggle_width);
-  layout.RowTitle(window.font_medium_, kSectionTitleTextSize, "Genie animations",
+  layout.RowTitle(window.font_medium_, kSectionTitleTextSize, "Minimize animations",
                   kPrimaryTextColor);
   layout.RowSubtitle(window.font_small_, kHelperTextSize,
                      "Replace minimize and restore transitions", kSecondaryTextColor);
@@ -54,7 +54,7 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
 
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "WHEN CLOSING THIS WINDOW");
   layout.BeginGroup();
-  layout.BeginStackRow(20.0f, ::genie::ui::theme::Metrics::kSegmentHeight);
+  layout.BeginStackRow(20.0f, ::minimize::ui::theme::Metrics::kSegmentHeight);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Close action", kPrimaryTextColor);
   constexpr std::array close_labels = {"Quit app", "Keep in tray"};
   int close_behavior_segment = window.controller_->view_model().close_behavior == "tray" ? 1 : 0;
@@ -74,7 +74,7 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
 
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "STARTUP");
   layout.BeginGroup();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
   layout.ReserveControl(toggle_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Launch at login", kPrimaryTextColor);
   bool proposed_startup = window.controller_->view_model().run_at_startup;
@@ -88,7 +88,7 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   }
   layout.EndRow();
 
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
   layout.ReserveControl(toggle_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Start in tray", kPrimaryTextColor);
   bool proposed_minimized = window.controller_->view_model().start_minimized;
@@ -106,8 +106,8 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "BACKUP");
   layout.BeginGroup();
   const float button_width = 108.0f * scale;
-  const float button_height = ::genie::ui::theme::Metrics::kButtonHeight * scale;
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  const float button_height = ::minimize::ui::theme::Metrics::kButtonHeight * scale;
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
   layout.ReserveControl(button_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Export settings", kPrimaryTextColor);
   layout.RowSubtitle(window.font_small_, kHelperTextSize, "Save a JSON profile you can share",
@@ -120,7 +120,7 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
     window.RecordFileOperationResult(window.controller_->actions().ExportSettings());
   }
   layout.EndRow();
-  layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
   layout.ReserveControl(button_width);
   layout.RowTitle(window.font_body_, kLabelTextSize, "Import settings", kPrimaryTextColor);
   layout.RowSubtitle(window.font_small_, kHelperTextSize,
@@ -136,4 +136,4 @@ void GeneralPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   layout.EndGroup();
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

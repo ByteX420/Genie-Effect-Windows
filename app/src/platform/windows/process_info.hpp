@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <string>
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 [[nodiscard]] DWORD WindowProcessId(HWND window);
 [[nodiscard]] std::optional<std::string> GetWindowExecutableName(HWND window);
@@ -12,4 +12,4 @@ namespace genie::platform {
 [[nodiscard]] std::wstring ExecutableDirectory();
 [[nodiscard]] std::string ExecutableProductVersion();
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

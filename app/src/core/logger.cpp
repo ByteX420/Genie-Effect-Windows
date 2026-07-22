@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "core/logger.hpp"
 
@@ -10,12 +10,12 @@
 
 #include "core/environment.hpp"
 
-namespace genie::core {
+namespace minimize::core {
 namespace {
 
 bool IsSynchronousLoggingEnabled() {
 #ifdef _DEBUG
-  static const bool enabled = EnvironmentFlagEnabled("GENIE_LOG_SYNC");
+  static const bool enabled = EnvironmentFlagEnabled("MINIMIZE_LOG_SYNC");
   return enabled;
 #else
   return false;
@@ -156,7 +156,7 @@ void WriteLogLine(std::wstring_view module_name, std::wstring_view level,
 
 bool IsTraceLoggingEnabled() {
 #ifdef _DEBUG
-  static const bool enabled = EnvironmentFlagEnabled("GENIE_TRACE");
+  static const bool enabled = EnvironmentFlagEnabled("MINIMIZE_TRACE");
   return enabled;
 #else
   return false;
@@ -167,7 +167,7 @@ const std::wstring& DebugLogPath() {
   static const std::wstring log_path = [] {
     std::wstring path;
     wchar_t environment_path[MAX_PATH]{};
-    DWORD length = GetEnvironmentVariableW(L"GENIE_DEBUG_LOG", environment_path, MAX_PATH);
+    DWORD length = GetEnvironmentVariableW(L"MINIMIZE_DEBUG_LOG", environment_path, MAX_PATH);
     if (length > 0 && length < MAX_PATH) {
       path.assign(environment_path, length);
     } else {
@@ -199,7 +199,7 @@ std::uintmax_t DebugLogFolderSize() {
     if (error) {
       break;
     }
-    if (entry.is_regular_file(error) && entry.path().filename().wstring().starts_with(L"genie_"
+    if (entry.is_regular_file(error) && entry.path().filename().wstring().starts_with(L"minimize_"
                                                                                       L"debug")) {
       total += entry.file_size(error);
       error.clear();
@@ -268,4 +268,4 @@ void LogTrace(std::wstring_view module_name, std::wstring_view message) {
 }
 #endif
 
-}  // namespace genie::core
+}  // namespace minimize::core

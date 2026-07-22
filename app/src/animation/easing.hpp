@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <string_view>
 
-namespace genie::animation {
+namespace minimize::animation {
 
 enum class EasingCurve {
   kLinear,
@@ -36,4 +36,4 @@ void CubicBezierPoint(const CubicBezier& bezier, float parameter, float* out_x, 
 [[nodiscard]] float ApplyEasing(EasingCurve curve, float value,
                                 const CubicBezier& custom = CubicBezier::EaseInOut());
 
-}  // namespace genie::animation
+}  // namespace minimize::animation

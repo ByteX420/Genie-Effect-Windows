@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include "ui/settings_actions.hpp"
 #include "ui/settings_view_model.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 
 class SettingsController final {
 public:
@@ -18,4 +18,4 @@ private:
   SettingsViewModel view_model_;
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

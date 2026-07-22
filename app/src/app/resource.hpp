@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #define IDR_UI_FONT_REGULAR 201
 #define IDR_UI_FONT_SEMIBOLD 202
 #define IDR_UI_FONT_BOLD 203
 #define IDR_UI_FONT_LICENSE 204
-#define IDR_GENIE_HOOK 205
+#define IDR_MINIMIZE_HOOK 205

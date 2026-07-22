@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/settings_window.hpp"
 
@@ -24,7 +24,7 @@
 #include "ui/theme/theme.hpp"
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 namespace {
 
 constexpr wchar_t kSettingsWindowClass[] = L"MinimizeEffectImGuiSettings";
@@ -131,7 +131,7 @@ void SettingsWindow::Show(bool show) {
   Render();
 }
 
-void SettingsWindow::UpdateState(const genie::settings::AppSettings& settings) {
+void SettingsWindow::UpdateState(const minimize::settings::AppSettings& settings) {
   const bool enabled_changed = controller_->view_model().enabled != settings.enabled;
   const bool changed =
       enabled_changed ||
@@ -149,7 +149,7 @@ void SettingsWindow::UpdateState(const genie::settings::AppSettings& settings) {
       controller_->view_model().restore_custom_bezier != settings.restore_custom_bezier ||
       controller_->view_model().animation_style != settings.animation_style ||
       controller_->view_model().quality_mode != settings.quality_mode ||
-      std::abs(controller_->view_model().genie_strength - settings.genie_strength) > 0.0001f ||
+      std::abs(controller_->view_model().minimize_strength - settings.minimize_strength) > 0.0001f ||
       controller_->view_model().fade_strength != settings.fade_strength ||
       controller_->view_model().show_target_indicator != settings.show_target_indicator ||
       controller_->view_model().close_behavior != settings.close_behavior ||
@@ -171,7 +171,7 @@ void SettingsWindow::UpdatePauseState(bool paused, bool until_restart) {
   ForceRender();
 }
 
-void SettingsWindow::SetHotkeyRegistrationStatus(genie::settings::HotkeyAction action,
+void SettingsWindow::SetHotkeyRegistrationStatus(minimize::settings::HotkeyAction action,
                                                  bool available) {
   const size_t index = static_cast<size_t>(action);
   if (index >= controller_->view_model().hotkey_available.size() ||
@@ -199,7 +199,7 @@ void SettingsWindow::FlushPendingSpeedSave() {
   if (strength_pending) {
     const bool saved =
         controller_ == nullptr ||
-        controller_->actions().SetGenieStrength(controller_->view_model().genie_strength, true);
+        controller_->actions().SetMinimizeStrength(controller_->view_model().minimize_strength, true);
     RecordSaveResult(saved);
     if (saved) strength_slider_dirty_ = false;
   }
@@ -222,7 +222,7 @@ void SettingsWindow::RecordSaveResult(bool saved) {
     save_feedback_ = "Could not save settings";
     save_feedback_until_ms_ = GetTickCount64() + 5500;
     save_feedback_error_ = true;
-    genie::core::LogDebug(L"Settings", L"Settings window could not persist the requested change");
+    minimize::core::LogDebug(L"Settings", L"Settings window could not persist the requested change");
   }
   ForceRender();
 }
@@ -246,7 +246,7 @@ void SettingsWindow::RecordFileOperationResult(const SettingsFileOperationResult
     save_feedback_ = result.message.empty() ? "Could not save settings" : result.message;
     save_feedback_until_ms_ = GetTickCount64() + 5500;
     save_feedback_error_ = true;
-    genie::core::LogDebug(L"Settings", L"Settings file operation failed");
+    minimize::core::LogDebug(L"Settings", L"Settings file operation failed");
   }
   ForceRender();
 }
@@ -395,4 +395,4 @@ bool SettingsWindow::WantsContinuousRendering() const {
          render_requested_;
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

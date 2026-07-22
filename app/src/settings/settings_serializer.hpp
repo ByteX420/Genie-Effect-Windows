@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <string>
@@ -6,7 +6,7 @@
 
 #include "settings/app_settings.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 class SettingsSerializer final {
 public:
@@ -14,4 +14,4 @@ public:
   [[nodiscard]] static std::string Serialize(const AppSettings& settings);
 };
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

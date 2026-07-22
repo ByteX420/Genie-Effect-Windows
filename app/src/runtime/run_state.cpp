@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "runtime/run_state.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 namespace {
 
 constexpr bool IsTransitionAllowed(RunState from, RunState to) {
@@ -87,4 +87,4 @@ std::uint64_t RunStateTimeoutMs(RunState state) {
   return TimeoutMs(state);
 }
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

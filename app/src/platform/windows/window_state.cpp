@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/window_state.hpp"
 
@@ -6,7 +6,7 @@
 #include <dwmapi.h>
 #include <string_view>
 
-namespace genie::platform {
+namespace minimize::platform {
 namespace {
 
 bool IsExcludedClassName(std::wstring_view class_name) {
@@ -134,4 +134,4 @@ bool IsExactForegroundWindow(HWND window, HWND ignored_window) {
   return foreground == window || GetAncestor(foreground, GA_ROOT) == window;
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

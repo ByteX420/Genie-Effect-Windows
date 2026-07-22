@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,7 +22,7 @@
 #include "platform/windows/window_state.hpp"
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::app {
+namespace minimize::app {
 
 bool ApplicationRuntime::CreateAnimationRenderer() {
   for (runtime::AnimationRun& slot : runs_) slot.overlay.Shutdown();
@@ -59,7 +59,7 @@ void ApplicationRuntime::BeginAnimationRendererRecovery() {
 
   recent_device_failures_ = std::min(recent_device_failures_ + 1u, 8u);
   last_device_failure_ms_ = GetTickCount64();
-  genie::core::LogDebug(L"App", L"Animation renderer device lost; rebuilding D3D resources");
+  minimize::core::LogDebug(L"App", L"Animation renderer device lost; rebuilding D3D resources");
   native_animation_blocker_.Disable();
 
   for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
@@ -95,12 +95,12 @@ bool ApplicationRuntime::TryRecoverAnimationRenderer() {
     if (IsEffectActive()) {
       native_animation_blocker_.Enable(GetOverlayWindow());
     }
-    genie::core::LogDebug(L"App", L"Animation renderer recovery completed");
+    minimize::core::LogDebug(L"App", L"Animation renderer recovery completed");
     return true;
   }
 
   renderer_recovery_.ScheduleRetry(now);
-  genie::core::LogDebug(L"App", L"Animation renderer recovery retry scheduled");
+  minimize::core::LogDebug(L"App", L"Animation renderer recovery retry scheduled");
   return false;
 }
 
@@ -237,12 +237,12 @@ MessageLoopWait ApplicationRuntime::TickRuntime() {
             HWND stalled_window = slot.animating_window;
             platform::windows::TraceWindowEvent(L"Run minimize timeout aborting stalled animation",
                                                 stalled_window);
-            std::wcerr << L"Genie minimize event timeout before native minimize completed; "
+            std::wcerr << L"Minimize minimize event timeout before native minimize completed; "
                           L"aborting animation.\n";
             if (stalled_window != nullptr && IsWindow(stalled_window)) {
               platform::SetWindowCloaked(stalled_window, false);
               platform::windows::properties::RestoreTransparency(stalled_window);
-              platform::windows::properties::ClearGenieState(stalled_window);
+              platform::windows::properties::ClearMinimizeState(stalled_window);
               native_animation_blocker_.SetTransitionsDisabledForWindow(stalled_window, false);
             }
             CleanupRun(i, RunCleanupOutcome::kAborted);
@@ -373,7 +373,7 @@ void ApplicationRuntime::UpdateFullscreenSuppression(bool force) {
       settings_service_.Get().disable_animations_fullscreen &&
       platform::IsFullscreenForegroundWindow(GetOverlayWindow(), settings_window_.hwnd());
   if (!effect_policy_.SetFullscreenSuppressed(suppressed)) return;
-  genie::core::LogDebug(L"Fullscreen", suppressed
+  minimize::core::LogDebug(L"Fullscreen", suppressed
                                            ? L"Fullscreen application detected; effect suspended"
                                            : L"Fullscreen application ended; effect resumed");
   RefreshEffectRuntimeState();
@@ -391,7 +391,7 @@ void ApplicationRuntime::UpdatePowerState(bool force) {
                              effect_policy_.battery_saver_active() != saver_active;
   const bool suppression_changed = effect_policy_.SetPowerState(on_battery, saver_active);
   if (power_changed) {
-    genie::core::LogDebug(L"Power", L"Power state changed: battery=" + std::to_wstring(on_battery) +
+    minimize::core::LogDebug(L"Power", L"Power state changed: battery=" + std::to_wstring(on_battery) +
                                         L" saver=" + std::to_wstring(saver_active));
   }
   if (suppression_changed) RefreshEffectRuntimeState();
@@ -410,7 +410,7 @@ void ApplicationRuntime::DisableEffectRuntime() {
     tracked_windows.push_back(window);
   }
   for (HWND window : tracked_windows) {
-    RestoreWindowFromGenieState(window, false);
+    RestoreWindowFromMinimizeState(window, false);
   }
   snapshot_cache_.Restore().clear();
   snapshot_cache_.PreMinimize().clear();
@@ -421,7 +421,7 @@ void ApplicationRuntime::DisableEffectRuntime() {
 void ApplicationRuntime::EnableEffectRuntime() {
   const bool cbt_hook_installed = cbt_hook_manager_.Install();
   if (!cbt_hook_installed) {
-    genie::core::LogDebug(L"Pause",
+    minimize::core::LogDebug(L"Pause",
                           L"Global CBT hook unavailable; WinEvent fallback remains active");
   }
   if (!renderer_recovery_.pending() && GetOverlayWindow() != nullptr) {
@@ -445,7 +445,7 @@ void ApplicationRuntime::RefreshEffectRuntimeState() {
 
 void ApplicationRuntime::UpdateTemporaryPause() {
   if (!pause_controller_.Update(GetTickCount64())) return;
-  genie::core::LogDebug(L"Pause", L"Temporary pause expired; resuming Minimize Effect");
+  minimize::core::LogDebug(L"Pause", L"Temporary pause expired; resuming Minimize Effect");
   RefreshEffectRuntimeState();
   settings_window_.UpdatePauseState(false, false);
 }
@@ -463,4 +463,4 @@ features::RenderingPressure ApplicationRuntime::GetRenderingPressure() const {
   };
 }
 
-}  // namespace genie::app
+}  // namespace minimize::app

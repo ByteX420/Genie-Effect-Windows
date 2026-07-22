@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 [[nodiscard]] bool GrantAppContainerPermissions(const std::wstring& path);
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

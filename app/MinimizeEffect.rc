@@ -1,4 +1,4 @@
-#include <winver.h>
+﻿#include <winver.h>
 #include "src/app/resource.hpp"
 
 // Product version embedded in the PE — About/Build reads this at runtime.
@@ -45,6 +45,6 @@ IDR_UI_FONT_SEMIBOLD RCDATA "assets\\fonts\\Inter-SemiBold.ttf"
 IDR_UI_FONT_BOLD RCDATA "assets\\fonts\\Inter-Bold.ttf"
 IDR_UI_FONT_LICENSE RCDATA "assets\\fonts\\OFL.txt"
 
-#ifdef GENIE_EMBED_RELEASE_HOOK
-IDR_GENIE_HOOK RCDATA "..\\build\\bin\\x64\\Release\\MinimizeEffectHook.dll"
+#ifdef MINIMIZE_EMBED_RELEASE_HOOK
+IDR_MINIMIZE_HOOK RCDATA "..\\build\\bin\\x64\\Release\\MinimizeEffectHook.dll"
 #endif

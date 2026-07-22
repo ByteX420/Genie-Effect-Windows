@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/minimize_feature.hpp"
 
@@ -24,7 +24,7 @@
 #include "runtime/animation_run_pool.hpp"
 #include "runtime/snapshot_cache.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 animation::RectF ToRectF(const RECT& rect) {
@@ -113,7 +113,7 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
   }
   // Per-window session exclusion (before any capture / cloak).
   if (window_exclusions_.IsExcluded(window)) {
-    core::LogDebug(L"Minimize", L"Skipping Genie: per-window exclusion");
+    core::LogDebug(L"Minimize", L"Skipping Minimize: per-window exclusion");
     platform::SetDwmTransitionsDisabled(window, false);
     return false;
   }
@@ -211,7 +211,7 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
   if (context.record_capture_duration) context.record_capture_duration(capture_duration);
   topmost.RestoreNow();
 
-  // Capture cost is known only after this sample — if it was already too slow, abort Genie
+  // Capture cost is known only after this sample — if it was already too slow, abort Minimize
   // for this minimize and latch smart-skip so subsequent events stay native while pressure cools.
   constexpr float kAbortCaptureMs = 28.0f;
   if (policy_.smart_skip_enabled() && !already_minimized &&
@@ -609,4 +609,4 @@ void MinimizeFeature::CompletePendingNativeMinimize(
   core::LogTrace(L"Minimize", L"Native minimize completed; animation clock started");
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

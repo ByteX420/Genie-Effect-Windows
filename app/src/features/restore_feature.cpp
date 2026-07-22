@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/restore_feature.hpp"
 
@@ -20,7 +20,7 @@
 #include "runtime/animation_run_pool.hpp"
 #include "runtime/snapshot_cache.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 animation::RectF ToRectF(const RECT& rect) {
@@ -113,7 +113,7 @@ bool RestoreFeature::Execute(HWND window, const RestoreExecutionContext& context
   const bool moved_offscreen =
       (has_snapshot && snapshot_iterator->second.moved_offscreen) ||
       GetPropW(window, platform::windows::properties::kMovedOffscreen) != nullptr;
-  const bool genie_minimized =
+  const bool minimize_minimized =
       has_snapshot || GetPropW(window, platform::windows::properties::kIsMinimizing) != nullptr;
 
   int run_index = context.find_run(window);
@@ -151,7 +151,7 @@ bool RestoreFeature::Execute(HWND window, const RestoreExecutionContext& context
   }
 
   const bool window_is_iconic = IsIconic(window) != FALSE;
-  if (!genie_minimized && !window_is_iconic) return false;
+  if (!minimize_minimized && !window_is_iconic) return false;
   auto transaction = Begin(RestoreRequest{
       .window = window,
       .shutting_down = context.shutting_down,
@@ -275,4 +275,4 @@ bool RestoreFeature::IsWindowRestored(HWND window) const {
   return IsIconic(window) == FALSE;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

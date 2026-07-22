@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "settings/settings_serializer.hpp"
 
@@ -11,7 +11,7 @@
 
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 namespace {
 
 constexpr float kMinimumDuration = 0.10f;
@@ -51,8 +51,8 @@ bool IsValidEasingName(std::string_view value) {
 }
 
 bool IsValidAnimationStyle(std::string_view value) {
-  return value == "Gienie classic" || value == "Gienie curvy" || value == "Squash" ||
-         value == "Classic Genie";
+  return value == "Minimize classic" || value == "Minimize curvy" || value == "Squash" ||
+         value == "Classic Minimize";
 }
 
 void AppendUtf8(std::string* output, unsigned int code_point) {
@@ -102,11 +102,11 @@ public:
             settings->restore_duration = static_cast<float>(value);
           }
         }
-      } else if (key == "genieStrength") {
+      } else if (key == "minimizeStrength") {
         double value = 0.0;
         value_valid = ParseNumber(&value);
         if (value_valid && std::isfinite(value) && value >= 0.25 && value <= 1.0) {
-          settings->genie_strength = static_cast<float>(value);
+          settings->minimize_strength = static_cast<float>(value);
         }
       } else if (key == "fadeStrength") {
         std::string value;
@@ -484,8 +484,8 @@ std::optional<AppSettings> SettingsSerializer::Deserialize(std::string_view json
     binding.modifiers &= kSupportedHotkeyModifiers;
     if (binding.virtual_key == 0) binding.modifiers = 0;
   }
-  if (loaded.animation_style == "Classic Genie") {
-    loaded.animation_style = "Gienie classic";
+  if (loaded.animation_style == "Classic Minimize") {
+    loaded.animation_style = "Minimize classic";
   }
   // Preserve saved easing names (including Custom) and clamp custom handles.
   if (!IsValidEasingName(loaded.minimize_easing)) loaded.minimize_easing = "Ease In Out";
@@ -517,7 +517,7 @@ std::string SettingsSerializer::Serialize(const AppSettings& settings) {
          << settings.restore_custom_bezier.y2 << "],\n"
          << "  \"animationStyle\": \"" << EscapeJsonString(settings.animation_style) << "\",\n"
          << "  \"qualityMode\": \"" << EscapeJsonString(settings.quality_mode) << "\",\n"
-         << "  \"genieStrength\": " << settings.genie_strength << ",\n"
+         << "  \"minimizeStrength\": " << settings.minimize_strength << ",\n"
          << "  \"fadeStrength\": \"" << EscapeJsonString(settings.fade_strength) << "\",\n"
          << "  \"showTargetIndicator\": " << settings.show_target_indicator << ",\n"
          << "  \"smartSkipUnderLoad\": " << settings.smart_skip_under_load << ",\n"
@@ -549,4 +549,4 @@ std::string SettingsSerializer::Serialize(const AppSettings& settings) {
   return output.str();
 }
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

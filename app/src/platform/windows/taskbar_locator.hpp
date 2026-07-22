@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 [[nodiscard]] HWND FindTaskbarWindowForRect(const RECT& rect);
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

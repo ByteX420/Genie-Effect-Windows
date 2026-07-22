@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/components/easing_editor.hpp"
 
@@ -9,9 +9,9 @@
 
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui::components {
-using ::genie::ui::motion::MotionContext;
-using ::genie::ui::theme::CenteredTextTop;
+namespace minimize::ui::components {
+using ::minimize::ui::motion::MotionContext;
+using ::minimize::ui::theme::CenteredTextTop;
 
 bool EasingGraphEditor(const MotionContext& motion, const char* id, animation::CubicBezier* bezier,
                        const ImVec2& size, float scale, float alpha, bool* changed,
@@ -254,4 +254,4 @@ bool EasingGraphEditor(const MotionContext& motion, const char* id, animation::C
   return dragging || active || input_active;
 }
 
-}  // namespace genie::ui::components
+}  // namespace minimize::ui::components

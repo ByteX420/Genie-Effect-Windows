@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "core/embedded_resource.hpp"
 
-namespace genie::core {
+namespace minimize::core {
 
 std::string LoadEmbeddedText(int resource_id) {
   const HINSTANCE instance = GetModuleHandleW(nullptr);
@@ -16,4 +16,4 @@ std::string LoadEmbeddedText(int resource_id) {
   return std::string(static_cast<const char*>(data), static_cast<std::size_t>(size));
 }
 
-}  // namespace genie::core
+}  // namespace minimize::core

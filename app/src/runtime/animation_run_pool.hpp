@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <deque>
 #include <vector>
@@ -6,7 +6,7 @@
 
 #include "runtime/animation_run.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 class AnimationRunPool final {
 public:
@@ -33,4 +33,4 @@ private:
   Container runs_;
 };
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

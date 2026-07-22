@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "settings/exclusion_rules.hpp"
 
 #include <algorithm>
 #include <windows.h>
 
-namespace genie::settings {
+namespace minimize::settings {
 namespace {
 
 std::optional<std::wstring> Utf8ToWide(std::string_view value) {
@@ -85,4 +85,4 @@ void NormalizeExcludedApplications(std::vector<std::string>* applications) {
   *applications = std::move(normalized);
 }
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

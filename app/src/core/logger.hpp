@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
 
-namespace genie::core {
+namespace minimize::core {
 
 [[nodiscard]] bool IsTraceLoggingEnabled();
 [[nodiscard]] const std::wstring& DebugLogPath();
@@ -22,4 +22,4 @@ inline void LogDebug(std::wstring_view, std::wstring_view) {}
 inline void LogTrace(std::wstring_view, std::wstring_view) {}
 #endif
 
-}  // namespace genie::core
+}  // namespace minimize::core

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/applications_page.hpp"
 
@@ -10,7 +10,7 @@
 #include "ui/components/controls.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
@@ -18,8 +18,8 @@ constexpr float kPageSubtitleTextSize = 13.0f;
 constexpr float kLabelTextSize = 15.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 struct ApplicationItem {
   std::string name;
@@ -36,8 +36,8 @@ std::string Lowercase(std::string value) {
 
 }  // namespace
 
-void ApplicationsPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                              const ::genie::ui::motion::MotionContext& motion, float scale,
+void ApplicationsPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                              const ::minimize::ui::motion::MotionContext& motion, float scale,
                               float alpha) {
   auto px = [scale](float value) { return value * scale; };
   layout.Title(window.font_title_, kPageTitleTextSize, "Apps", window.font_small_,
@@ -84,11 +84,11 @@ void ApplicationsPage::Render(::genie::ui::SettingsWindow& window, components::P
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(px(12.0f), padding_y));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, px(1.0f));
   ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,
-                      ::genie::ui::theme::Metrics::kControlRounding * scale);
+                      ::minimize::ui::theme::Metrics::kControlRounding * scale);
   ImGui::PushStyleColor(ImGuiCol_FrameBg,
-                        ImGui::ColorConvertU32ToFloat4(::genie::ui::theme::kPanelHeader));
+                        ImGui::ColorConvertU32ToFloat4(::minimize::ui::theme::kPanelHeader));
   ImGui::PushStyleColor(ImGuiCol_Border,
-                        ImGui::ColorConvertU32ToFloat4(::genie::ui::theme::kBorder));
+                        ImGui::ColorConvertU32ToFloat4(::minimize::ui::theme::kBorder));
   ImGui::SetNextItemWidth(field_width);
   ImGui::InputTextWithHint("##app_search", "Filter apps...", window.exclusion_input_.data(),
                            window.exclusion_input_.size());
@@ -100,19 +100,19 @@ void ApplicationsPage::Render(::genie::ui::SettingsWindow& window, components::P
 
   const std::string caption = std::format("{} APPS", filtered.size());
   layout.SectionCaption(window.font_small_, kCaptionTextSize, caption.c_str());
-  const float toggle_width = ::genie::ui::theme::Metrics::kToggleWidth * scale;
-  const float toggle_height = (::genie::ui::theme::Metrics::kToggleHeight + 4.0f) * scale;
+  const float toggle_width = ::minimize::ui::theme::Metrics::kToggleWidth * scale;
+  const float toggle_height = (::minimize::ui::theme::Metrics::kToggleHeight + 4.0f) * scale;
   layout.BeginGroup();
   if (filtered.empty()) {
-    layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
+    layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
     layout.RowTitle(window.font_small_, kHelperTextSize,
                     filter.empty() ? "No applications found" : "No matches", kSecondaryTextColor);
     layout.EndRow();
   }
   for (size_t index = 0; index < filtered.size(); ++index) {
     const bool inactive = !filtered[index].active;
-    layout.BeginRow(inactive ? ::genie::ui::theme::Metrics::kRowHeightTall
-                             : ::genie::ui::theme::Metrics::kRowHeight);
+    layout.BeginRow(inactive ? ::minimize::ui::theme::Metrics::kRowHeightTall
+                             : ::minimize::ui::theme::Metrics::kRowHeight);
     layout.ReserveControl(toggle_width);
     layout.RowTitle(window.font_body_, kLabelTextSize, filtered[index].name.c_str(),
                     inactive ? kSecondaryTextColor : kPrimaryTextColor);
@@ -147,8 +147,8 @@ void ApplicationsPage::Render(::genie::ui::SettingsWindow& window, components::P
   ImGui::GetWindowDrawList()->AddText(
       window.font_small_, window.font_small_->FontSize,
       ImVec2(std::floor(position.x + 0.5f), std::floor(position.y + 0.5f)),
-      ::genie::ui::theme::WithAlpha(IM_COL32(235, 120, 120, 255), alpha), error.c_str());
+      ::minimize::ui::theme::WithAlpha(IM_COL32(235, 120, 120, 255), alpha), error.c_str());
   layout.Gap(22.0f);
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

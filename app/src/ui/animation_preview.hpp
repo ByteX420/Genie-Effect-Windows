@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-namespace genie::ui {
+namespace minimize::ui {
 
 class AnimationPreview final {
 public:
@@ -24,4 +24,4 @@ private:
   POINT drag_offset_{};
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

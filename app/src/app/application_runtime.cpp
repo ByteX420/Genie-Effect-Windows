@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "app/application_runtime.hpp"
 
@@ -21,33 +21,33 @@
 #include "settings/exclusion_rules.hpp"
 #include "settings/settings_service.hpp"
 
-namespace genie::app {
+namespace minimize::app {
 
 ApplicationRuntime::~ApplicationRuntime() { CleanupAndRestoreAll(); }
 
 bool ApplicationRuntime::Initialize(HINSTANCE instance) {
-  genie::core::CleanupDebugLogs();
+  minimize::core::CleanupDebugLogs();
   instance_ = instance;
   main_thread_id_ = GetCurrentThreadId();
 #ifdef _DEBUG
-  device_recovery_test_pending_ = core::EnvironmentFlagEnabled("GENIE_TEST_DEVICE_RECOVERY");
+  device_recovery_test_pending_ = core::EnvironmentFlagEnabled("MINIMIZE_TEST_DEVICE_RECOVERY");
 #endif
   (void)settings_service_.Load();
   effect_policy_.Configure(settings_service_.Get());
   window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);
   if (settings_service_.Get().run_at_startup && !platform::windows::ConfigureRunAtStartup(true)) {
-    genie::core::LogDebug(L"Startup",
+    minimize::core::LogDebug(L"Startup",
                           L"Could not repair the per-user startup entry; disabling the option");
     auto repaired_settings = settings_service_.Get();
     repaired_settings.run_at_startup = false;
     if (!settings_service_.Update(std::move(repaired_settings))) {
-      genie::core::LogDebug(L"Startup", L"Could not persist the repaired startup state");
+      minimize::core::LogDebug(L"Startup", L"Could not persist the repaired startup state");
     }
   }
 #ifdef _DEBUG
   // Touch log file and grant permissions so AppContainers can write to it
   {
-    const std::wstring& log_path = genie::core::DebugLogPath();
+    const std::wstring& log_path = minimize::core::DebugLogPath();
     HANDLE file =
         CreateFileW(log_path.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
                     OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -58,8 +58,8 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
   }
 #endif
 
-  genie::core::LogDebug(L"App", L"ApplicationRuntime::Initialize started");
-  genie::core::LogTrace(L"App", L"ApplicationRuntime::Initialize started");
+  minimize::core::LogDebug(L"App", L"ApplicationRuntime::Initialize started");
+  minimize::core::LogTrace(L"App", L"ApplicationRuntime::Initialize started");
 
   frame_scheduler_.Initialize();
 
@@ -70,9 +70,9 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
                   L"cmd as Admin, etc.)\n"
                << L"         will NOT be hooked due to Windows UIPI security restrictions.\n"
                << L"         To hook all windows, please run MinimizeEffect.exe as Administrator.\n\n";
-    genie::core::LogDebug(L"App", L"Warning: Not running as Administrator");
+    minimize::core::LogDebug(L"App", L"Warning: Not running as Administrator");
   } else {
-    genie::core::LogDebug(L"App", L"Running as Administrator");
+    minimize::core::LogDebug(L"App", L"Running as Administrator");
   }
 
   if (!CreateAnimationRenderer()) return false;
@@ -106,9 +106,9 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
                         settings_service_.Get().close_behavior != "tray");
   seed_iconic_snapshots_pending_ = true;
 
-  std::wcout << L"Genie minimize monitor is running.\n";
-  genie::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");
-  std::wcout << L"Set GENIE_TASKBAR_RECT=left,top,right,bottom to aim at a "
+  std::wcout << L"Minimize minimize monitor is running.\n";
+  minimize::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");
+  std::wcout << L"Set MINIMIZE_TASKBAR_RECT=left,top,right,bottom to aim at a "
                 L"custom taskbar rectangle.\n";
   std::wcout << L"Close this console window to restore the previous Windows "
                 L"animation setting.\n";
@@ -138,4 +138,4 @@ void ApplicationRuntime::RequestShutdown() {
   }
 }
 
-}  // namespace genie::app
+}  // namespace minimize::app

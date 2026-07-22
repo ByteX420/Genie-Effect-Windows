@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/motion/motion_tokens.hpp"
 
-namespace genie::ui::motion {
+namespace minimize::ui::motion {
 
 MotionTokens MotionTokens::Default() {
   MotionTokens tokens{};
@@ -54,4 +54,4 @@ MotionTokens MotionTokens::Reduced() {
   return tokens;
 }
 
-}  // namespace genie::ui::motion
+}  // namespace minimize::ui::motion

@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 class RendererRecovery final {
 public:
@@ -20,4 +20,4 @@ private:
   DWORD delay_ms_ = 0;
 };
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

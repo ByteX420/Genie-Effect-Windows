@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 
@@ -6,7 +6,7 @@
 #include "settings/settings_service.hpp"
 #include "ui/settings_actions.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 class HotkeyController final {
 public:
@@ -26,4 +26,4 @@ private:
   platform::windows::GlobalHotkeyManager& manager_;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

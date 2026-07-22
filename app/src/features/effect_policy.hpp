@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 #include <string_view>
 
 #include "settings/app_settings.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 struct RenderingPressure {
   int active_animations = 0;
@@ -50,4 +50,4 @@ private:
   std::uint64_t last_smart_skip_ms_ = 0;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

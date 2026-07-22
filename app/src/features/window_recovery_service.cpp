@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/window_recovery_service.hpp"
 
@@ -10,7 +10,7 @@
 #include "platform/windows/window_state.hpp"
 #include "runtime/snapshot_cache.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 WindowRecoveryService::WindowRecoveryService(runtime::SnapshotCache& snapshots)
     : snapshots_(snapshots) {}
@@ -34,11 +34,11 @@ void WindowRecoveryService::Restore(HWND window, bool force_show_if_iconic) {
 
   // Keep the real window alpha-hidden while its restored placement and first composed frame
   // settle. Layered Chromium windows can otherwise expose an incomplete fullscreen frame before
-  // the Genie overlay is removed.
+  // the Minimize overlay is removed.
   platform::SetWindowCloaked(window, false);
   RedrawWindow(window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
   DwmFlush();
-  platform::windows::properties::ClearGenieState(window);
+  platform::windows::properties::ClearMinimizeState(window);
   DwmFlush();
   restoring_ = false;
 }
@@ -49,10 +49,10 @@ void WindowRecoveryService::ReleaseWithoutShowing(HWND window, bool finish_as_mi
 
   (void)platform::SetOwnedWindowRegion(window, nullptr, true);
 
-  // Mid-minimize: Genie has cloaked/transparent the window but native minimize may not have
+  // Mid-minimize: Minimize has cloaked/transparent the window but native minimize may not have
   // finished. On shutdown we must finish as minimized — never SW_RESTORE those windows.
   if (finish_as_minimized && IsIconic(window) == FALSE &&
-      platform::windows::properties::HasGenieState(window)) {
+      platform::windows::properties::HasMinimizeState(window)) {
     platform::SetDwmTransitionsDisabled(window, true);
     SetPropW(window, platform::windows::properties::kAllowMinimize, reinterpret_cast<HANDLE>(1));
     ShowWindow(window, SW_SHOWMINNOACTIVE);
@@ -62,12 +62,12 @@ void WindowRecoveryService::ReleaseWithoutShowing(HWND window, bool finish_as_mi
 
   platform::SetWindowCloaked(window, false);
   platform::windows::properties::RestoreTransparency(window);
-  platform::windows::properties::ClearGenieState(window);
+  platform::windows::properties::ClearMinimizeState(window);
   restoring_ = false;
 }
 
 std::size_t WindowRecoveryService::HealLeftovers() {
-  core::LogDebug(L"Recovery", L"Checking for leftover Genie windows");
+  core::LogDebug(L"Recovery", L"Checking for leftover Minimize windows");
   std::size_t repaired_count = 0;
   std::pair<WindowRecoveryService*, std::size_t*> context{this, &repaired_count};
   EnumWindows(
@@ -75,7 +75,7 @@ std::size_t WindowRecoveryService::HealLeftovers() {
         auto* context =
             reinterpret_cast<std::pair<WindowRecoveryService*, std::size_t*>*>(parameter);
         RemovePropW(window, platform::windows::properties::kExcludedApplication);
-        if (platform::windows::properties::HasGenieState(window)) {
+        if (platform::windows::properties::HasMinimizeState(window)) {
           core::LogDebug(L"Recovery",
                          L"Restoring leftover window hwnd=0x" +
                              std::to_wstring(reinterpret_cast<std::uintptr_t>(window)));
@@ -92,15 +92,15 @@ void WindowRecoveryService::HealUntrackedWindows() {
   EnumWindows(
       [](HWND window, LPARAM) -> BOOL {
         RemovePropW(window, platform::windows::properties::kExcludedApplication);
-        if (platform::windows::properties::HasGenieState(window)) {
+        if (platform::windows::properties::HasMinimizeState(window)) {
           platform::SetWindowCloaked(window, false);
           platform::windows::properties::RestoreTransparency(window);
           (void)platform::SetOwnedWindowRegion(window, nullptr, true);
-          platform::windows::properties::ClearGenieState(window);
+          platform::windows::properties::ClearMinimizeState(window);
         }
         return TRUE;
       },
       0);
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

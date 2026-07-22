@@ -1,12 +1,12 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
-#include "animation/genie_mesh.hpp"
+#include "animation/minimize_mesh.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <numbers>
 
-namespace genie::animation {
+namespace minimize::animation {
 namespace {
 
 constexpr float kSlideAnimationEndFraction = 0.5f;
@@ -59,24 +59,24 @@ void AppendCellIndices(int rows, int columns, std::vector<std::uint16_t>* indice
 
 }  // namespace
 
-void GenieMeshGenerator::SetStrength(float strength) { strength_ = strength; }
+void MinimizeMeshGenerator::SetStrength(float strength) { strength_ = strength; }
 
-void GenieMeshGenerator::SetLongGridSegmentCount(int segment_count) {
+void MinimizeMeshGenerator::SetLongGridSegmentCount(int segment_count) {
   long_grid_segment_count_ = std::clamp(segment_count, 2, 100);
 }
 
-bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& target_rect,
-                                      GenieEdge edge, GenieDirection direction,
+bool MinimizeMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& target_rect,
+                                      MinimizeEdge edge, MinimizeDirection direction,
                                       AnimationStyle style, float progress, float viewport_height,
-                                      GenieMesh* mesh) {
+                                      MinimizeMesh* mesh) {
   if (mesh == nullptr) {
     return false;
   }
   (void)viewport_height;
   const float oriented_progress =
-      direction == GenieDirection::kMinimize ? Clamp01(progress) : 1.0f - Clamp01(progress);
+      direction == MinimizeDirection::kMinimize ? Clamp01(progress) : 1.0f - Clamp01(progress);
 
-  const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
+  const bool horizontal = edge == MinimizeEdge::kTop || edge == MinimizeEdge::kBottom;
   int rows = horizontal ? long_grid_segment_count_ : 1;
   int columns = horizontal ? 1 : long_grid_segment_count_;
   if (style == AnimationStyle::kSquash) {
@@ -130,9 +130,9 @@ bool GenieMeshGenerator::GenerateInto(const RectF& source_rect, const RectF& tar
   return indices_changed;
 }
 
-void GenieMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const RectF& target_rect,
-                                                GenieEdge edge, float progress) {
-  const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
+void MinimizeMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const RectF& target_rect,
+                                                MinimizeEdge edge, float progress) {
+  const bool horizontal = edge == MinimizeEdge::kTop || edge == MinimizeEdge::kBottom;
   const int row_count = horizontal ? long_grid_segment_count_ : 1;
   const int column_count = horizontal ? 1 : long_grid_segment_count_;
   screen_positions_.resize(static_cast<std::size_t>((row_count + 1) * (column_count + 1)));
@@ -140,16 +140,16 @@ void GenieMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const 
   const float moving_extent = horizontal ? source_rect.Height() : source_rect.Width();
   float distance_to_target = 1.0f;
   switch (edge) {
-    case GenieEdge::kTop:
+    case MinimizeEdge::kTop:
       distance_to_target = source_rect.bottom - target_rect.bottom;
       break;
-    case GenieEdge::kBottom:
+    case MinimizeEdge::kBottom:
       distance_to_target = target_rect.top - source_rect.top;
       break;
-    case GenieEdge::kLeft:
+    case MinimizeEdge::kLeft:
       distance_to_target = source_rect.right - target_rect.right;
       break;
-    case GenieEdge::kRight:
+    case MinimizeEdge::kRight:
       distance_to_target = target_rect.left - source_rect.left;
       break;
   }
@@ -183,13 +183,13 @@ void GenieMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const 
 
       PointF point{.x = source_x, .y = source_y};
       switch (edge) {
-        case GenieEdge::kTop:
-        case GenieEdge::kBottom: {
+        case MinimizeEdge::kTop:
+        case MinimizeEdge::kBottom: {
           const float local_y = source_y - source_rect.top;
-          const float offset = edge == GenieEdge::kBottom
+          const float offset = edge == MinimizeEdge::kBottom
                                    ? local_y + distance_to_target * squash_progress
                                    : local_y - distance_to_target * squash_progress;
-          const float shape_position = edge == GenieEdge::kBottom
+          const float shape_position = edge == MinimizeEdge::kBottom
                                            ? offset / distance_to_target
                                            : (source_rect.Height() - offset) / distance_to_target;
           const float scale = stretch_progress * SineEaseInOut(shape_position);
@@ -197,13 +197,13 @@ void GenieMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const 
           point.y = source_rect.top + offset;
           break;
         }
-        case GenieEdge::kLeft:
-        case GenieEdge::kRight: {
+        case MinimizeEdge::kLeft:
+        case MinimizeEdge::kRight: {
           const float local_x = source_x - source_rect.left;
-          const float offset = edge == GenieEdge::kRight
+          const float offset = edge == MinimizeEdge::kRight
                                    ? local_x + distance_to_target * squash_progress
                                    : local_x - distance_to_target * squash_progress;
-          const float shape_position = edge == GenieEdge::kRight
+          const float shape_position = edge == MinimizeEdge::kRight
                                            ? offset / distance_to_target
                                            : (source_rect.Width() - offset) / distance_to_target;
           const float scale = stretch_progress * SineEaseInOut(shape_position);
@@ -217,7 +217,7 @@ void GenieMeshGenerator::GenerateCurvyPositions(const RectF& source_rect, const 
   }
 }
 
-void GenieMeshGenerator::GenerateSquashPositions(const RectF& source_rect, const RectF& target_rect,
+void MinimizeMeshGenerator::GenerateSquashPositions(const RectF& source_rect, const RectF& target_rect,
                                                  float progress) {
   screen_positions_.resize(4);
   const float left = Lerp(source_rect.left, target_rect.left, progress);
@@ -230,10 +230,10 @@ void GenieMeshGenerator::GenerateSquashPositions(const RectF& source_rect, const
   screen_positions_[3] = PointF{.x = right, .y = bottom};
 }
 
-void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
-                                                  const RectF& target_rect, GenieEdge edge,
+void MinimizeMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
+                                                  const RectF& target_rect, MinimizeEdge edge,
                                                   float progress) {
-  const bool horizontal = edge == GenieEdge::kTop || edge == GenieEdge::kBottom;
+  const bool horizontal = edge == MinimizeEdge::kTop || edge == MinimizeEdge::kBottom;
   const int row_count = horizontal ? long_grid_segment_count_ : 1;
   const int column_count = horizontal ? 1 : long_grid_segment_count_;
 
@@ -243,7 +243,7 @@ void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
   const float translate_progress = Clamp01((progress - kTranslateAnimationStartFraction) /
                                            (1.0f - kTranslateAnimationStartFraction));
 
-  if (edge == GenieEdge::kBottom) {
+  if (edge == MinimizeEdge::kBottom) {
     const float left_bezier_bottom_x = source_rect.left;
     const float right_bezier_bottom_x = source_rect.right;
 
@@ -297,7 +297,7 @@ void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
       screen_positions_[base] = PointF{.x = x_min, .y = y};
       screen_positions_[base + 1] = PointF{.x = x_max, .y = y};
     }
-  } else if (edge == GenieEdge::kTop) {
+  } else if (edge == MinimizeEdge::kTop) {
     const float left_bezier_top_x = source_rect.left;
     const float right_bezier_top_x = source_rect.right;
 
@@ -351,7 +351,7 @@ void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
       screen_positions_[base] = PointF{.x = x_min, .y = y};
       screen_positions_[base + 1] = PointF{.x = x_max, .y = y};
     }
-  } else if (edge == GenieEdge::kLeft) {
+  } else if (edge == MinimizeEdge::kLeft) {
     const float top_bezier_left_y = source_rect.bottom;
     const float bottom_bezier_left_y = source_rect.top;
 
@@ -405,7 +405,7 @@ void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
       screen_positions_[static_cast<std::size_t>(column_count + 1 + col)] =
           PointF{.x = x, .y = y_top};
     }
-  } else if (edge == GenieEdge::kRight) {
+  } else if (edge == MinimizeEdge::kRight) {
     const float top_bezier_right_y = source_rect.bottom;
     const float bottom_bezier_right_y = source_rect.top;
 
@@ -462,4 +462,4 @@ void GenieMeshGenerator::GenerateClassicPositions(const RectF& source_rect,
   }
 }
 
-}  // namespace genie::animation
+}  // namespace minimize::animation

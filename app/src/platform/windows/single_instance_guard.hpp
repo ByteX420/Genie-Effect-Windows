@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 
 enum class SingleInstanceResult {
   kPrimary,
@@ -29,4 +29,4 @@ private:
   DWORD error_ = ERROR_SUCCESS;
 };
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/window_properties.hpp"
 
-namespace genie::platform::windows::properties {
+namespace minimize::platform::windows::properties {
 namespace {
 
 bool IsUsableRect(const RECT& rect) {
@@ -43,14 +43,14 @@ void StoreWasMaximized(HWND window, bool was_maximized) {
   }
 }
 
-bool HasGenieState(HWND window) {
+bool HasMinimizeState(HWND window) {
   return GetPropW(window, kMovedOffscreen) != nullptr ||
          GetPropW(window, kTransparencySaved) != nullptr ||
          GetPropW(window, kOriginalExtendedStyle) != nullptr ||
          GetPropW(window, kOriginalPlacementLeft) != nullptr;
 }
 
-void ClearGenieState(HWND window) {
+void ClearMinimizeState(HWND window) {
   if (!IsWindow(window)) return;
   RestoreTransparency(window);
   RemovePropW(window, kOriginalPlacementLeft);
@@ -126,4 +126,4 @@ void RestoreTransparency(HWND window) {
   RemovePropW(window, kOriginalFlags);
 }
 
-}  // namespace genie::platform::windows::properties
+}  // namespace minimize::platform::windows::properties

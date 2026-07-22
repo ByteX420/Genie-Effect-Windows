@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/theme/theme.hpp"
 
@@ -8,7 +8,7 @@
 
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui::theme {
+namespace minimize::ui::theme {
 namespace {
 
 ImU32 Alpha(ImU32 color, float alpha) {
@@ -251,4 +251,4 @@ bool SidebarItem(const motion::MotionContext& motion, const char* id, const char
   return clicked;
 }
 
-}  // namespace genie::ui::theme
+}  // namespace minimize::ui::theme

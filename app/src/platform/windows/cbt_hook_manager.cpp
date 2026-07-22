@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/cbt_hook_manager.hpp"
 
@@ -11,7 +11,7 @@
 #include "core/logger.hpp"
 #include "platform/windows/app_container_permissions.hpp"
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 namespace {
 
 constexpr wchar_t kHookDllName[] = L"MinimizeEffectHook.dll";
@@ -76,7 +76,7 @@ std::filesystem::path HookCacheDirectory() {
 }
 
 std::wstring ExtractEmbeddedHookDll() {
-  const EmbeddedResource hook = LoadEmbeddedResource(IDR_GENIE_HOOK);
+  const EmbeddedResource hook = LoadEmbeddedResource(IDR_MINIMIZE_HOOK);
   if (hook.data == nullptr) return {};
 
   const std::filesystem::path directory = HookCacheDirectory();
@@ -135,8 +135,8 @@ bool CbtHookManager::Install() {
   if (hook_path.empty()) hook_path = ExecutableDirectory() + kHookDllName;
   const std::wstring hook_directory =
       std::filesystem::path(hook_path).parent_path().wstring() + L"\\";
-  (void)genie::platform::GrantAppContainerPermissions(hook_directory);
-  (void)genie::platform::GrantAppContainerPermissions(hook_path);
+  (void)minimize::platform::GrantAppContainerPermissions(hook_directory);
+  (void)minimize::platform::GrantAppContainerPermissions(hook_path);
 
   library_ = LoadLibraryW(hook_path.c_str());
   if (library_ == nullptr) {
@@ -175,4 +175,4 @@ void CbtHookManager::Uninstall() {
   }
 }
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/effect_policy.hpp"
 
@@ -6,7 +6,7 @@
 
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 constexpr int kSmartSkipEnterScore = 5;
@@ -135,4 +135,4 @@ int EffectPolicy::SelectMeshSegmentCount(int width, int height,
   return 50;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

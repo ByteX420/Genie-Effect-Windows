@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <memory>
@@ -19,7 +19,7 @@
 
 struct ImFont;
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 class AboutPage;
 class AnimationPage;
 class ApplicationsPage;
@@ -28,9 +28,9 @@ class GeneralPage;
 class HotkeysPage;
 class DisplaysPage;
 class WindowsIntegrationPage;
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages
 
-namespace genie::ui {
+namespace minimize::ui {
 class SettingsShell;
 
 class SettingsWindow {
@@ -43,9 +43,9 @@ public:
   bool Initialize(HINSTANCE instance, ui::SettingsActions& actions);
   void Shutdown();
   void Show(bool show);
-  void UpdateState(const genie::settings::AppSettings& settings);
+  void UpdateState(const minimize::settings::AppSettings& settings);
   void UpdatePauseState(bool paused, bool until_restart);
-  void SetHotkeyRegistrationStatus(genie::settings::HotkeyAction action, bool available);
+  void SetHotkeyRegistrationStatus(minimize::settings::HotkeyAction action, bool available);
   void Render();
   void ForceRender();
   [[nodiscard]] HWND hwnd() const { return hwnd_; }
@@ -139,4 +139,4 @@ private:
   ui::motion::MotionTokens motion_tokens_ = ui::motion::MotionTokens::Default();
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

@@ -1,17 +1,17 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <string>
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 class TaskbarTargetProvider;
 }
-namespace genie::rendering {
+namespace minimize::rendering {
 class D3dDevice;
 }
 
-namespace genie::features {
+namespace minimize::features {
 
 struct DiagnosticsSnapshot {
   std::string effect;
@@ -65,4 +65,4 @@ public:
   [[nodiscard]] bool OpenLogFolder(HWND owner) const;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

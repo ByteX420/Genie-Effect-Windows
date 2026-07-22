@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "runtime/animation_run_pool.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 AnimationRun& AnimationRunPool::Add() { return runs_.emplace_back(); }
 
@@ -28,4 +28,4 @@ void AnimationRunPool::ShutdownOverlays() {
   for (AnimationRun& run : runs_) run.overlay.Shutdown();
 }
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

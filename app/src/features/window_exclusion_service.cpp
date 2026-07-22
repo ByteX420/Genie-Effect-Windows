@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/window_exclusion_service.hpp"
 
@@ -7,7 +7,7 @@
 #include "core/logger.hpp"
 #include "platform/windows/process_info.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 constexpr wchar_t kWindowExclusionMarker[] = L"MinimizeEffect.PerWindowExclusion";
@@ -148,4 +148,4 @@ bool WindowExclusionService::SetDisplayExcluded(const std::string& device_name, 
   return true;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

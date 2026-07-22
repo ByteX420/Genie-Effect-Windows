@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 struct PowerStatus {
   bool on_battery = false;
@@ -11,4 +11,4 @@ struct PowerStatus {
 
 [[nodiscard]] std::optional<PowerStatus> QueryPowerStatus();
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

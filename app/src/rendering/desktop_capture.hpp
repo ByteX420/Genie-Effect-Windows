@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
@@ -9,12 +9,12 @@
 #include "rendering/d3d_device.hpp"
 #include "rendering/desktop_duplication_session.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 struct CapturedTexture {
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
   Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shader_resource_view;
-  genie::animation::SizeF size;
+  minimize::animation::SizeF size;
 };
 
 class DesktopCapture {
@@ -51,4 +51,4 @@ private:
   bool device_lost_ = false;
 };
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

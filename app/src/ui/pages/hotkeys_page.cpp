@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/hotkeys_page.hpp"
 
@@ -9,20 +9,20 @@
 #include "ui/hotkey_presenter.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
 constexpr float kPageSubtitleTextSize = 13.0f;
 constexpr float kLabelTextSize = 15.0f;
 constexpr float kValueTextSize = 13.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 }  // namespace
 
-void HotkeysPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                         const ::genie::ui::motion::MotionContext& motion, float scale,
+void HotkeysPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                         const ::minimize::ui::motion::MotionContext& motion, float scale,
                          float alpha) {
   layout.Title(window.font_title_, kPageTitleTextSize, "Hotkeys", window.font_small_,
                kPageSubtitleTextSize, "Click Change, then press a combination");
@@ -31,10 +31,10 @@ void HotkeysPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
       "Open settings",
       "Repair windows",
   };
-  const float button_height = ::genie::ui::theme::Metrics::kButtonHeight * scale;
+  const float button_height = ::minimize::ui::theme::Metrics::kButtonHeight * scale;
   layout.BeginGroup();
   for (size_t index = 0; index < labels.size(); ++index) {
-    layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+    layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
     const float change_width = 86.0f * scale;
     const float disable_width = 78.0f * scale;
     const float gap = 8.0f * scale;
@@ -77,8 +77,8 @@ void HotkeysPage::Render(::genie::ui::SettingsWindow& window, components::PageLa
   ImGui::GetWindowDrawList()->AddText(
       window.font_small_, window.font_small_->FontSize,
       ImVec2(std::floor(position.x + 0.5f), std::floor(position.y + 0.5f)),
-      ::genie::ui::theme::WithAlpha(kSecondaryTextColor, alpha), window.hotkey_feedback_.c_str());
+      ::minimize::ui::theme::WithAlpha(kSecondaryTextColor, alpha), window.hotkey_feedback_.c_str());
   layout.Gap(20.0f);
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-namespace genie::ui {
+namespace minimize::ui {
 
 class SettingsViewModel;
 
@@ -40,4 +40,4 @@ private:
   UINT taskbar_created_message_ = 0;
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

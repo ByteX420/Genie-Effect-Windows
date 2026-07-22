@@ -1,13 +1,13 @@
-#pragma once
+﻿#pragma once
 
 #include "ui/theme/theme.hpp"
 
-namespace genie::ui::components {
+namespace minimize::ui::components {
 
 class PageLayout final {
 public:
   PageLayout(ImDrawList* draw, ImVec2 origin, float page_width, float scale, float alpha,
-             float y_start, ::genie::ui::motion::MotionContext* motion = nullptr,
+             float y_start, ::minimize::ui::motion::MotionContext* motion = nullptr,
              const char* page_scope = "page");
 
   [[nodiscard]] float scale() const { return scale_; }
@@ -16,17 +16,17 @@ public:
   [[nodiscard]] float y() const { return y_; }
   [[nodiscard]] float content_bottom() const { return y_; }
   [[nodiscard]] float content_left() const {
-    return ::genie::ui::theme::Metrics::kContentInset * scale_;
+    return ::minimize::ui::theme::Metrics::kContentInset * scale_;
   }
   [[nodiscard]] float content_right() const {
-    return page_width_ - ::genie::ui::theme::Metrics::kContentInset * scale_;
+    return page_width_ - ::minimize::ui::theme::Metrics::kContentInset * scale_;
   }
   [[nodiscard]] float content_width() const { return content_right() - content_left(); }
   [[nodiscard]] float group_left() const {
-    return ::genie::ui::theme::Metrics::kPageInset * scale_;
+    return ::minimize::ui::theme::Metrics::kPageInset * scale_;
   }
   [[nodiscard]] float group_right() const {
-    return page_width_ - ::genie::ui::theme::Metrics::kPageInset * scale_;
+    return page_width_ - ::minimize::ui::theme::Metrics::kPageInset * scale_;
   }
   [[nodiscard]] float motion_y_shift() const { return motion_y_shift_; }
 
@@ -69,7 +69,7 @@ private:
   float local_alpha_ = 1.0f;
   float motion_y_shift_ = 0.0f;
   float y_ = 0.0f;
-  ::genie::ui::motion::MotionContext* motion_ = nullptr;
+  ::minimize::ui::motion::MotionContext* motion_ = nullptr;
   const char* page_scope_ = "page";
   int reveal_serial_ = 0;
   bool in_group_ = false;
@@ -91,4 +91,4 @@ private:
   float dual_sub_box_h_ = 0.0f;
 };
 
-}  // namespace genie::ui::components
+}  // namespace minimize::ui::components

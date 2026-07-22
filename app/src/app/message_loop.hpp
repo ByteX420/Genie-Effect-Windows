@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 
-namespace genie::app {
+namespace minimize::app {
 
 enum class MessageLoopWait {
   kImmediate,
@@ -24,4 +24,4 @@ public:
   [[nodiscard]] int Run(const MessageLoopCallbacks& callbacks) const;
 };
 
-}  // namespace genie::app
+}  // namespace minimize::app

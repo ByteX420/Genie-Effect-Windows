@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/startup_manager.hpp"
 
 #include <vector>
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 namespace {
 
 constexpr wchar_t kRunKeyPath[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
@@ -52,4 +52,4 @@ bool ConfigureRunAtStartup(bool enabled) {
   return status == ERROR_SUCCESS;
 }
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/animation_page.hpp"
 
@@ -13,7 +13,7 @@
 #include "ui/components/easing_editor.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kMinimumDuration = 0.10f;
@@ -23,8 +23,8 @@ constexpr float kPageSubtitleTextSize = 13.0f;
 constexpr float kLabelTextSize = 15.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 template <typename Names>
 int SelectedIndex(const Names& names, const std::string& value) {
@@ -35,10 +35,10 @@ int SelectedIndex(const Names& names, const std::string& value) {
 
 }  // namespace
 
-void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                           const ::genie::ui::motion::MotionContext& motion, float scale,
+void AnimationPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                           const ::minimize::ui::motion::MotionContext& motion, float scale,
                            float alpha, float vertical_offset) {
-  using namespace ::genie::ui::theme;
+  using namespace ::minimize::ui::theme;
   using ui::components::Combo;
   using ui::components::CompactButton;
   using ui::components::DelayedTooltip;
@@ -59,7 +59,7 @@ void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::Page
   const float actions_width = action_width * 2.0f + action_gap;
 
   layout.Title(window.font_title_, kPageTitleTextSize, "Motion", window.font_small_,
-               kPageSubtitleTextSize, "Speed, curve and look of the genie",
+               kPageSubtitleTextSize, "Speed, curve and look of the minimize",
                actions_width + px(8.0f));
   const float title_top = px(16.0f) + vertical_offset;
   layout.SetCursor(layout.group_right() - actions_width, title_top + px(2.0f));
@@ -89,8 +89,8 @@ void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::Page
                       std::clamp((model.restore_duration - kMinimumDuration) /
                                      (kMaximumDuration - kMinimumDuration),
                                  0.0f, 1.0f));
-    motion.system.Set(ui::motion::MotionKey("menu.slider", "##genie_strength", "fill"),
-                      std::clamp((model.genie_strength - 0.25f) / 0.75f, 0.0f, 1.0f));
+    motion.system.Set(ui::motion::MotionKey("menu.slider", "##minimize_strength", "fill"),
+                      std::clamp((model.minimize_strength - 0.25f) / 0.75f, 0.0f, 1.0f));
     window.RecordSaveResult(ok);
   }
 
@@ -188,8 +188,8 @@ void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::Page
       "Linear", "Ease In", "Ease Out", "Ease In Out", "Cubic", "Back", "Elastic", "Custom",
   };
   constexpr std::array style_names = {
-      "Gienie classic",
-      "Gienie curvy",
+      "Minimize classic",
+      "Minimize curvy",
       "Squash",
   };
   const float combo_width = layout.ControlMaxWidth(340.0f);
@@ -292,18 +292,18 @@ void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::Page
   layout.RowTitle(window.font_body_, kLabelTextSize, "Strength", kPrimaryTextColor);
   cursor = layout.ControlCursor(strength_width, slider_height);
   layout.SetCursor(cursor.x, cursor.y);
-  float strength = model.genie_strength;
+  float strength = model.minimize_strength;
   const bool strength_active =
-      Slider(motion, "##genie_strength", "", &strength, 0.25f, 1.0f, strength_width, scale, alpha,
+      Slider(motion, "##minimize_strength", "", &strength, 0.25f, 1.0f, strength_width, scale, alpha,
              window.font_small_, 0.01f, 100.0f, 0, "%");
   DelayedTooltip("How strongly the window bends toward the taskbar target.", scale);
-  if (strength_active && std::abs(strength - model.genie_strength) > 0.0001f) {
-    model.genie_strength = strength;
+  if (strength_active && std::abs(strength - model.minimize_strength) > 0.0001f) {
+    model.minimize_strength = strength;
     window.strength_slider_dirty_ = true;
-    actions.SetGenieStrength(model.genie_strength, false);
+    actions.SetMinimizeStrength(model.minimize_strength, false);
   }
   if (window.strength_slider_active_ && !strength_active && window.strength_slider_dirty_) {
-    const bool saved = actions.SetGenieStrength(model.genie_strength, true);
+    const bool saved = actions.SetMinimizeStrength(model.minimize_strength, true);
     window.RecordSaveResult(saved);
     if (saved) window.strength_slider_dirty_ = false;
   }
@@ -345,4 +345,4 @@ void AnimationPage::Render(::genie::ui::SettingsWindow& window, components::Page
   layout.EndGroup();
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

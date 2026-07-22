@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -116,12 +116,12 @@
       <UACExecutionLevel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">HighestAvailable</UACExecutionLevel>
     </Link>
     <ResourceCompile>
-      <PreprocessorDefinitions>GENIE_EMBED_RELEASE_HOOK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MINIMIZE_EMBED_RELEASE_HOOK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\animation\easing.cpp" />
-    <ClCompile Include="src\animation\genie_mesh.cpp" />
+    <ClCompile Include="src\animation\minimize_mesh.cpp" />
     <ClCompile Include="src\app\application.cpp" />
     <ClCompile Include="src\app\application_runtime.cpp" />
     <ClCompile Include="src\app\message_loop.cpp" />
@@ -238,7 +238,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\animation\easing.hpp" />
-    <ClInclude Include="src\animation\genie_mesh.hpp" />
+    <ClInclude Include="src\animation\minimize_mesh.hpp" />
     <ClInclude Include="src\animation\geometry.hpp" />
     <ClInclude Include="src\app\application.hpp" />
     <ClInclude Include="src\app\application_runtime.hpp" />
@@ -340,12 +340,12 @@
     <ResourceCompile Include="MinimizeEffect.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\genie_mesh.hlsl" />
+    <None Include="shaders\minimize_mesh.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
-  <Target Name="BuildGenieHook" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
-    <MSBuild Projects="$(ProjectDir)..\hook\GenieHook.vcxproj"
+  <Target Name="BuildMinimizeHook" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <MSBuild Projects="$(ProjectDir)..\hook\MinimizeHook.vcxproj"
              Targets="Build"
              Properties="Configuration=$(Configuration);Platform=$(Platform)"
              BuildInParallel="false" />

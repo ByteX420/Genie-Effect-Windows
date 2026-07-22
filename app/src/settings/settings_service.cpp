@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "settings/settings_service.hpp"
 
@@ -6,7 +6,7 @@
 
 #include "settings/settings_validator.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 SettingsService::SettingsService(SettingsRepository repository)
     : repository_(std::move(repository)) {}
@@ -27,4 +27,4 @@ void SettingsService::Preview(AppSettings proposed) {
   settings_ = SettingsValidator::Normalize(std::move(proposed));
 }
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

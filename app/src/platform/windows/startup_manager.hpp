@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 
 [[nodiscard]] bool ConfigureRunAtStartup(bool enabled);
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

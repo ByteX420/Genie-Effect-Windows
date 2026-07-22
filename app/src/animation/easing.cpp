@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "animation/easing.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace genie::animation {
+namespace minimize::animation {
 namespace {
 
 float BezierComponent(float parameter, float first_handle, float second_handle) {
@@ -157,4 +157,4 @@ float ApplyEasing(EasingCurve curve, float value, const CubicBezier& custom) {
   return std::clamp(eased, 0.0f, 1.0f);
 }
 
-}  // namespace genie::animation
+}  // namespace minimize::animation

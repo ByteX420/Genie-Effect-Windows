@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/tray_icon.hpp"
 
@@ -7,7 +7,7 @@
 #include "core/logger.hpp"
 #include "ui/settings_view_model.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 namespace {
 
 constexpr UINT kIconId = 1;
@@ -139,4 +139,4 @@ TrayCommand TrayIcon::HandleCallback(HWND owner, LPARAM parameter,
   }
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

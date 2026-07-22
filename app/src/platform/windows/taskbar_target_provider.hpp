@@ -1,15 +1,15 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
-#include "animation/genie_mesh.hpp"
+#include "animation/minimize_mesh.hpp"
 #include "animation/geometry.hpp"
 
-namespace genie::platform {
+namespace minimize::platform {
 
 struct TaskbarTarget {
-  genie::animation::RectF rect;
-  genie::animation::GenieEdge edge = genie::animation::GenieEdge::kBottom;
+  minimize::animation::RectF rect;
+  minimize::animation::MinimizeEdge edge = minimize::animation::MinimizeEdge::kBottom;
 };
 
 class TaskbarTargetProvider {
@@ -21,4 +21,4 @@ private:
   [[nodiscard]] RECT GetShellTaskbarRect() const;
 };
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

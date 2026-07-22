@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <windows.h>
 
 #include "settings/hotkey_binding.hpp"
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 
 enum class HotkeyRegistrationResult {
   kSuccess,
@@ -42,4 +42,4 @@ private:
   std::array<bool, static_cast<std::size_t>(settings::HotkeyAction::kCount)> registered_{};
 };
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

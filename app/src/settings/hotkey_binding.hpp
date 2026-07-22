@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <cstddef>
 #include <cstdint>
 
-namespace genie::settings {
+namespace minimize::settings {
 
 enum class HotkeyAction : std::size_t {
   kToggleEffect,
@@ -19,4 +19,4 @@ struct HotkeyBinding {
   bool operator==(const HotkeyBinding&) const = default;
 };
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "runtime/renderer_recovery.hpp"
 
 #include <algorithm>
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 void RendererRecovery::Begin() {
   pending_ = true;
@@ -28,4 +28,4 @@ void RendererRecovery::ScheduleRetry(ULONGLONG now) {
   delay_ms_ = std::min(delay_ms_ * 2, kMaximumDelayMilliseconds);
 }
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

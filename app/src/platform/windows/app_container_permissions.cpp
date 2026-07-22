@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/app_container_permissions.hpp"
 
 #include <aclapi.h>
 #include <sddl.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 bool GrantAppContainerPermissions(const std::wstring& path) {
   std::wstring normalized_path = path;
@@ -51,4 +51,4 @@ bool GrantAppContainerPermissions(const std::wstring& path) {
   return success;
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

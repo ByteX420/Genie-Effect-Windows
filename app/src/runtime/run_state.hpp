@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 enum class RunState {
   kIdle,
@@ -18,4 +18,4 @@ enum class RunState {
 [[nodiscard]] bool IsRunStateTransitionAllowed(RunState from, RunState to);
 [[nodiscard]] std::uint64_t RunStateTimeoutMs(RunState state);
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

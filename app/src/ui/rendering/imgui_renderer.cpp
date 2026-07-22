@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/rendering/imgui_renderer.hpp"
 
@@ -15,7 +15,7 @@
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
-namespace genie::ui::rendering {
+namespace minimize::ui::rendering {
 namespace {
 
 constexpr DWORD kInitialRecoveryDelayMs = 250;
@@ -62,7 +62,7 @@ bool ImguiRenderer::Initialize(HWND window) {
   if (!ImGui_ImplDX11_Init(device_.Get(), context_.Get())) return false;
   dx11_ready_ = true;
 #ifdef _DEBUG
-  recovery_test_pending_ = core::EnvironmentFlagEnabled("GENIE_TEST_DEVICE_RECOVERY");
+  recovery_test_pending_ = core::EnvironmentFlagEnabled("MINIMIZE_TEST_DEVICE_RECOVERY");
 #endif
   return true;
 }
@@ -208,7 +208,7 @@ bool ImguiRenderer::IsDeviceLostError(HRESULT result) {
          result == DXGI_ERROR_DEVICE_HUNG || result == DXGI_ERROR_DRIVER_INTERNAL_ERROR;
 }
 
-void ImguiRenderer::ApplyStyle() const { ::genie::ui::theme::ApplyStyle(scale_); }
+void ImguiRenderer::ApplyStyle() const { ::minimize::ui::theme::ApplyStyle(scale_); }
 
 void ImguiRenderer::RebuildFonts() {
   ImGuiIO& io = ImGui::GetIO();
@@ -267,4 +267,4 @@ void ImguiRenderer::RebuildFonts() {
   if (dx11_ready_) ImGui_ImplDX11_CreateDeviceObjects();
 }
 
-}  // namespace genie::ui::rendering
+}  // namespace minimize::ui::rendering

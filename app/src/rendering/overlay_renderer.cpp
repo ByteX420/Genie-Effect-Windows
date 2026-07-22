@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/overlay_renderer.hpp"
 
@@ -8,7 +8,7 @@
 
 #include "rendering/d3d_device.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 namespace {
 
 constexpr UINT kMaximumMeshVertices = 102;
@@ -163,7 +163,7 @@ bool OverlayRenderer::CompileShaders() {
       pixel_blob->GetBufferPointer(), pixel_blob->GetBufferSize(), nullptr, &pixel_shader_));
 }
 
-bool OverlayRenderer::UploadMesh(const animation::GenieMesh& mesh, bool upload_indices) {
+bool OverlayRenderer::UploadMesh(const animation::MinimizeMesh& mesh, bool upload_indices) {
   if (mesh.vertices.empty() || mesh.indices.empty() ||
       mesh.vertices.size() > kMaximumMeshVertices || mesh.indices.size() > kMaximumMeshIndices) {
     return false;
@@ -208,7 +208,7 @@ bool OverlayRenderer::UpdateConstants(UINT width, UINT height, float opacity) {
   return true;
 }
 
-bool OverlayRenderer::Render(const animation::GenieMesh& mesh, bool indices_changed,
+bool OverlayRenderer::Render(const animation::MinimizeMesh& mesh, bool indices_changed,
                              ID3D11ShaderResourceView* texture,
                              ID3D11RenderTargetView* render_target, UINT width, UINT height,
                              float opacity) {
@@ -249,4 +249,4 @@ void OverlayRenderer::MarkDeviceLost(HRESULT result) {
   if (device_ != nullptr && device_->IsDeviceLost(result)) device_lost_ = true;
 }
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

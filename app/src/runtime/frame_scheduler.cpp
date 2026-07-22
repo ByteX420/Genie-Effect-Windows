@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "runtime/frame_scheduler.hpp"
 
@@ -14,7 +14,7 @@
 
 #pragma comment(lib, "winmm.lib")
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 FrameScheduler::~FrameScheduler() { Shutdown(); }
 
@@ -158,4 +158,4 @@ void FrameScheduler::EndFallbackTimerResolution() {
   fallback_resolution_active_ = false;
 }
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

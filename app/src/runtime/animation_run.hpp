@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <chrono>
 #include <windows.h>
@@ -8,7 +8,7 @@
 #include "rendering/overlay_window.hpp"
 #include "runtime/run_state.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 struct CachedSnapshot {
   HWND window = nullptr;
@@ -38,4 +38,4 @@ struct AnimationRun {
   ULONGLONG state_entered_ms = 0;
 };
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

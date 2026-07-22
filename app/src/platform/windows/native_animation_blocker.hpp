@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <unordered_set>
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 class NativeAnimationBlocker {
 public:
@@ -23,4 +23,4 @@ private:
   std::unordered_set<HWND> blocked_windows_;
 };
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

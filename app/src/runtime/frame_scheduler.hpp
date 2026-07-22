@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <windows.h>
 
 #include "runtime/animation_run.hpp"
 #include "runtime/animation_run_pool.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 class FrameScheduler final {
 public:
@@ -34,4 +34,4 @@ private:
   UINT fallback_period_ms_ = 0;
 };
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

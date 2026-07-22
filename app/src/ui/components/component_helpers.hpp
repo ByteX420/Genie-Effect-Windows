@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "ui/theme/theme.hpp"
 
-namespace genie::ui::components::detail {
+namespace minimize::ui::components::detail {
 
 inline motion::MotionKey MotionKey(const char* scope, const char* id, const char* channel) {
   return motion::MotionKey(scope, id ? id : "", channel);
@@ -14,7 +14,7 @@ inline ImVec4 MixColor(const ImVec4& from, const ImVec4& to, float amount) {
 }
 
 inline float ControlRounding(float scale) {
-  return ::genie::ui::theme::Metrics::kControlRounding * scale;
+  return ::minimize::ui::theme::Metrics::kControlRounding * scale;
 }
 
-}  // namespace genie::ui::components::detail
+}  // namespace minimize::ui::components::detail

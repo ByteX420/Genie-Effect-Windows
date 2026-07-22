@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <d3d11_4.h>
 #include <wrl/client.h>
 
-#include "animation/genie_mesh.hpp"
+#include "animation/minimize_mesh.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 class D3dDevice;
 
@@ -13,7 +13,7 @@ class OverlayRenderer final {
 public:
   [[nodiscard]] bool Initialize(D3dDevice* device);
   void Shutdown();
-  [[nodiscard]] bool Render(const animation::GenieMesh& mesh, bool indices_changed,
+  [[nodiscard]] bool Render(const animation::MinimizeMesh& mesh, bool indices_changed,
                             ID3D11ShaderResourceView* texture,
                             ID3D11RenderTargetView* render_target, UINT width, UINT height,
                             float opacity);
@@ -21,7 +21,7 @@ public:
 
 private:
   [[nodiscard]] bool CompileShaders();
-  [[nodiscard]] bool UploadMesh(const animation::GenieMesh& mesh, bool upload_indices);
+  [[nodiscard]] bool UploadMesh(const animation::MinimizeMesh& mesh, bool upload_indices);
   [[nodiscard]] bool UpdateConstants(UINT width, UINT height, float opacity);
   void MarkDeviceLost(HRESULT result);
 
@@ -39,4 +39,4 @@ private:
   bool device_lost_ = false;
 };
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

@@ -1,6 +1,6 @@
-# Minimize Effect for Windows
+﻿# Minimize Effect for Windows
 
-**Minimize Effect** (`Minimize-Effect-Windows`) is an open-source Windows desktop app that replaces the stock minimize and restore transition with **smooth mesh animations** into the taskbar (classic / curvy genie-style curves and squash). When you minimize a window, the live desktop region is captured and warped until it lands on the taskbar target (and expands back out on restore).
+**Minimize Effect** (`Minimize-Effect-Windows`) is an open-source Windows desktop app that replaces the stock minimize and restore transition with **smooth mesh animations** into the taskbar (classic / curvy minimize-style curves and squash). When you minimize a window, the live desktop region is captured and warped until it lands on the taskbar target (and expands back out on restore).
 
 It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished ImGui settings UI — not a shell theme pack or AutoHotkey script.
 
@@ -40,7 +40,7 @@ Windows does **not** expose a public API that means “replace this DWM minimize
 3. **Suppress** the stock transition with `DwmSetWindowAttribute(DWMWA_TRANSITIONS_FORCEDISABLED)` and temporary `SystemParametersInfo(SPI_SETANIMATION)` changes (restored on exit).
 4. **Capture** the visible window region via **DXGI Desktop Duplication** into an `ID3D11Texture2D`.
 5. **Composite** a transparent topmost overlay with **DirectComposition** + a D3D11 swap chain.
-6. **Deform** a textured mesh (Genie curve / squash) each frame until the window lands at the taskbar target.
+6. **Deform** a textured mesh (Minimize curve / squash) each frame until the window lands at the taskbar target.
 
 Elevated processes are only visible to the hook if Minimize Effect itself runs elevated (UIPI).
 
@@ -92,7 +92,7 @@ MSBuild.exe MinimizeEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 | `build\obj\App\x64\<Config>\` | App intermediates |
 | `build\obj\Hook\x64\<Config>\` | Hook intermediates |
 
-**Runtime:** keep `MinimizeEffect.exe` and `MinimizeEffectHook.dll` in the **same folder**. Release builds can also use the embedded hook resource when configured with `GENIE_EMBED_RELEASE_HOOK`.
+**Runtime:** keep `MinimizeEffect.exe` and `MinimizeEffectHook.dll` in the **same folder**. Release builds can also use the embedded hook resource when configured with `MINIMIZE_EMBED_RELEASE_HOOK`.
 
 ---
 
@@ -102,7 +102,7 @@ MSBuild.exe MinimizeEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 2. Run `MinimizeEffect.exe` (optionally **as Administrator** if you want the effect on elevated windows).
 3. Open the settings window from the tray or hotkey.
 4. Enable the effect (sidebar status chip shows **On** / **Off** / **Paused**).
-5. Minimize any eligible window — it should Genie into the taskbar.
+5. Minimize any eligible window — it should Minimize into the taskbar.
 
 ### Settings overview
 
@@ -130,16 +130,16 @@ Settings persist to:
 
 | Variable | Purpose |
 | --- | --- |
-| `GENIE_TASKBAR_RECT` | Override minimize target as `left,top,right,bottom` (physical screen coords). Useful for custom taskbars. |
-| `GENIE_DEBUG_LOG` | Override path of the debug log file |
-| `GENIE_TRACE=1` | Verbose timing traces (noisy; for debugging) |
-| `GENIE_LOG_SYNC=1` | Flush every log line (helps after hangs/crashes) |
-| `GENIE_TEST_DEVICE_RECOVERY=1` | Debug: one controlled D3D teardown/recreate after startup |
+| `MINIMIZE_TASKBAR_RECT` | Override minimize target as `left,top,right,bottom` (physical screen coords). Useful for custom taskbars. |
+| `MINIMIZE_DEBUG_LOG` | Override path of the debug log file |
+| `MINIMIZE_TRACE=1` | Verbose timing traces (noisy; for debugging) |
+| `MINIMIZE_LOG_SYNC=1` | Flush every log line (helps after hangs/crashes) |
+| `MINIMIZE_TEST_DEVICE_RECOVERY=1` | Debug: one controlled D3D teardown/recreate after startup |
 
 Example custom taskbar target:
 
 ```powershell
-$env:GENIE_TASKBAR_RECT = "100,980,1820,1070"
+$env:MINIMIZE_TASKBAR_RECT = "100,980,1820,1070"
 .\MinimizeEffect.exe
 ```
 
@@ -225,7 +225,7 @@ main -> app -> features / runtime / ui -> rendering / platform / settings -> cor
 
 - No official “pre-DWM replace animation” API — behavior can vary with shell updates.
 - **UIPI:** non-elevated Minimize Effect cannot hook elevated windows.
-- Multi-monitor / exotic taskbar setups may need `GENIE_TASKBAR_RECT`.
+- Multi-monitor / exotic taskbar setups may need `MINIMIZE_TASKBAR_RECT`.
 - Fullscreen games / exclusive modes may disable or skip the effect (settings flags exist for battery saver / fullscreen-related behavior).
 
 See [`docs/architecture.md`](docs/architecture.md) for ownership, state machine, and recovery paths.
@@ -319,7 +319,7 @@ Please include:
 | --- | --- |
 | No animation at all | Confirm effect is **On** in settings; check Repair page (Hook / Renderer / D3D). |
 | Elevated apps ignore effect | Run Minimize Effect **as Administrator**. |
-| Wrong suck target | Set `GENIE_TASKBAR_RECT` or check taskbar edge (top/bottom/left/right). |
+| Wrong suck target | Set `MINIMIZE_TASKBAR_RECT` or check taskbar edge (top/bottom/left/right). |
 | Black / stuck overlay | Restart app; check device-lost path; update GPU drivers. |
 | Hook not installed | Ensure `MinimizeEffectHook.dll` sits next to the EXE; rebuild both projects. |
 | Settings not saving | Check write access to `%LOCALAPPDATA%\MinimizeEffect\`. |
@@ -328,7 +328,7 @@ Please include:
 
 ## Credits & third-party
 
-- **Genie mesh / timing inspiration** — adapted from Harshil Shah’s MIT-licensed [Genie](https://github.com/HarshilShah/Genie) SpriteKit playground  
+- **Minimize mesh / timing inspiration** — adapted from Harshil Shah’s MIT-licensed [Minimize](https://github.com/HarshilShah/Minimize) SpriteKit playground  
 - **[Dear ImGui](https://github.com/ocornut/imgui)** — immediate-mode UI  
 - **[FreeType](https://freetype.org/)** — font rasterization for the settings UI  
 - **[Inter](https://github.com/rsms/inter)** — UI typeface (SIL Open Font License; see `app/assets/fonts/OFL.txt`)

@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "settings/settings_repository.hpp"
 
@@ -9,7 +9,7 @@
 #include "settings/settings_serializer.hpp"
 #include "settings/settings_validator.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 std::wstring SettingsRepository::Path() {
   DWORD required = GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
@@ -67,4 +67,4 @@ bool SettingsRepository::Save(const AppSettings& settings) const {
   return true;
 }
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

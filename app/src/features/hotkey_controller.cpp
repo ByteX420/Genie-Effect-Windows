@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/hotkey_controller.hpp"
 
 #include "core/logger.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 void HotkeyController::SetWindow(HWND window) { manager_.SetWindow(window); }
 
@@ -59,4 +59,4 @@ ui::HotkeyUpdateResult HotkeyController::Replace(
   return ui::HotkeyUpdateResult::kSuccess;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

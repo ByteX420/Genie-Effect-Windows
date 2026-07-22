@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
 
-namespace genie::features {
+namespace minimize::features {
 
 class PauseController final {
 public:
@@ -18,4 +18,4 @@ private:
   std::uint64_t until_ms_ = 0;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

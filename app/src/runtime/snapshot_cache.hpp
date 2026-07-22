@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <unordered_map>
 #include <windows.h>
 
 #include "runtime/animation_run.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 class SnapshotCache final {
 public:
@@ -32,4 +32,4 @@ private:
   Map restore_;
 };
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

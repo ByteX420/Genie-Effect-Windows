@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/taskbar_locator.hpp"
 
-namespace genie::platform {
+namespace minimize::platform {
 
 HWND FindTaskbarWindowForRect(const RECT& rect) {
   const HMONITOR rect_monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
@@ -19,4 +19,4 @@ HWND FindTaskbarWindowForRect(const RECT& rect) {
   return taskbar;
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

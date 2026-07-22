@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 
-namespace genie::platform::windows {
+namespace minimize::platform::windows {
 
 class ProcessRuntime final {
 public:
@@ -22,4 +22,4 @@ private:
   HRESULT error_ = S_OK;
 };
 
-}  // namespace genie::platform::windows
+}  // namespace minimize::platform::windows

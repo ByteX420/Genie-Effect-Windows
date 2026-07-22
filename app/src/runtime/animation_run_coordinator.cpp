@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include <algorithm>
 #include <array>
@@ -21,7 +21,7 @@
 #include "platform/windows/window_state.hpp"
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::app {
+namespace minimize::app {
 
 int ApplicationRuntime::FindRunForWindow(HWND window) const {
   for (int i = 0; i < static_cast<int>(runs_.size()); ++i) {
@@ -69,7 +69,7 @@ void ApplicationRuntime::SetRunState(int run_index, runtime::RunState state) {
   if (run_index < 0 || run_index >= static_cast<int>(runs_.size())) return;
   const runtime::RunState previous = runs_[run_index].state;
   if (!runtime::IsRunStateTransitionAllowed(previous, state)) {
-    genie::core::LogDebug(
+    minimize::core::LogDebug(
         L"Runtime",
         L"Rejected run-state transition " +
             std::wstring(
@@ -80,7 +80,7 @@ void ApplicationRuntime::SetRunState(int run_index, runtime::RunState state) {
                          runtime::RunStateName(state) + std::strlen(runtime::RunStateName(state))));
     return;
   }
-  genie::core::LogTrace(
+  minimize::core::LogTrace(
       L"Runtime",
       L"Run " + std::to_wstring(run_index) + L" state " +
           std::wstring(
@@ -136,7 +136,7 @@ void ApplicationRuntime::CleanupRun(int run_index, RunCleanupOutcome outcome) {
         }
       }
       minimize_suppressed_until_[window] = now + kPostRestoreMinimizeSuppressionMs;
-      RestoreWindowFromGenieState(window);
+      RestoreWindowFromMinimizeState(window);
       slot.overlay.FinishRestoreAnimation();
       snapshot_cache_.Restore().erase(window);
       std::wcout << L"Restore animation completed.\n";
@@ -185,7 +185,7 @@ void ApplicationRuntime::CheckAnimationTimeouts() {
                                                    : slot.pending_native_minimize_window;
     wchar_t title[128]{};
     if (window != nullptr) GetWindowTextW(window, title, 128);
-    genie::core::LogDebug(
+    minimize::core::LogDebug(
         L"Watchdog", L"Aborting stuck animation=" + std::to_wstring(index) + L" state=" +
                          std::wstring(runtime::RunStateName(slot.state),
                                       runtime::RunStateName(slot.state) +
@@ -206,7 +206,7 @@ bool ApplicationRuntime::OnMinimizeStart(HWND window) {
   const auto suppressed = minimize_suppressed_until_.find(window);
   if (suppressed != minimize_suppressed_until_.end()) {
     if (now < suppressed->second) {
-      genie::core::LogDebug(L"Minimize",
+      minimize::core::LogDebug(L"Minimize",
                             L"Ignored delayed minimize immediately after restore");
       return true;
     }
@@ -270,7 +270,7 @@ bool ApplicationRuntime::OnRestoreAttempt(HWND window) {
       });
 }
 
-void ApplicationRuntime::RestoreWindowFromGenieState(HWND window, bool force_show_if_iconic) {
+void ApplicationRuntime::RestoreWindowFromMinimizeState(HWND window, bool force_show_if_iconic) {
   window_recovery_service_.Restore(window, force_show_if_iconic);
 }
 
@@ -279,7 +279,7 @@ void ApplicationRuntime::HealLeftoverWindows() {
   startup_repair_status_ = repaired_count == 0
                                ? "No issues found"
                                : std::to_string(repaired_count) + " window(s) repaired";
-  genie::core::LogDebug(L"App", L"Startup repair result: " + std::to_wstring(repaired_count) +
+  minimize::core::LogDebug(L"App", L"Startup repair result: " + std::to_wstring(repaired_count) +
                                     L" suspicious window(s) repaired");
 }
 
@@ -291,7 +291,7 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
   // Signal the main loop and all event handlers to stop immediately.
   shutting_down_.store(true, std::memory_order_release);
 
-  genie::core::LogDebug(L"App", L"CleanupAndRestoreAll starting");
+  minimize::core::LogDebug(L"App", L"CleanupAndRestoreAll starting");
   seed_iconic_snapshots_pending_ = false;
   minimize_feature_.CancelSeedSnapshotsForIconicWindows();
   UnregisterAllHotkeys();
@@ -304,7 +304,7 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
     PostMessageW(GetOverlayWindow(), WM_CLOSE, 0, 0);
   }
 
-  // Tear down in-flight animations without unminimizing windows that Genie already
+  // Tear down in-flight animations without unminimizing windows that Minimize already
   // put in the taskbar. Mid-minimize finishes as minimized; mid-restore only clears
   // cloak/transparency and leaves iconic windows iconic.
   for (int index = 0; index < static_cast<int>(runs_.size()); ++index) {
@@ -352,7 +352,7 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
     window_recovery_service_.ReleaseWithoutShowing(hwnd, false);
   }
 
-  // Safety net: any remaining Genie cloak/props on the desktop, still without SW_RESTORE.
+  // Safety net: any remaining Minimize cloak/props on the desktop, still without SW_RESTORE.
   window_recovery_service_.HealUntrackedWindows();
 
   runs_.ShutdownOverlays();
@@ -361,7 +361,7 @@ void ApplicationRuntime::CleanupAndRestoreAll() {
   d3d_device_.reset();
   frame_scheduler_.EndFallbackTimerResolution();
   frame_scheduler_.Wake();
-  genie::core::LogDebug(L"App", L"CleanupAndRestoreAll completed");
+  minimize::core::LogDebug(L"App", L"CleanupAndRestoreAll completed");
 }
 
-}  // namespace genie::app
+}  // namespace minimize::app

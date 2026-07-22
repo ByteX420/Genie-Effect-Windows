@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/motion/motion.hpp"
 
 #include <algorithm>
 #include <cmath>
 
-namespace genie::ui::motion {
+namespace minimize::ui::motion {
 namespace {
 constexpr unsigned kFinishedRetentionFrames = 2;
 constexpr unsigned kActiveRetentionFrames = 180;
@@ -442,4 +442,4 @@ template bool MotionSystem::IsTrackActive(const TrackMap<ImVec4>& tracks,
 template void MotionSystem::CleanupTracks(TrackMap<float>& tracks);
 template void MotionSystem::CleanupTracks(TrackMap<ImVec2>& tracks);
 template void MotionSystem::CleanupTracks(TrackMap<ImVec4>& tracks);
-}  // namespace genie::ui::motion
+}  // namespace minimize::ui::motion

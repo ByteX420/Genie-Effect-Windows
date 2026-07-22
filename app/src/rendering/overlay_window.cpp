@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/overlay_window.hpp"
 
@@ -15,7 +15,7 @@
 #include "platform/windows/window_properties.hpp"
 #include "platform/windows/window_state.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 namespace {
 
 constexpr wchar_t kOverlayWindowClassName[] = L"MinimizeEffectOverlayWindow";
@@ -26,8 +26,8 @@ int RectWidth(const RECT& rect) { return static_cast<int>(rect.right - rect.left
 
 int RectHeight(const RECT& rect) { return static_cast<int>(rect.bottom - rect.top); }
 
-genie::animation::RectF RectToRectF(const RECT& rect) {
-  return genie::animation::RectF{
+minimize::animation::RectF RectToRectF(const RECT& rect) {
+  return minimize::animation::RectF{
       .left = static_cast<float>(rect.left),
       .top = static_cast<float>(rect.top),
       .right = static_cast<float>(rect.right),
@@ -35,8 +35,8 @@ genie::animation::RectF RectToRectF(const RECT& rect) {
   };
 }
 
-RECT AnimationSurfaceRect(const genie::animation::RectF& source,
-                          const genie::animation::RectF& target, const RECT& virtual_screen) {
+RECT AnimationSurfaceRect(const minimize::animation::RectF& source,
+                          const minimize::animation::RectF& target, const RECT& virtual_screen) {
   RECT requested{
       .left = static_cast<LONG>(std::floor(std::min(source.left, target.left))) - kOverlayPadding,
       .top = static_cast<LONG>(std::floor(std::min(source.top, target.top))) - kOverlayPadding,
@@ -52,7 +52,7 @@ RECT AnimationSurfaceRect(const genie::animation::RectF& source,
   return clipped;
 }
 
-std::wstring RectFTraceString(const genie::animation::RectF& rect) {
+std::wstring RectFTraceString(const minimize::animation::RectF& rect) {
   std::wstringstream ss;
   ss << L"(" << rect.left << L"," << rect.top << L"," << rect.right << L"," << rect.bottom << L")";
   return ss.str();
@@ -67,13 +67,13 @@ void AllowCrossIntegrityMessage(HWND window, UINT message, const wchar_t* messag
   CHANGEFILTERSTRUCT filter_status{};
   filter_status.cbSize = sizeof(filter_status);
   if (!ChangeWindowMessageFilterEx(window, message, MSGFLT_ALLOW, &filter_status)) {
-    genie::core::LogDebug(L"Overlay", std::wstring(L"ChangeWindowMessageFilterEx failed for ") +
+    minimize::core::LogDebug(L"Overlay", std::wstring(L"ChangeWindowMessageFilterEx failed for ") +
                                           message_name + L" message=" + std::to_wstring(message) +
                                           L" error=" + std::to_wstring(GetLastError()));
     return;
   }
 
-  genie::core::LogDebug(L"Overlay", std::wstring(L"Allowed cross-integrity window message ") +
+  minimize::core::LogDebug(L"Overlay", std::wstring(L"Allowed cross-integrity window message ") +
                                         message_name + L" message=" + std::to_wstring(message));
 }
 
@@ -88,8 +88,8 @@ bool OverlayWindow::Initialize(HINSTANCE instance, D3dDevice* d3d_device,
   device_lost_ = false;
   minimize_callback_ = std::move(minimize_callback);
   restore_callback_ = std::move(restore_callback);
-  minimize_attempt_message_ = RegisterWindowMessageW(L"GenieMinimizeAttempt");
-  restore_attempt_message_ = RegisterWindowMessageW(L"GenieRestoreAttempt");
+  minimize_attempt_message_ = RegisterWindowMessageW(L"MinimizeMinimizeAttempt");
+  restore_attempt_message_ = RegisterWindowMessageW(L"MinimizeRestoreAttempt");
   virtual_screen_rect_ = platform::GetVirtualScreenRect();
   overlay_screen_rect_ = RECT{virtual_screen_rect_.left, virtual_screen_rect_.top,
                               virtual_screen_rect_.left + 1, virtual_screen_rect_.top + 1};
@@ -103,8 +103,8 @@ bool OverlayWindow::Initialize(HINSTANCE instance, D3dDevice* d3d_device,
     return false;
   }
 
-  AllowCrossIntegrityMessage(window_, minimize_attempt_message_, L"GenieMinimizeAttempt");
-  AllowCrossIntegrityMessage(window_, restore_attempt_message_, L"GenieRestoreAttempt");
+  AllowCrossIntegrityMessage(window_, minimize_attempt_message_, L"MinimizeMinimizeAttempt");
+  AllowCrossIntegrityMessage(window_, restore_attempt_message_, L"MinimizeRestoreAttempt");
 
   ClearFrame();
   ShowWindow(window_, SW_SHOWNOACTIVATE);
@@ -131,11 +131,11 @@ void OverlayWindow::Shutdown() {
 }
 
 bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
-                                   const genie::animation::RectF& source_screen_rect,
-                                   const genie::animation::RectF& target_screen_rect,
-                                   genie::animation::GenieEdge edge, float start_progress,
+                                   const minimize::animation::RectF& source_screen_rect,
+                                   const minimize::animation::RectF& target_screen_rect,
+                                   minimize::animation::MinimizeEdge edge, float start_progress,
                                    float target_progress) {
-  genie::core::LogTrace(
+  minimize::core::LogTrace(
       L"Overlay", L"StartAnimation requested source=" + RectFTraceString(source_screen_rect) +
                       L" target=" + RectFTraceString(target_screen_rect) + L" start_progress=" +
                       std::to_wstring(start_progress) + L" target_progress=" +
@@ -144,7 +144,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
                       std::to_wstring(captured_texture.shader_resource_view != nullptr));
 
   if (captured_texture.shader_resource_view == nullptr) {
-    genie::core::LogTrace(L"Overlay", L"StartAnimation failed: missing shader resource view");
+    minimize::core::LogTrace(L"Overlay", L"StartAnimation failed: missing shader resource view");
     std::wcerr << L"Overlay start failed: captured texture has no shader "
                   L"resource view.\n";
     return false;
@@ -153,15 +153,15 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   const RECT animation_surface =
       AnimationSurfaceRect(source_screen_rect, target_screen_rect, virtual_screen_rect_);
   if (RectWidth(animation_surface) <= 0 || RectHeight(animation_surface) <= 0) {
-    genie::core::LogTrace(L"Overlay",
+    minimize::core::LogTrace(L"Overlay",
                           L"StartAnimation failed: animation surface is outside virtual screen");
     return false;
   }
 
   HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
-  (void)genie::platform::SetOwnedWindowRegion(window_, hidden_region, false);
+  (void)minimize::platform::SetOwnedWindowRegion(window_, hidden_region, false);
   if (!ResizeOverlaySurface(animation_surface)) {
-    genie::core::LogTrace(L"Overlay",
+    minimize::core::LogTrace(L"Overlay",
                           L"StartAnimation failed: ResizeOverlaySurface returned "
                           L"false");
     HideOverlay();
@@ -177,7 +177,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   if (target_indicator_enabled_) ShowTargetIndicator(target_screen_rect);
 
   if (!Render(animation_renderer_.progress())) {
-    genie::core::LogTrace(L"Overlay", L"StartAnimation failed: first Render returned false");
+    minimize::core::LogTrace(L"Overlay", L"StartAnimation failed: first Render returned false");
     animation_renderer_.Cancel();
     HideOverlay();
     std::wcerr << L"Overlay start failed: first frame render failed.\n";
@@ -189,7 +189,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   target_rect_win.right = static_cast<LONG>(target_screen_rect.right);
   target_rect_win.bottom = static_cast<LONG>(target_screen_rect.bottom);
 
-  HWND taskbar_hwnd = genie::platform::FindTaskbarWindowForRect(target_rect_win);
+  HWND taskbar_hwnd = minimize::platform::FindTaskbarWindowForRect(target_rect_win);
 
   if (taskbar_hwnd != nullptr) {
     SetWindowPos(taskbar_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
@@ -205,7 +205,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   HRESULT hr = composition_device_->WaitForCommitCompletion();
   if (FAILED(hr)) {
     MarkDeviceLost(L"WaitForCommitCompletion", hr);
-    genie::core::LogTrace(L"Overlay", L"StartAnimation failed: WaitForCommitCompletion hr=0x" +
+    minimize::core::LogTrace(L"Overlay", L"StartAnimation failed: WaitForCommitCompletion hr=0x" +
                                           std::to_wstring(static_cast<unsigned long>(hr)));
     animation_renderer_.Cancel();
     HideOverlay();
@@ -214,7 +214,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
                << std::hex << hr << std::dec << L"\n";
     return false;
   }
-  genie::core::LogTrace(L"Overlay", L"StartAnimation first frame visible overlay_source=" +
+  minimize::core::LogTrace(L"Overlay", L"StartAnimation first frame visible overlay_source=" +
                                         RectFTraceString(ToOverlayRect(source_screen_rect)) +
                                         L" overlay_target=" +
                                         RectFTraceString(ToOverlayRect(target_screen_rect)));
@@ -290,7 +290,7 @@ LRESULT OverlayWindow::HandleMessage(HWND hwnd, UINT message, WPARAM w_param, LP
                reinterpret_cast<HANDLE>(1));
       ShowWindow(minimize_window, SW_MINIMIZE);
       RemovePropW(minimize_window, platform::windows::properties::kAllowMinimize);
-      genie::core::LogTrace(L"Overlay",
+      minimize::core::LogTrace(L"Overlay",
                             L"Minimize callback failed; allowed native minimize fallback");
     }
     return 0;
@@ -360,7 +360,7 @@ bool OverlayWindow::CreateOverlayWindow(HINSTANCE instance) {
   return window_ != nullptr && target_indicator_window_ != nullptr;
 }
 
-void OverlayWindow::ShowTargetIndicator(const genie::animation::RectF& target) {
+void OverlayWindow::ShowTargetIndicator(const minimize::animation::RectF& target) {
   if (target_indicator_window_ == nullptr) return;
   const int left = static_cast<int>(std::floor(target.left)) - 3;
   const int top = static_cast<int>(std::floor(target.top)) - 3;
@@ -502,7 +502,7 @@ void OverlayWindow::ApplyVisibleOverlayRegion(HWND taskbar_window) {
     }
   }
 
-  (void)genie::platform::SetOwnedWindowRegion(window_, visible_region, true);
+  (void)minimize::platform::SetOwnedWindowRegion(window_, visible_region, true);
 }
 
 bool OverlayWindow::Render(float progress) {
@@ -555,7 +555,7 @@ void OverlayWindow::MarkDeviceLost(const wchar_t* operation, HRESULT hr) {
     return;
   }
   device_lost_ = true;
-  genie::core::LogDebug(
+  minimize::core::LogDebug(
       L"Overlay",
       std::wstring(L"D3D device lost during ") + operation + L" hr=" +
           std::to_wstring(static_cast<unsigned long>(hr)) + L" reason=" +
@@ -566,16 +566,16 @@ void OverlayWindow::HideOverlay() {
   if (window_ != nullptr) {
     ClearFrame();
     HRGN hidden_region = CreateRectRgn(0, 0, 0, 0);
-    (void)genie::platform::SetOwnedWindowRegion(window_, hidden_region, true);
+    (void)minimize::platform::SetOwnedWindowRegion(window_, hidden_region, true);
     SetWindowPos(window_, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
   }
 }
 
-genie::animation::RectF OverlayWindow::ToOverlayRect(
-    const genie::animation::RectF& screen_rect) const {
-  const genie::animation::RectF overlay_screen = RectToRectF(overlay_screen_rect_);
-  return genie::animation::RectF{
+minimize::animation::RectF OverlayWindow::ToOverlayRect(
+    const minimize::animation::RectF& screen_rect) const {
+  const minimize::animation::RectF overlay_screen = RectToRectF(overlay_screen_rect_);
+  return minimize::animation::RectF{
       .left = screen_rect.left - overlay_screen.left,
       .top = screen_rect.top - overlay_screen.top,
       .right = screen_rect.right - overlay_screen.left,
@@ -583,4 +583,4 @@ genie::animation::RectF OverlayWindow::ToOverlayRect(
   };
 }
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

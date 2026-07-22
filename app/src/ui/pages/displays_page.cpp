@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/displays_page.hpp"
 
@@ -14,7 +14,7 @@
 #include "ui/settings_window.hpp"
 #include "ui/theme/theme.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
@@ -22,16 +22,16 @@ constexpr float kPageSubtitleTextSize = 13.0f;
 constexpr float kLabelTextSize = 15.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 constexpr ULONGLONG kRefreshIntervalMs = 750;
 
 }  // namespace
 
-void DisplaysPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                          const ::genie::ui::motion::MotionContext& motion, float scale,
+void DisplaysPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                          const ::minimize::ui::motion::MotionContext& motion, float scale,
                           float alpha) {
-  using namespace ::genie::ui::theme;
+  using namespace ::minimize::ui::theme;
   auto px = [scale](float value) { return value * scale; };
   auto& actions = window.controller_->actions();
   const float button_height = Metrics::kButtonHeight * scale;
@@ -40,7 +40,7 @@ void DisplaysPage::Render(::genie::ui::SettingsWindow& window, components::PageL
   // Same placement as Motion "Reset": top-right of the page title row.
   const float title_top = layout.y();
   layout.Title(window.font_title_, kPageTitleTextSize, "Displays", window.font_small_,
-               kPageSubtitleTextSize, "Select a display, then choose Genie for its windows",
+               kPageSubtitleTextSize, "Select a display, then choose Minimize for its windows",
                action_width + px(8.0f));
   layout.SetCursor(layout.group_right() - action_width, title_top + px(2.0f));
   if (ui::components::CompactButton(motion, "##refresh_displays", "Refresh",
@@ -81,7 +81,7 @@ void DisplaysPage::Render(::genie::ui::SettingsWindow& window, components::PageL
     for (const features::OpenWindowInfo& info : snapshot.windows) {
       if (info.monitor == selected->monitor || info.monitor_index == selected->index) {
         ++windows_on_display;
-        if (info.genie_excluded) ++excluded_on_display;
+        if (info.minimize_excluded) ++excluded_on_display;
       }
     }
   }
@@ -157,14 +157,14 @@ void DisplaysPage::Render(::genie::ui::SettingsWindow& window, components::PageL
         is_selected ? IM_COL32(55, 105, 130, static_cast<int>((200 + 40 * select) * alpha))
                     : IM_COL32(32 + static_cast<int>(14 * hover), 32 + static_cast<int>(14 * hover),
                                36 + static_cast<int>(14 * hover), static_cast<int>(230 * alpha));
-    if (monitor.genie_excluded && !is_selected) {
+    if (monitor.minimize_excluded && !is_selected) {
       fill = IM_COL32(48 + static_cast<int>(10 * hover), 34 + static_cast<int>(8 * hover),
                       34 + static_cast<int>(8 * hover), static_cast<int>(230 * alpha));
     }
     // Color only for selection — thickness stays constant.
     const ImU32 border =
         is_selected ? IM_COL32(140, 190, 210, static_cast<int>(255 * alpha))
-        : monitor.genie_excluded
+        : monitor.minimize_excluded
             ? IM_COL32(160 + static_cast<int>(20 * hover), 90 + static_cast<int>(20 * hover),
                        90 + static_cast<int>(20 * hover), static_cast<int>(255 * alpha))
             : IM_COL32(70 + static_cast<int>(40 * hover), 70 + static_cast<int>(40 * hover),
@@ -224,17 +224,17 @@ void DisplaysPage::Render(::genie::ui::SettingsWindow& window, components::PageL
   ImGui::Dummy(ImVec2(content_w, map_h));
   layout.EndRow();
 
-  // Disable Genie — directly under the arrangement map, same card. Persisted to settings.
+  // Disable Minimize — directly under the arrangement map, same card. Persisted to settings.
   layout.BeginRow(Metrics::kRowHeight);
   layout.ReserveControl(toggle_width);
-  layout.RowTitle(window.font_body_, kLabelTextSize, "Disable Genie on this display",
+  layout.RowTitle(window.font_body_, kLabelTextSize, "Disable Minimize on this display",
                   kPrimaryTextColor);
-  bool disable_display = selected != nullptr && selected->genie_excluded;
+  bool disable_display = selected != nullptr && selected->minimize_excluded;
   const ImVec2 toggle_cursor = layout.ControlCursor(toggle_width, toggle_height);
   layout.SetCursor(toggle_cursor.x, toggle_cursor.y);
   if (selected != nullptr &&
-      ui::components::Toggle(motion, "##disable_genie_display", &disable_display, scale, alpha)) {
-    if (actions.SetDisplayGenieExcluded(selected->device_name, disable_display)) {
+      ui::components::Toggle(motion, "##disable_minimize_display", &disable_display, scale, alpha)) {
+    if (actions.SetDisplayMinimizeExcluded(selected->device_name, disable_display)) {
       window.InvalidateOpenWindowsSnapshot();
       window.ForceRender();
     }
@@ -282,13 +282,13 @@ void DisplaysPage::Render(::genie::ui::SettingsWindow& window, components::PageL
     layout.EndRow();
 
     layout.BeginRow(Metrics::kRowHeightDense);
-    layout.RowTitle(window.font_body_, kLabelTextSize, "Genie", kPrimaryTextColor);
+    layout.RowTitle(window.font_body_, kLabelTextSize, "Minimize", kPrimaryTextColor);
     layout.RowValue(window.font_small_, kHelperTextSize,
-                    selected->genie_excluded ? "Disabled" : "Enabled", kSecondaryTextColor);
+                    selected->minimize_excluded ? "Disabled" : "Enabled", kSecondaryTextColor);
     layout.EndRow();
   }
 
   layout.EndGroup();
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

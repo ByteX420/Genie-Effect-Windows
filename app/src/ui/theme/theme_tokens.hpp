@@ -1,10 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #include "imgui.h"
 
 // Shared color palette for the menu UI.
 // Cool zinc neutrals, high-contrast type, no brand-purple accent.
-namespace genie::ui::theme {
+namespace minimize::ui::theme {
 inline const ImVec4 kMainColor = ImVec4(0.043f, 0.043f, 0.047f, 0.72f);         // #0b0b0c
 inline const ImVec4 kPanelColor = ImVec4(0.078f, 0.078f, 0.086f, 0.92f);        // #141416
 inline const ImVec4 kBorderColor = ImVec4(0.165f, 0.165f, 0.176f, 1.0f);        // #2a2a2d
@@ -17,4 +17,4 @@ inline const ImVec4 kTextDimColor = ImVec4(0.545f, 0.545f, 0.576f, 1.0f);  // #8
 inline const ImVec4 kSidebarColor = ImVec4(0.051f, 0.051f, 0.055f, 0.55f);  // #0d0d0e
 inline const ImVec4 kSubNamespaceBackgroundColor = ImVec4(0.043f, 0.043f, 0.047f, 0.80f);
 inline const ImVec4 kComboBackgroundColor = ImVec4(0.063f, 0.063f, 0.071f, 0.98f);  // #101012
-}  // namespace genie::ui::theme
+}  // namespace minimize::ui::theme

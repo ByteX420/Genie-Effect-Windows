@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 
-namespace genie::core {
+namespace minimize::core {
 
 [[nodiscard]] std::string LoadEmbeddedText(int resource_id);
 
-}  // namespace genie::core
+}  // namespace minimize::core

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <chrono>
 #include <d3d11_4.h>
@@ -9,13 +9,13 @@
 #include <wrl/client.h>
 
 #include "animation/easing.hpp"
-#include "animation/genie_mesh.hpp"
+#include "animation/minimize_mesh.hpp"
 #include "rendering/animation_renderer.hpp"
 #include "rendering/d3d_device.hpp"
 #include "rendering/desktop_capture.hpp"
 #include "rendering/overlay_renderer.hpp"
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 class OverlayWindow {
 public:
@@ -34,17 +34,17 @@ public:
   void SetAnimationDuration(float duration_seconds) {
     animation_renderer_.SetDuration(duration_seconds);
   }
-  void SetAnimationEasing(genie::animation::EasingCurve easing,
-                          genie::animation::CubicBezier custom = {}) {
+  void SetAnimationEasing(minimize::animation::EasingCurve easing,
+                          minimize::animation::CubicBezier custom = {}) {
     animation_renderer_.SetEasing(easing, custom);
   }
-  void SetAnimationStyle(genie::animation::AnimationStyle style) {
+  void SetAnimationStyle(minimize::animation::AnimationStyle style) {
     animation_renderer_.SetStyle(style);
   }
   void SetMeshSegmentCount(int segment_count) {
     animation_renderer_.SetMeshSegmentCount(segment_count);
   }
-  void SetGenieStrength(float strength) { animation_renderer_.SetGenieStrength(strength); }
+  void SetMinimizeStrength(float strength) { animation_renderer_.SetMinimizeStrength(strength); }
   void SetFadeStrength(float strength) { animation_renderer_.SetFadeStrength(strength); }
   void SetTargetIndicatorEnabled(bool enabled) { target_indicator_enabled_ = enabled; }
 
@@ -54,9 +54,9 @@ public:
   [[nodiscard]] bool device_lost() const { return device_lost_ || overlay_renderer_.device_lost(); }
 
   [[nodiscard]] bool StartAnimation(CapturedTexture captured_texture,
-                                    const genie::animation::RectF& source_screen_rect,
-                                    const genie::animation::RectF& target_screen_rect,
-                                    genie::animation::GenieEdge edge, float start_progress = 0.0f,
+                                    const minimize::animation::RectF& source_screen_rect,
+                                    const minimize::animation::RectF& target_screen_rect,
+                                    minimize::animation::MinimizeEdge edge, float start_progress = 0.0f,
                                     float target_progress = 1.0f);
   void StartAnimationClock();
   void ContinueMinimizeAnimation();
@@ -82,11 +82,11 @@ private:
   [[nodiscard]] bool Render(float progress);
   void ClearFrame();
   void HideOverlay();
-  void ShowTargetIndicator(const genie::animation::RectF& target);
+  void ShowTargetIndicator(const minimize::animation::RectF& target);
   void HideTargetIndicator();
   void MarkDeviceLost(const wchar_t* operation, HRESULT hr);
-  [[nodiscard]] genie::animation::RectF ToOverlayRect(
-      const genie::animation::RectF& screen_rect) const;
+  [[nodiscard]] minimize::animation::RectF ToOverlayRect(
+      const minimize::animation::RectF& screen_rect) const;
 
   D3dDevice* d3d_device_ = nullptr;
   HWND window_ = nullptr;
@@ -112,4 +112,4 @@ private:
   bool device_lost_ = false;
 };
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

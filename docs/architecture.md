@@ -1,4 +1,4 @@
-# Minimize Effect architecture
+﻿# Minimize Effect architecture
 
 Minimize Effect is a native Windows application that replaces the visible
 minimize/restore transition with a Direct3D 11 mesh animation. Windows has no
@@ -82,6 +82,6 @@ DXGI Desktop Duplication, and a DirectComposition overlay.
 `ProcessRuntime` owns DPI awareness, COM lifetime, and console-control shutdown
 routing. `main.cpp` only coordinates these program-entry concerns.
 
-`GENIE_TASKBAR_RECT=left,top,right,bottom` overrides shell target discovery in
+`MINIMIZE_TASKBAR_RECT=left,top,right,bottom` overrides shell target discovery in
 physical screen coordinates. Parsing and target selection remain isolated in
 the taskbar provider.

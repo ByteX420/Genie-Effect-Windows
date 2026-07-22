@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/open_windows_service.hpp"
 
@@ -10,7 +10,7 @@
 #include "platform/windows/process_info.hpp"
 #include "platform/windows/window_state.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 bool IsUsableRect(const RECT& rect) {
@@ -97,7 +97,7 @@ OpenWindowsSnapshot OpenWindowsService::Capture(HWND overlay_window,
   for (int i = 0; i < static_cast<int>(snapshot.monitors.size()); ++i) {
     snapshot.monitors[i].index = i;
     snapshot.monitors[i].label = std::format("{}", i + 1);
-    snapshot.monitors[i].genie_excluded =
+    snapshot.monitors[i].minimize_excluded =
         exclusions_.IsDisplayExcluded(snapshot.monitors[i].device_name);
   }
 
@@ -120,7 +120,7 @@ OpenWindowsSnapshot OpenWindowsService::Capture(HWND overlay_window,
     info.minimized = IsIconic(window) != FALSE;
     info.foreground = window == foreground;
     info.maximized = IsZoomed(window) != FALSE;
-    info.genie_excluded = exclusions_.IsExcluded(window);
+    info.minimize_excluded = exclusions_.IsExcluded(window);
     info.monitor = MonitorFromRect(&info.bounds, MONITOR_DEFAULTTONEAREST);
 
     for (const OpenMonitorInfo& monitor : snapshot.monitors) {
@@ -144,4 +144,4 @@ OpenWindowsSnapshot OpenWindowsService::Capture(HWND overlay_window,
   return snapshot;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

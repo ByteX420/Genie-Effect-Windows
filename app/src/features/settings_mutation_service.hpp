@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <string>
@@ -6,7 +6,7 @@
 #include "animation/easing.hpp"
 #include "settings/settings_service.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 class SettingsMutationService final {
 public:
@@ -21,7 +21,7 @@ public:
   bool SetCustomEasingBezier(bool minimize, animation::CubicBezier bezier, bool save);
   bool SetAnimationStyle(const std::string& style);
   bool SetQualityMode(const std::string& mode);
-  bool SetGenieStrength(float strength, bool save);
+  bool SetMinimizeStrength(float strength, bool save);
   bool SetFadeStrength(const std::string& strength);
   // Atomically restore every Motion-page field to AppSettings defaults.
   bool ResetMotionSettings();
@@ -31,7 +31,7 @@ public:
   bool SetStartupOptions(bool run_at_startup, bool start_minimized);
   bool SetApplicationExcluded(const std::string& executable, bool excluded,
                               const std::function<void()>& applied);
-  bool SetDisplayGenieExcluded(const std::string& device_name, bool excluded,
+  bool SetDisplayMinimizeExcluded(const std::string& device_name, bool excluded,
                                const std::function<void()>& applied);
   // applied runs after a successful settings write. When startup registration fails,
   // applied still runs but out_startup_registration_failed is set so the host can warn.
@@ -43,4 +43,4 @@ private:
   settings::SettingsService& settings_;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

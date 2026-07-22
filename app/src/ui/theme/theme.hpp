@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <cmath>
 
 #include "imgui.h"
 #include "ui/motion/motion_context.hpp"
 
-namespace genie::ui::theme {
+namespace minimize::ui::theme {
 
 // Layout metrics — logical (1x DPI) units. Everything scales via ui_scale.
 //
@@ -131,4 +131,4 @@ bool SidebarItem(const motion::MotionContext& motion, const char* id, const char
                  bool selected, ImVec2 position, ImVec2 size, ImFont* regular, ImFont* emphasis,
                  float scale, float alpha = 1.0f);
 
-}  // namespace genie::ui::theme
+}  // namespace minimize::ui::theme

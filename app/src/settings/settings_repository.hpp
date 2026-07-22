@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <string>
@@ -7,7 +7,7 @@
 
 #include "settings/app_settings.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 class SettingsRepository final {
 public:
@@ -15,4 +15,4 @@ public:
   [[nodiscard]] AppSettings Load() const;
   [[nodiscard]] bool Save(const AppSettings& settings) const;
 };
-}  // namespace genie::settings
+}  // namespace minimize::settings

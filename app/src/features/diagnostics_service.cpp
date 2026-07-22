@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/diagnostics_service.hpp"
 
@@ -17,7 +17,7 @@
 #include "platform/windows/taskbar_target_provider.hpp"
 #include "rendering/d3d_device.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 namespace {
 
 std::string WideToUtf8(std::wstring_view value) {
@@ -103,16 +103,16 @@ DiagnosticsSnapshot DiagnosticsService::Build(const DiagnosticsContext& context)
       const platform::TaskbarTarget target =
           context.taskbar_targets->GetTargetForWindow(reference_window, bounds);
       switch (target.edge) {
-        case animation::GenieEdge::kLeft:
+        case animation::MinimizeEdge::kLeft:
           snapshot.taskbar = "Left";
           break;
-        case animation::GenieEdge::kTop:
+        case animation::MinimizeEdge::kTop:
           snapshot.taskbar = "Top";
           break;
-        case animation::GenieEdge::kRight:
+        case animation::MinimizeEdge::kRight:
           snapshot.taskbar = "Right";
           break;
-        case animation::GenieEdge::kBottom:
+        case animation::MinimizeEdge::kBottom:
           snapshot.taskbar = "Bottom";
           break;
       }
@@ -197,4 +197,4 @@ bool DiagnosticsService::OpenLogFolder(HWND owner) const {
              ShellExecuteW(owner, L"open", folder.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) > 32;
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

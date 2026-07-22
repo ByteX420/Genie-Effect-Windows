@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <optional>
@@ -8,26 +8,26 @@
 
 #include "runtime/run_state.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 class AnimationConfiguration;
 class EffectPolicy;
 class WindowExclusionService;
 class WindowRecoveryService;
 struct RenderingPressure;
-}  // namespace genie::features
-namespace genie::platform {
+}  // namespace minimize::features
+namespace minimize::platform {
 class NativeAnimationBlocker;
 class TaskbarTargetProvider;
-}  // namespace genie::platform
-namespace genie::rendering {
+}  // namespace minimize::platform
+namespace minimize::rendering {
 class DesktopCapture;
 }
-namespace genie::runtime {
+namespace minimize::runtime {
 class AnimationRunPool;
 class SnapshotCache;
-}  // namespace genie::runtime
-namespace genie::features {
+}  // namespace minimize::runtime
+namespace minimize::features {
 
 struct MinimizeRequest {
   HWND window = nullptr;
@@ -130,4 +130,4 @@ private:
   platform::TaskbarTargetProvider* seed_targets_ = nullptr;
 };
 
-}  // namespace genie::features
+}  // namespace minimize::features

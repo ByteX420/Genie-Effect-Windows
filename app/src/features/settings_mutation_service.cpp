@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "features/settings_mutation_service.hpp"
 
@@ -15,7 +15,7 @@
 #include "settings/settings_serializer.hpp"
 #include "settings/settings_validator.hpp"
 
-namespace genie::features {
+namespace minimize::features {
 
 bool SettingsMutationService::SetEnabled(bool enabled, const std::function<void()>& applied) {
   if (settings_.Get().enabled == enabled) return true;
@@ -95,7 +95,7 @@ bool SettingsMutationService::SetCustomEasingBezier(bool minimize, animation::Cu
 }
 
 bool SettingsMutationService::SetAnimationStyle(const std::string& style) {
-  if (style != "Gienie classic" && style != "Gienie curvy" && style != "Squash") return false;
+  if (style != "Minimize classic" && style != "Minimize curvy" && style != "Squash") return false;
   auto proposed = settings_.Get();
   proposed.animation_style = style;
   return settings_.Update(std::move(proposed));
@@ -108,9 +108,9 @@ bool SettingsMutationService::SetQualityMode(const std::string& mode) {
   return settings_.Update(std::move(proposed));
 }
 
-bool SettingsMutationService::SetGenieStrength(float strength, bool save) {
+bool SettingsMutationService::SetMinimizeStrength(float strength, bool save) {
   auto proposed = settings_.Get();
-  proposed.genie_strength = std::clamp(strength, 0.25f, 1.0f);
+  proposed.minimize_strength = std::clamp(strength, 0.25f, 1.0f);
   const bool succeeded = !save || settings_.Update(proposed);
   if (!save) settings_.Preview(std::move(proposed));
   return succeeded;
@@ -137,7 +137,7 @@ bool SettingsMutationService::ResetMotionSettings() {
   proposed.restore_custom_bezier = defaults.restore_custom_bezier;
   proposed.animation_style = defaults.animation_style;
   proposed.quality_mode = defaults.quality_mode;
-  proposed.genie_strength = defaults.genie_strength;
+  proposed.minimize_strength = defaults.minimize_strength;
   proposed.fade_strength = defaults.fade_strength;
   proposed.show_target_indicator = defaults.show_target_indicator;
   return settings_.Update(std::move(proposed));
@@ -179,7 +179,7 @@ bool SettingsMutationService::SetStartupOptions(bool run_at_startup, bool start_
   return true;
 }
 
-bool SettingsMutationService::SetDisplayGenieExcluded(const std::string& device_name, bool excluded,
+bool SettingsMutationService::SetDisplayMinimizeExcluded(const std::string& device_name, bool excluded,
                                                       const std::function<void()>& applied) {
   if (device_name.empty()) return false;
   auto proposed = settings_.Get();
@@ -280,4 +280,4 @@ bool SettingsMutationService::ExportSettingsToFile(const std::wstring& path) con
   return static_cast<bool>(output);
 }
 
-}  // namespace genie::features
+}  // namespace minimize::features

@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <memory>
 #include <windows.h>
 
-namespace genie::app {
+namespace minimize::app {
 
 class ApplicationRuntime;
 
@@ -22,4 +22,4 @@ private:
   std::unique_ptr<ApplicationRuntime> runtime_;
 };
 
-}  // namespace genie::app
+}  // namespace minimize::app

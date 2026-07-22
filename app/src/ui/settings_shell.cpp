@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/settings_shell.hpp"
 
@@ -21,8 +21,8 @@
 #include "ui/theme/theme.hpp"
 #include "ui/theme/theme_tokens.hpp"
 
-namespace genie::ui {
-namespace settings_ui = ::genie::ui::theme;
+namespace minimize::ui {
+namespace settings_ui = ::minimize::ui::theme;
 using theme::WithAlpha;
 
 void SettingsShell::Render(SettingsWindow& window) {
@@ -490,4 +490,4 @@ void SettingsShell::Render(SettingsWindow& window) {
   ImGui::End();
 }
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

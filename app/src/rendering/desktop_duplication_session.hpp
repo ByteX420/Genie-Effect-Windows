@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <wrl/client.h>
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 class D3dDevice;
 
@@ -47,4 +47,4 @@ private:
   bool device_lost_ = false;
 };
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

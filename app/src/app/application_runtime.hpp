@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <atomic>
 #include <chrono>
@@ -38,7 +38,7 @@
 #include "settings/settings_service.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::app {
+namespace minimize::app {
 
 class ApplicationRuntime : public ui::SettingsActions {
 public:
@@ -62,7 +62,7 @@ public:
   bool SetCustomEasingBezier(bool is_minimize, animation::CubicBezier bezier, bool save) override;
   bool SetAnimationStyle(const std::string& style) override;
   bool SetQualityMode(const std::string& mode) override;
-  bool SetGenieStrength(float strength, bool save) override;
+  bool SetMinimizeStrength(float strength, bool save) override;
   bool SetFadeStrength(const std::string& strength) override;
   bool ResetMotionSettings() override;
   bool SetTargetIndicator(bool enabled) override;
@@ -70,8 +70,8 @@ public:
   bool SetCloseBehavior(const std::string& close_behavior) override;
   bool SetStartupOptions(bool run_at_startup, bool start_minimized) override;
   bool SetApplicationExcluded(const std::string& executable_name, bool excluded) override;
-  bool SetWindowGenieExcluded(HWND window, bool excluded) override;
-  bool SetDisplayGenieExcluded(const std::string& device_name, bool excluded) override;
+  bool SetWindowMinimizeExcluded(HWND window, bool excluded) override;
+  bool SetDisplayMinimizeExcluded(const std::string& device_name, bool excluded) override;
   [[nodiscard]] features::OpenWindowsSnapshot GetOpenWindowsSnapshot() override;
   bool FocusOpenWindow(HWND window) override;
   ui::SettingsFileOperationResult ExportSettings() override;
@@ -105,7 +105,7 @@ private:
   bool OnMinimizeStart(HWND window);
   bool OnRestoreAttempt(HWND window);
   void FinishActiveAnimation(int run_index);
-  void RestoreWindowFromGenieState(HWND window, bool force_show_if_iconic = true);
+  void RestoreWindowFromMinimizeState(HWND window, bool force_show_if_iconic = true);
   void UpdateTemporaryPause();
   void RegisterConfiguredHotkeys();
   void UnregisterAllHotkeys();
@@ -158,24 +158,24 @@ private:
   std::string startup_repair_status_ = "Not checked";
   // Defer startup iconic capture until settings enter motion (shell/sidebar/page) finishes.
   bool seed_iconic_snapshots_pending_ = false;
-  genie::settings::SettingsService settings_service_;
-  genie::features::HotkeyController hotkey_controller_{settings_service_, hotkey_manager_};
-  genie::features::SettingsMutationService settings_mutations_{settings_service_};
-  genie::features::EffectPolicy effect_policy_;
-  genie::features::AnimationConfiguration animation_configuration_{settings_service_,
+  minimize::settings::SettingsService settings_service_;
+  minimize::features::HotkeyController hotkey_controller_{settings_service_, hotkey_manager_};
+  minimize::features::SettingsMutationService settings_mutations_{settings_service_};
+  minimize::features::EffectPolicy effect_policy_;
+  minimize::features::AnimationConfiguration animation_configuration_{settings_service_,
                                                                    effect_policy_};
-  genie::features::DiagnosticsService diagnostics_service_;
-  genie::features::PauseController pause_controller_;
-  genie::features::WindowRecoveryService window_recovery_service_{snapshot_cache_};
-  genie::features::WindowExclusionService window_exclusion_service_;
-  genie::features::OpenWindowsService open_windows_service_{window_exclusion_service_};
-  genie::features::MinimizeFeature minimize_feature_{effect_policy_, window_recovery_service_,
+  minimize::features::DiagnosticsService diagnostics_service_;
+  minimize::features::PauseController pause_controller_;
+  minimize::features::WindowRecoveryService window_recovery_service_{snapshot_cache_};
+  minimize::features::WindowExclusionService window_exclusion_service_;
+  minimize::features::OpenWindowsService open_windows_service_{window_exclusion_service_};
+  minimize::features::MinimizeFeature minimize_feature_{effect_policy_, window_recovery_service_,
                                                      runs_, snapshot_cache_,
                                                      window_exclusion_service_};
-  genie::features::RestoreFeature restore_feature_{
+  minimize::features::RestoreFeature restore_feature_{
       effect_policy_, window_recovery_service_, snapshot_cache_, runs_, minimize_feature_,
       window_exclusion_service_};
-  genie::features::EffectController effect_controller_{effect_policy_, pause_controller_,
+  minimize::features::EffectController effect_controller_{effect_policy_, pause_controller_,
                                                        minimize_feature_, restore_feature_};
   std::atomic<bool> shutting_down_{false};
   std::atomic<bool> cleaned_up_{false};
@@ -183,4 +183,4 @@ private:
   MessageLoop message_loop_;
 };
 
-}  // namespace genie::app
+}  // namespace minimize::app

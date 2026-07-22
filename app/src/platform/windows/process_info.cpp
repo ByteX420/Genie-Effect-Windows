@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/process_info.hpp"
 
@@ -8,7 +8,7 @@
 
 #pragma comment(lib, "version.lib")
 
-namespace genie::platform {
+namespace minimize::platform {
 namespace {
 
 std::string WideToUtf8(std::wstring_view value) {
@@ -133,4 +133,4 @@ std::string ExecutableProductVersion() {
                     : std::format("{}.{}.{}.{}", major, minor, patch, build);
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

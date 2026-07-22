@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "runtime/snapshot_cache.hpp"
 
@@ -7,7 +7,7 @@
 
 #include "platform/windows/process_info.hpp"
 
-namespace genie::runtime {
+namespace minimize::runtime {
 
 const CachedSnapshot* SnapshotCache::FindBest(HWND window) const {
   const auto restore = restore_.find(window);
@@ -55,4 +55,4 @@ SnapshotCache::Contents SnapshotCache::TakeAll() {
   return contents;
 }
 
-}  // namespace genie::runtime
+}  // namespace minimize::runtime

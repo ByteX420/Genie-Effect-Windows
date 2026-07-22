@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include <algorithm>
 #include <array>
@@ -24,7 +24,7 @@
 #include "platform/windows/window_state.hpp"
 #include "settings/exclusion_rules.hpp"
 
-namespace genie::app {
+namespace minimize::app {
 
 bool ApplicationRuntime::SetEnabled(bool enabled) {
   const bool result = settings_mutations_.SetEnabled(enabled, [this] {
@@ -57,8 +57,8 @@ void ApplicationRuntime::RegisterConfiguredHotkeys() {
   });
 }
 
-ui::HotkeyUpdateResult ApplicationRuntime::SetHotkey(genie::settings::HotkeyAction action,
-                                                     genie::settings::HotkeyBinding binding) {
+ui::HotkeyUpdateResult ApplicationRuntime::SetHotkey(minimize::settings::HotkeyAction action,
+                                                     minimize::settings::HotkeyBinding binding) {
   const auto result = hotkey_controller_.Replace(
       action, binding, [this](settings::HotkeyAction changed_action, bool available) {
         settings_window_.SetHotkeyRegistrationStatus(changed_action, available);
@@ -69,18 +69,18 @@ ui::HotkeyUpdateResult ApplicationRuntime::SetHotkey(genie::settings::HotkeyActi
   return result;
 }
 
-void ApplicationRuntime::ExecuteHotkeyAction(genie::settings::HotkeyAction action) {
+void ApplicationRuntime::ExecuteHotkeyAction(minimize::settings::HotkeyAction action) {
   switch (action) {
-    case genie::settings::HotkeyAction::kToggleEffect:
+    case minimize::settings::HotkeyAction::kToggleEffect:
       (void)SetEnabled(!settings_service_.Get().enabled);
       break;
-    case genie::settings::HotkeyAction::kOpenSettings:
+    case minimize::settings::HotkeyAction::kOpenSettings:
       settings_window_.Show(true);
       break;
-    case genie::settings::HotkeyAction::kRepairWindows:
+    case minimize::settings::HotkeyAction::kRepairWindows:
       HealLeftoverWindows();
       break;
-    case genie::settings::HotkeyAction::kCount:
+    case minimize::settings::HotkeyAction::kCount:
       break;
   }
 }
@@ -182,8 +182,8 @@ bool ApplicationRuntime::SetQualityMode(const std::string& mode) {
   return result;
 }
 
-bool ApplicationRuntime::SetGenieStrength(float strength, bool save) {
-  const bool result = settings_mutations_.SetGenieStrength(strength, save);
+bool ApplicationRuntime::SetMinimizeStrength(float strength, bool save) {
+  const bool result = settings_mutations_.SetMinimizeStrength(strength, save);
   settings_window_.UpdateState(settings_service_.Get());
   return result;
 }
@@ -235,7 +235,7 @@ bool ApplicationRuntime::SetApplicationExcluded(const std::string& executable_na
   return result;
 }
 
-bool ApplicationRuntime::SetWindowGenieExcluded(HWND window, bool excluded) {
+bool ApplicationRuntime::SetWindowMinimizeExcluded(HWND window, bool excluded) {
   if (window == nullptr || !IsWindow(window)) return false;
 
   if (excluded) {
@@ -245,7 +245,7 @@ bool ApplicationRuntime::SetWindowGenieExcluded(HWND window, bool excluded) {
     if (run_index != -1) {
       runtime::AnimationRun& run = runs_[run_index];
       const bool was_restoring = run.animating_restore;
-      // Tear down Genie ownership without leaving cloak/transparency behind.
+      // Tear down Minimize ownership without leaving cloak/transparency behind.
       if (run.state != runtime::RunState::kIdle) {
         SetRunState(run_index, runtime::RunState::kCleaningUp);
       }
@@ -271,19 +271,19 @@ bool ApplicationRuntime::SetWindowGenieExcluded(HWND window, bool excluded) {
           snapshot_cache_.Restore().count(window) != 0 ||
           GetPropW(window, platform::windows::properties::kIsMinimizing) != nullptr ||
           GetPropW(window, platform::windows::properties::kMovedOffscreen) != nullptr ||
-          platform::windows::properties::HasGenieState(window);
+          platform::windows::properties::HasMinimizeState(window);
       if (has_state) {
-        // Already minimized by Genie: uncloak/clear props, keep minimized.
+        // Already minimized by Minimize: uncloak/clear props, keep minimized.
         window_recovery_service_.ReleaseWithoutShowing(window, IsIconic(window) == FALSE);
         snapshot_cache_.Restore().erase(window);
         snapshot_cache_.PreMinimize().erase(window);
       }
     }
     platform::SetDwmTransitionsDisabled(window, false);
-    core::LogDebug(L"WindowExclude", L"Per-window Genie disabled for selected window");
+    core::LogDebug(L"WindowExclude", L"Per-window Minimize disabled for selected window");
   } else {
     window_exclusion_service_.SetExcluded(window, false);
-    core::LogDebug(L"WindowExclude", L"Per-window Genie re-enabled for selected window");
+    core::LogDebug(L"WindowExclude", L"Per-window Minimize re-enabled for selected window");
   }
 
   settings_window_.ForceRender();
@@ -306,8 +306,8 @@ bool ApplicationRuntime::FocusOpenWindow(HWND window) {
   return true;
 }
 
-bool ApplicationRuntime::SetDisplayGenieExcluded(const std::string& device_name, bool excluded) {
-  const bool result = settings_mutations_.SetDisplayGenieExcluded(device_name, excluded, [this] {
+bool ApplicationRuntime::SetDisplayMinimizeExcluded(const std::string& device_name, bool excluded) {
+  const bool result = settings_mutations_.SetDisplayMinimizeExcluded(device_name, excluded, [this] {
     window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);
   });
   if (result) {
@@ -427,4 +427,4 @@ ui::SettingsFileOperationResult ApplicationRuntime::ImportSettings() {
   };
 }
 
-}  // namespace genie::app
+}  // namespace minimize::app

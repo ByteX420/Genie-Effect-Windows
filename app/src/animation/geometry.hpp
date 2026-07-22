@@ -1,6 +1,6 @@
-#pragma once
+﻿#pragma once
 
-namespace genie::animation {
+namespace minimize::animation {
 
 struct RectF {
   float left = 0.0f;
@@ -22,4 +22,4 @@ struct SizeF {
   float height = 0.0f;
 };
 
-}  // namespace genie::animation
+}  // namespace minimize::animation

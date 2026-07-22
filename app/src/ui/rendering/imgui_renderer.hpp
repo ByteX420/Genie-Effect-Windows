@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -7,7 +7,7 @@
 
 struct ImFont;
 
-namespace genie::ui::rendering {
+namespace minimize::ui::rendering {
 
 class ImguiRenderer final {
 public:
@@ -60,4 +60,4 @@ private:
   ImFont* title_font_ = nullptr;
 };
 
-}  // namespace genie::ui::rendering
+}  // namespace minimize::ui::rendering

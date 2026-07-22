@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "ui/motion/motion.hpp"
 
-namespace genie::ui::motion {
+namespace minimize::ui::motion {
 
 struct MotionTokens {
   MotionSpec hover_fast;
@@ -30,4 +30,4 @@ struct MotionTokens {
   [[nodiscard]] static MotionTokens Reduced();
 };
 
-}  // namespace genie::ui::motion
+}  // namespace minimize::ui::motion

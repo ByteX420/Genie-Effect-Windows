@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <windows.h>
@@ -8,7 +8,7 @@
 #include "features/open_windows_service.hpp"
 #include "settings/hotkey_binding.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 
 enum class TemporaryPauseAction {
   kResume,
@@ -51,7 +51,7 @@ public:
   virtual bool SetCustomEasingBezier(bool minimize, animation::CubicBezier bezier, bool save) = 0;
   virtual bool SetAnimationStyle(const std::string& style) = 0;
   virtual bool SetQualityMode(const std::string& mode) = 0;
-  virtual bool SetGenieStrength(float strength, bool save) = 0;
+  virtual bool SetMinimizeStrength(float strength, bool save) = 0;
   virtual bool SetFadeStrength(const std::string& strength) = 0;
   virtual bool ResetMotionSettings() = 0;
   virtual bool SetTargetIndicator(bool enabled) = 0;
@@ -59,10 +59,10 @@ public:
   virtual bool SetCloseBehavior(const std::string& behavior) = 0;
   virtual bool SetStartupOptions(bool run_at_startup, bool start_minimized) = 0;
   virtual bool SetApplicationExcluded(const std::string& executable, bool excluded) = 0;
-  // Session per-window Genie disable (HWND + PID; not exe-wide).
-  virtual bool SetWindowGenieExcluded(HWND window, bool excluded) = 0;
-  // Persisted display-device Genie disable (settings.json excludedDisplays).
-  virtual bool SetDisplayGenieExcluded(const std::string& device_name, bool excluded) = 0;
+  // Session per-window Minimize disable (HWND + PID; not exe-wide).
+  virtual bool SetWindowMinimizeExcluded(HWND window, bool excluded) = 0;
+  // Persisted display-device Minimize disable (settings.json excludedDisplays).
+  virtual bool SetDisplayMinimizeExcluded(const std::string& device_name, bool excluded) = 0;
   [[nodiscard]] virtual features::OpenWindowsSnapshot GetOpenWindowsSnapshot() = 0;
   virtual bool FocusOpenWindow(HWND window) = 0;
   virtual SettingsFileOperationResult ExportSettings() = 0;
@@ -77,4 +77,4 @@ public:
   virtual void RequestExit() = 0;
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

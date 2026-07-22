@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/native_animation_blocker.hpp"
 
@@ -6,7 +6,7 @@
 
 #include "platform/windows/window_state.hpp"
 
-namespace genie::platform {
+namespace minimize::platform {
 
 NativeAnimationBlocker::~NativeAnimationBlocker() { Disable(); }
 
@@ -44,4 +44,4 @@ void NativeAnimationBlocker::SetTransitionsDisabledForWindow(HWND window, bool d
   blocked_windows_.erase(window);
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

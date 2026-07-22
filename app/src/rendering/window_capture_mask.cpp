@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/window_capture_mask.hpp"
 
@@ -6,7 +6,7 @@
 #include <cmath>
 #include <dwmapi.h>
 
-namespace genie::rendering::window_capture_mask {
+namespace minimize::rendering::window_capture_mask {
 
 int CornerRadius(HWND window) {
   if (window == nullptr || !IsWindow(window) || IsZoomed(window)) {
@@ -99,4 +99,4 @@ void Apply(std::vector<std::uint8_t>* pixels, int width, int height, int radius,
   }
 }
 
-}  // namespace genie::rendering::window_capture_mask
+}  // namespace minimize::rendering::window_capture_mask

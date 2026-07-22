@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <string>
@@ -7,7 +7,7 @@
 #include "features/diagnostics_service.hpp"
 #include "settings/app_settings.hpp"
 
-namespace genie::ui {
+namespace minimize::ui {
 
 class SettingsViewModel final {
 public:
@@ -31,9 +31,9 @@ public:
   std::string restore_easing = "Linear";
   animation::CubicBezier minimize_custom_bezier = animation::CubicBezier::EaseInOut();
   animation::CubicBezier restore_custom_bezier = animation::CubicBezier::EaseInOut();
-  std::string animation_style = "Gienie classic";
+  std::string animation_style = "Minimize classic";
   std::string quality_mode = "automatic";
-  float genie_strength = 1.0f;
+  float minimize_strength = 1.0f;
   std::string fade_strength = "Subtle";
   bool show_target_indicator = false;
   bool smart_skip_under_load = true;
@@ -43,4 +43,4 @@ public:
   std::vector<std::string> excluded_applications;
 };
 
-}  // namespace genie::ui
+}  // namespace minimize::ui

@@ -1,4 +1,4 @@
-# Build Release x64 and publish/update a GitHub Release when the product version changes.
+﻿# Build Release x64 and publish/update a GitHub Release when the product version changes.
 #
 # Security model (no personal tokens in the repo):
 # - Uses only the job-scoped GITHUB_TOKEN (auto-injected by Actions).
@@ -20,7 +20,7 @@ on:
     paths:
       - "app/MinimizeEffect.rc"
       - "app/MinimizeEffect.vcxproj"
-      - "hook/GenieHook.vcxproj"
+      - "hook/MinimizeHook.vcxproj"
       - ".github/workflows/release.yml"
   workflow_dispatch:
     inputs:

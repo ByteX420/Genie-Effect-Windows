@@ -1,11 +1,11 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "core/environment.hpp"
 
 #include <array>
 #include <string>
 
-namespace genie::core {
+namespace minimize::core {
 
 bool EnvironmentFlagEnabled(std::string_view name) {
   if (name.empty()) {
@@ -23,4 +23,4 @@ bool EnvironmentFlagEnabled(std::string_view name) {
          value[0] == 'T';
 }
 
-}  // namespace genie::core
+}  // namespace minimize::core

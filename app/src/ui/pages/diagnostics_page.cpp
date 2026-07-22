@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "ui/pages/diagnostics_page.hpp"
 
@@ -9,7 +9,7 @@
 #include "ui/components/controls.hpp"
 #include "ui/settings_window.hpp"
 
-namespace genie::ui::pages {
+namespace minimize::ui::pages {
 namespace {
 
 constexpr float kPageTitleTextSize = 22.0f;
@@ -18,13 +18,13 @@ constexpr float kLabelTextSize = 15.0f;
 constexpr float kValueTextSize = 13.0f;
 constexpr float kHelperTextSize = 13.0f;
 constexpr float kCaptionTextSize = 12.0f;
-constexpr ImU32 kPrimaryTextColor = ::genie::ui::theme::kText;
-constexpr ImU32 kSecondaryTextColor = ::genie::ui::theme::kMutedText;
+constexpr ImU32 kPrimaryTextColor = ::minimize::ui::theme::kText;
+constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 
 }  // namespace
 
-void DiagnosticsPage::Render(::genie::ui::SettingsWindow& window, components::PageLayout& layout,
-                             const ::genie::ui::motion::MotionContext& motion, float scale,
+void DiagnosticsPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
+                             const ::minimize::ui::motion::MotionContext& motion, float scale,
                              float alpha) {
   const ULONGLONG now = GetTickCount64();
   auto& diagnostics = window.controller_->view_model().diagnostics;
@@ -36,7 +36,7 @@ void DiagnosticsPage::Render(::genie::ui::SettingsWindow& window, components::Pa
   layout.Title(window.font_title_, kPageTitleTextSize, "Repair", window.font_small_,
                kPageSubtitleTextSize, "Status, recovery tools, and system info");
   const auto status_row = [&](const char* title, const std::string& value) {
-    layout.BeginRow(::genie::ui::theme::Metrics::kRowHeight);
+    layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
     layout.ReserveControl(layout.content_width() * 0.55f);
     layout.RowTitle(window.font_body_, kLabelTextSize, title, kPrimaryTextColor);
     layout.RowValue(window.font_small_, kValueTextSize, value.c_str(), kSecondaryTextColor);
@@ -79,12 +79,12 @@ void DiagnosticsPage::Render(::genie::ui::SettingsWindow& window, components::Pa
                  features::DiagnosticsAction::kRestartRenderer},
   };
   const float button_width = 108.0f * scale;
-  const float button_height = ::genie::ui::theme::Metrics::kButtonHeight * scale;
+  const float button_height = ::minimize::ui::theme::Metrics::kButtonHeight * scale;
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "TOOLS");
   layout.BeginGroup();
   for (size_t index = 0; index < actions.size(); ++index) {
     const auto& [title, helper, action] = actions[index];
-    layout.BeginRow(::genie::ui::theme::Metrics::kRowHeightTall);
+    layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
     layout.ReserveControl(button_width);
     layout.RowTitle(window.font_body_, kLabelTextSize, title, kPrimaryTextColor);
     layout.RowSubtitle(window.font_small_, kHelperTextSize, helper, kSecondaryTextColor);
@@ -111,9 +111,9 @@ void DiagnosticsPage::Render(::genie::ui::SettingsWindow& window, components::Pa
   ImGui::GetWindowDrawList()->AddText(
       window.font_small_, window.font_small_->FontSize,
       ImVec2(std::floor(position.x + 0.5f), std::floor(position.y + 0.5f)),
-      ::genie::ui::theme::WithAlpha(kSecondaryTextColor, alpha),
+      ::minimize::ui::theme::WithAlpha(kSecondaryTextColor, alpha),
       window.diagnostics_feedback_.c_str());
   layout.Gap(18.0f);
 }
 
-}  // namespace genie::ui::pages
+}  // namespace minimize::ui::pages

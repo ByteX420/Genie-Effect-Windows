@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <functional>
 #include <windows.h>
 
-namespace genie::platform {
+namespace minimize::platform {
 
 class WindowEventMonitor {
 public:
@@ -45,4 +45,4 @@ private:
   static WindowEventMonitor* active_monitor_;
 };
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

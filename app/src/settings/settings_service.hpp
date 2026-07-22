@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 
 #include "settings/settings_repository.hpp"
 
-namespace genie::settings {
+namespace minimize::settings {
 
 class SettingsService final {
 public:
@@ -18,4 +18,4 @@ private:
   AppSettings settings_;
 };
 
-}  // namespace genie::settings
+}  // namespace minimize::settings

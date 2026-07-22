@@ -1,11 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
 #include <memory>
 #include <wrl/client.h>
 
-namespace genie::rendering {
+namespace minimize::rendering {
 
 class D3dDevice {
 public:
@@ -31,4 +31,4 @@ private:
   Microsoft::WRL::ComPtr<IDXGIFactory2> factory_;
 };
 
-}  // namespace genie::rendering
+}  // namespace minimize::rendering

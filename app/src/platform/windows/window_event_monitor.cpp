@@ -1,4 +1,4 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "platform/windows/window_event_monitor.hpp"
 
@@ -7,7 +7,7 @@
 
 #include "core/logger.hpp"
 
-namespace genie::platform {
+namespace minimize::platform {
 namespace {
 
 std::wstring EventName(DWORD event) {
@@ -81,10 +81,10 @@ bool WindowEventMonitor::Start(WindowCallback minimize_start_callback,
   wc.cbSize = sizeof(wc);
   wc.lpfnWndProc = &WindowEventMonitor::MessageWindowProc;
   wc.hInstance = GetModuleHandle(nullptr);
-  wc.lpszClassName = L"GenieShellHookWindow";
+  wc.lpszClassName = L"MinimizeShellHookWindow";
   RegisterClassExW(&wc);
 
-  message_window_ = CreateWindowExW(0, L"GenieShellHookWindow", L"", 0, 0, 0, 0, 0, HWND_MESSAGE,
+  message_window_ = CreateWindowExW(0, L"MinimizeShellHookWindow", L"", 0, 0, 0, 0, 0, HWND_MESSAGE,
                                     nullptr, wc.hInstance, nullptr);
   if (message_window_) {
     RegisterShellHookWindow(message_window_);
@@ -94,13 +94,13 @@ bool WindowEventMonitor::Start(WindowCallback minimize_start_callback,
   if (minimize_hook_ == nullptr || restore_hook_ == nullptr || show_hook_ == nullptr ||
       foreground_hook_ == nullptr || state_change_hook_ == nullptr) {
     std::wcerr << L"SetWinEventHook failed.\n";
-    genie::core::LogDebug(L"WinEvent",
+    minimize::core::LogDebug(L"WinEvent",
                           L"SetWinEventHook failed error=" + std::to_wstring(GetLastError()));
     Stop();
     return false;
   }
 
-  genie::core::LogDebug(L"WinEvent", L"Started WinEvent hooks and shell hook window");
+  minimize::core::LogDebug(L"WinEvent", L"Started WinEvent hooks and shell hook window");
   return true;
 }
 
@@ -155,14 +155,14 @@ LRESULT CALLBACK WindowEventMonitor::MessageWindowProc(HWND hwnd, UINT msg, WPAR
 }
 
 void WindowEventMonitor::HandleMinimizeStart(HWND window) {
-  genie::core::LogTrace(L"WinEvent", L"HandleMinimizeStart " + WindowBrief(window));
+  minimize::core::LogTrace(L"WinEvent", L"HandleMinimizeStart " + WindowBrief(window));
   if (minimize_start_callback_) {
     minimize_start_callback_(window);
   }
 }
 
 void WindowEventMonitor::HandleRestoreStart(HWND window) {
-  genie::core::LogTrace(L"WinEvent", L"HandleRestoreStart " + WindowBrief(window));
+  minimize::core::LogTrace(L"WinEvent", L"HandleRestoreStart " + WindowBrief(window));
   if (restore_start_callback_) {
     restore_start_callback_(window);
   }
@@ -175,19 +175,19 @@ LRESULT WindowEventMonitor::OnShellMessage(UINT msg, WPARAM w_param, LPARAM l_pa
       const auto* info = reinterpret_cast<const SHELLHOOKINFO*>(l_param);
       if (info != nullptr) {
         HWND window = info->hwnd;
-        genie::core::LogTrace(L"WinEvent", L"ShellHook HSHELL_GETMINRECT " + WindowBrief(window));
+        minimize::core::LogTrace(L"WinEvent", L"ShellHook HSHELL_GETMINRECT " + WindowBrief(window));
         WINDOWPLACEMENT wp{};
         wp.length = sizeof(wp);
         if (GetWindowPlacement(window, &wp)) {
           if (wp.showCmd == SW_SHOWMINIMIZED || wp.showCmd == SW_MINIMIZE || IsIconic(window)) {
             HandleMinimizeStart(window);
           } else {
-            genie::core::LogTrace(L"WinEvent",
+            minimize::core::LogTrace(L"WinEvent",
                                   L"ShellHook ignored because window is not minimized showCmd=" +
                                       std::to_wstring(wp.showCmd) + L" " + WindowBrief(window));
           }
         } else {
-          genie::core::LogTrace(L"WinEvent", L"ShellHook GetWindowPlacement failed error=" +
+          minimize::core::LogTrace(L"WinEvent", L"ShellHook GetWindowPlacement failed error=" +
                                                  std::to_wstring(GetLastError()) + L" " +
                                                  WindowBrief(window));
         }
@@ -199,11 +199,11 @@ LRESULT WindowEventMonitor::OnShellMessage(UINT msg, WPARAM w_param, LPARAM l_pa
 
 void WindowEventMonitor::OnWinEvent(DWORD event, HWND window, LONG object_id, LONG child_id) {
   if (window == nullptr) {
-    genie::core::LogTrace(L"WinEvent", L"OnWinEvent ignored null window event=" + EventName(event));
+    minimize::core::LogTrace(L"WinEvent", L"OnWinEvent ignored null window event=" + EventName(event));
     return;
   }
 
-  genie::core::LogTrace(L"WinEvent", L"OnWinEvent event=" + EventName(event) + L" object_id=" +
+  minimize::core::LogTrace(L"WinEvent", L"OnWinEvent event=" + EventName(event) + L" object_id=" +
                                          std::to_wstring(object_id) + L" child_id=" +
                                          std::to_wstring(child_id) + L" " + WindowBrief(window));
 
@@ -218,7 +218,7 @@ void WindowEventMonitor::OnWinEvent(DWORD event, HWND window, LONG object_id, LO
   }
 
   if (object_id != OBJID_WINDOW || child_id != CHILDID_SELF) {
-    genie::core::LogTrace(L"WinEvent", L"OnWinEvent ignored non-window object event=" +
+    minimize::core::LogTrace(L"WinEvent", L"OnWinEvent ignored non-window object event=" +
                                            EventName(event) + L" object_id=" +
                                            std::to_wstring(object_id) + L" child_id=" +
                                            std::to_wstring(child_id) + L" " + WindowBrief(window));
@@ -226,10 +226,10 @@ void WindowEventMonitor::OnWinEvent(DWORD event, HWND window, LONG object_id, LO
   }
 
   if (window_seen_callback_) {
-    genie::core::LogTrace(L"WinEvent", L"OnWinEvent dispatch window_seen event=" +
+    minimize::core::LogTrace(L"WinEvent", L"OnWinEvent dispatch window_seen event=" +
                                            EventName(event) + L" " + WindowBrief(window));
     window_seen_callback_(window, event);
   }
 }
 
-}  // namespace genie::platform
+}  // namespace minimize::platform

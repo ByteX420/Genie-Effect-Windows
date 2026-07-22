@@ -1,8 +1,8 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "app/message_loop.hpp"
 
-namespace genie::app {
+namespace minimize::app {
 
 int MessageLoop::Run(const MessageLoopCallbacks& callbacks) const {
   MSG message{};
@@ -35,4 +35,4 @@ int MessageLoop::Run(const MessageLoopCallbacks& callbacks) const {
   return static_cast<int>(message.wParam);
 }
 
-}  // namespace genie::app
+}  // namespace minimize::app

@@ -1,10 +1,10 @@
-#include "pch.hpp"
+﻿#include "pch.hpp"
 
 #include "rendering/capture_geometry.hpp"
 
 #include <algorithm>
 
-namespace genie::rendering::capture_geometry {
+namespace minimize::rendering::capture_geometry {
 
 int Width(const RECT& rect) { return static_cast<int>(rect.right - rect.left); }
 
@@ -19,4 +19,4 @@ RECT ClampToOutput(const RECT& rect, const RECT& output_rect) {
   };
 }
 
-}  // namespace genie::rendering::capture_geometry
+}  // namespace minimize::rendering::capture_geometry
