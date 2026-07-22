@@ -1,4 +1,4 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "platform/windows/taskbar_target_provider.hpp"
 
@@ -130,9 +130,27 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
   std::wstring description_lower = ToLower(process_description);
   std::vector<std::wstring> description_tokens = Tokenize(process_description);
 
-  // 2. Find the taskbar window corresponding to the window
-  HWND taskbar_hwnd = FindTaskbarWindowForRect(window_rect);
-  if (taskbar_hwnd == nullptr) {
+  HWND root_owner = GetAncestor(window, GA_ROOTOWNER);
+  if (root_owner == nullptr) root_owner = window;
+
+  // 2. Collect all taskbar windows (Primary + Secondary taskbars)
+  std::vector<HWND> taskbar_windows;
+  HWND primary_tb = FindTaskbarWindowForRect(window_rect);
+  if (primary_tb != nullptr) {
+    taskbar_windows.push_back(primary_tb);
+  }
+  HWND main_tb = FindWindowW(L"Shell_TrayWnd", nullptr);
+  if (main_tb != nullptr && std::find(taskbar_windows.begin(), taskbar_windows.end(), main_tb) == taskbar_windows.end()) {
+    taskbar_windows.push_back(main_tb);
+  }
+  HWND sec_tb = nullptr;
+  while ((sec_tb = FindWindowExW(nullptr, sec_tb, L"Shell_SecondaryTrayWnd", nullptr)) != nullptr) {
+    if (std::find(taskbar_windows.begin(), taskbar_windows.end(), sec_tb) == taskbar_windows.end()) {
+      taskbar_windows.push_back(sec_tb);
+    }
+  }
+
+  if (taskbar_windows.empty()) {
     return false;
   }
 
@@ -144,173 +162,205 @@ bool FindTaskbarIconUIAutomation(HWND window, const RECT& window_rect, RECT* out
     return false;
   }
 
-  IUIAutomationElement* taskbar_element = nullptr;
-  hr = automation->ElementFromHandle(taskbar_hwnd, &taskbar_element);
-  if (FAILED(hr) || taskbar_element == nullptr) {
-    automation->Release();
-    return false;
-  }
-
-  // 4. Build Or condition to find Buttons or ListItems or TabItems
-  IUIAutomationCondition* cond_button = nullptr;
-  IUIAutomationCondition* cond_list = nullptr;
-  IUIAutomationCondition* cond_tab = nullptr;
-  IUIAutomationCondition* cond_or1 = nullptr;
-  IUIAutomationCondition* cond_combined = nullptr;
-
-  VARIANT var;
-  VariantInit(&var);
-  var.vt = VT_I4;
-  var.lVal = UIA_ButtonControlTypeId;
-  automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_button);
-
-  var.lVal = UIA_ListItemControlTypeId;
-  automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_list);
-
-  var.lVal = UIA_TabItemControlTypeId;
-  automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_tab);
-
-  if (cond_button && cond_list) {
-    automation->CreateOrCondition(cond_button, cond_list, &cond_or1);
-  } else if (cond_button) {
-    cond_or1 = cond_button;
-    cond_button->AddRef();
-  }
-
-  if (cond_or1 && cond_tab) {
-    automation->CreateOrCondition(cond_or1, cond_tab, &cond_combined);
-  } else if (cond_or1) {
-    cond_combined = cond_or1;
-    cond_or1->AddRef();
-  }
-
-  if (cond_button) cond_button->Release();
-  if (cond_list) cond_list->Release();
-  if (cond_tab) cond_tab->Release();
-  if (cond_or1) cond_or1->Release();
-
-  if (cond_combined == nullptr) {
-    taskbar_element->Release();
-    automation->Release();
-    return false;
-  }
-
-  IUIAutomationElementArray* elements = nullptr;
-  hr = taskbar_element->FindAll(TreeScope_Subtree, cond_combined, &elements);
-  cond_combined->Release();
-
-  if (FAILED(hr) || elements == nullptr) {
-    taskbar_element->Release();
-    automation->Release();
-    return false;
-  }
-
-  int length = 0;
-  elements->get_Length(&length);
-
   int best_score = -1;
   RECT best_rect{};
 
-  for (int i = 0; i < length; ++i) {
-    IUIAutomationElement* el = nullptr;
-    elements->GetElement(i, &el);
-    if (el == nullptr) continue;
-
-    BSTR name = nullptr;
-    RECT rect{};
-    el->get_CurrentName(&name);
-    el->get_CurrentBoundingRectangle(&rect);
-
-    std::wstring btn_name = name ? name : L"";
-    if (name) SysFreeString(name);
-
-    // Filter out items with invalid bounding boxes
-    if (rect.right <= rect.left || rect.bottom <= rect.top) {
-      el->Release();
+  for (HWND tb_hwnd : taskbar_windows) {
+    IUIAutomationElement* taskbar_element = nullptr;
+    hr = automation->ElementFromHandle(tb_hwnd, &taskbar_element);
+    if (FAILED(hr) || taskbar_element == nullptr) {
       continue;
     }
 
-    std::wstring btn_name_lower = ToLower(btn_name);
-    std::vector<std::wstring> btn_tokens = Tokenize(btn_name);
+    // 4. Build Or condition to find Buttons, ListItems, TabItems, Panes, Groups, or Custom controls
+    IUIAutomationCondition* cond_button = nullptr;
+    IUIAutomationCondition* cond_list = nullptr;
+    IUIAutomationCondition* cond_tab = nullptr;
+    IUIAutomationCondition* cond_pane = nullptr;
+    IUIAutomationCondition* cond_or1 = nullptr;
+    IUIAutomationCondition* cond_or2 = nullptr;
+    IUIAutomationCondition* cond_combined = nullptr;
 
-    // Compute match score
-    int score = 0;
-    if (!btn_name_lower.empty()) {
-      if (!title.empty() && btn_name_lower == title) {
-        score = 100;
-      } else if (!process_no_ext.empty() && btn_name_lower == process_no_ext) {
-        score = 95;
-      } else if (!description_lower.empty() && btn_name_lower == description_lower) {
-        score = 93;
-      } else if (!title.empty() && title.find(btn_name_lower) != std::wstring::npos) {
-        score = 90;
-      } else if (!title.empty() && btn_name_lower.find(title) != std::wstring::npos) {
-        score = 85;
-      } else if (!description_lower.empty() &&
-                 description_lower.find(btn_name_lower) != std::wstring::npos) {
-        score = 83;
-      } else if (!description_lower.empty() &&
-                 btn_name_lower.find(description_lower) != std::wstring::npos) {
-        score = 82;
-      } else if (!process_no_ext.empty() &&
-                 btn_name_lower.find(process_no_ext) != std::wstring::npos) {
-        score = 80;
-      } else if (!process_no_ext.empty() &&
-                 process_no_ext.find(btn_name_lower) != std::wstring::npos) {
-        score = 75;
-      } else {
-        // Token overlapping
-        int token_matches = 0;
-        for (const auto& bt : btn_tokens) {
-          if (bt.length() < 2) continue;
-          if (bt == L"the" || bt == L"and" || bt == L"new" || bt == L"tab" || bt == L"window")
-            continue;
+    VARIANT var;
+    VariantInit(&var);
+    var.vt = VT_I4;
 
-          if (!title.empty() &&
-              std::find(title_tokens.begin(), title_tokens.end(), bt) != title_tokens.end()) {
-            token_matches++;
-          }
-          if (!process_no_ext.empty() &&
-              std::find(process_tokens.begin(), process_tokens.end(), bt) != process_tokens.end()) {
-            token_matches += 2;
-          }
-          if (!description_lower.empty() &&
-              std::find(description_tokens.begin(), description_tokens.end(), bt) !=
-                  description_tokens.end()) {
-            token_matches += 2;
-          }
+    var.lVal = UIA_ButtonControlTypeId;
+    automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_button);
+
+    var.lVal = UIA_ListItemControlTypeId;
+    automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_list);
+
+    var.lVal = UIA_TabItemControlTypeId;
+    automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_tab);
+
+    var.lVal = UIA_PaneControlTypeId;
+    automation->CreatePropertyCondition(UIA_ControlTypePropertyId, var, &cond_pane);
+
+    if (cond_button && cond_list) {
+      automation->CreateOrCondition(cond_button, cond_list, &cond_or1);
+    } else if (cond_button) {
+      cond_or1 = cond_button;
+      cond_button->AddRef();
+    }
+
+    if (cond_or1 && cond_tab) {
+      automation->CreateOrCondition(cond_or1, cond_tab, &cond_or2);
+    } else if (cond_or1) {
+      cond_or2 = cond_or1;
+      cond_or1->AddRef();
+    }
+
+    if (cond_or2 && cond_pane) {
+      automation->CreateOrCondition(cond_or2, cond_pane, &cond_combined);
+    } else if (cond_or2) {
+      cond_combined = cond_or2;
+      cond_or2->AddRef();
+    }
+
+    if (cond_button) cond_button->Release();
+    if (cond_list) cond_list->Release();
+    if (cond_tab) cond_tab->Release();
+    if (cond_pane) cond_pane->Release();
+    if (cond_or1) cond_or1->Release();
+    if (cond_or2) cond_or2->Release();
+
+    if (cond_combined == nullptr) {
+      taskbar_element->Release();
+      continue;
+    }
+
+    IUIAutomationElementArray* elements = nullptr;
+    hr = taskbar_element->FindAll(TreeScope_Subtree, cond_combined, &elements);
+    cond_combined->Release();
+
+    if (FAILED(hr) || elements == nullptr) {
+      taskbar_element->Release();
+      continue;
+    }
+
+    int length = 0;
+    elements->get_Length(&length);
+
+    for (int i = 0; i < length; ++i) {
+      IUIAutomationElement* el = nullptr;
+      elements->GetElement(i, &el);
+      if (el == nullptr) continue;
+
+      BSTR name = nullptr;
+      RECT rect{};
+      el->get_CurrentName(&name);
+      el->get_CurrentBoundingRectangle(&rect);
+
+      std::wstring btn_name = name ? name : L"";
+      if (name) SysFreeString(name);
+
+      // Filter out items with invalid bounding boxes
+      if (rect.right <= rect.left || rect.bottom <= rect.top) {
+        el->Release();
+        continue;
+      }
+
+      int score = 0;
+
+      // Check NativeWindowHandle for 100% exact HWND match
+      UIA_HWND el_hwnd = nullptr;
+      if (SUCCEEDED(el->get_CurrentNativeWindowHandle(&el_hwnd)) && el_hwnd != nullptr) {
+        HWND item_hwnd = reinterpret_cast<HWND>(el_hwnd);
+        if (item_hwnd == window || item_hwnd == root_owner || GetAncestor(item_hwnd, GA_ROOTOWNER) == root_owner) {
+          score = 1000;
         }
-        if (token_matches > 0) {
-          score = 50 + token_matches * 5;
-        } else {
-          // Class matching fallback
-          for (const auto& bt : btn_tokens) {
-            if (bt.length() < 3) continue;
-            if (class_name.find(bt) != std::wstring::npos) {
-              score = 40;
-              break;
+      }
+
+      if (score < 1000) {
+        std::wstring btn_name_lower = ToLower(btn_name);
+        std::vector<std::wstring> btn_tokens = Tokenize(btn_name);
+
+        if (!btn_name_lower.empty()) {
+          if (!title.empty() && btn_name_lower == title) {
+            score = 100;
+          } else if (!process_no_ext.empty() && btn_name_lower == process_no_ext) {
+            score = 95;
+          } else if (!description_lower.empty() && btn_name_lower == description_lower) {
+            score = 93;
+          } else if (!title.empty() && title.find(btn_name_lower) != std::wstring::npos) {
+            score = 90;
+          } else if (!title.empty() && btn_name_lower.find(title) != std::wstring::npos) {
+            score = 85;
+          } else if (!description_lower.empty() &&
+                     description_lower.find(btn_name_lower) != std::wstring::npos) {
+            score = 83;
+          } else if (!description_lower.empty() &&
+                     btn_name_lower.find(description_lower) != std::wstring::npos) {
+            score = 82;
+          } else if (!process_no_ext.empty() &&
+                     btn_name_lower.find(process_no_ext) != std::wstring::npos) {
+            score = 80;
+          } else if (!process_no_ext.empty() &&
+                     process_no_ext.find(btn_name_lower) != std::wstring::npos) {
+            score = 75;
+          } else {
+            // Token overlapping
+            int token_matches = 0;
+            for (const auto& bt : btn_tokens) {
+              if (bt.length() < 2) continue;
+              if (bt == L"the" || bt == L"and" || bt == L"new" || bt == L"tab" || bt == L"window")
+                continue;
+
+              if (!title.empty() &&
+                  std::find(title_tokens.begin(), title_tokens.end(), bt) != title_tokens.end()) {
+                token_matches++;
+              }
+              if (!process_no_ext.empty() &&
+                  std::find(process_tokens.begin(), process_tokens.end(), bt) != process_tokens.end()) {
+                token_matches += 2;
+              }
+              if (!description_lower.empty() &&
+                  std::find(description_tokens.begin(), description_tokens.end(), bt) !=
+                      description_tokens.end()) {
+                token_matches += 2;
+              }
+            }
+            if (token_matches > 0) {
+              score = 50 + token_matches * 5;
+            } else {
+              // Class matching fallback
+              for (const auto& bt : btn_tokens) {
+                if (bt.length() < 3) continue;
+                if (class_name.find(bt) != std::wstring::npos) {
+                  score = 40;
+                  break;
+                }
+              }
             }
           }
         }
       }
+
+      minimize::core::LogTrace(L"UIAutomation",
+                            L"Checking button: '" + btn_name + L"' rect=" +
+                                std::to_wstring(rect.left) + L"," + std::to_wstring(rect.top) + L"," +
+                                std::to_wstring(rect.right) + L"," + std::to_wstring(rect.bottom) +
+                                L" score=" + std::to_wstring(score));
+
+      if (score > best_score) {
+        best_score = score;
+        best_rect = rect;
+      }
+
+      el->Release();
+      if (best_score >= 1000) {
+        break;
+      }
     }
 
-    minimize::core::LogTrace(L"UIAutomation",
-                          L"Checking button: '" + btn_name + L"' rect=" +
-                              std::to_wstring(rect.left) + L"," + std::to_wstring(rect.top) + L"," +
-                              std::to_wstring(rect.right) + L"," + std::to_wstring(rect.bottom) +
-                              L" score=" + std::to_wstring(score));
-
-    if (score > best_score) {
-      best_score = score;
-      best_rect = rect;
+    elements->Release();
+    taskbar_element->Release();
+    if (best_score >= 1000) {
+      break;
     }
-
-    el->Release();
   }
 
-  elements->Release();
-  taskbar_element->Release();
   automation->Release();
 
   if (best_score > 0) {
