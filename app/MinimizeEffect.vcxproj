@@ -340,7 +340,7 @@
     <ResourceCompile Include="MinimizeEffect.rc" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\minimize_mesh.hlsl" />
+    <None Include="shaders\genie_mesh.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

@@ -511,8 +511,7 @@ bool OverlayWindow::Render(float progress) {
     return false;
   }
   const float eased_progress = animation_renderer_.eased_progress();
-  const bool indices_changed = animation_renderer_.GenerateMesh(static_cast<float>(height_));
-  if (!overlay_renderer_.Render(animation_renderer_.mesh(), indices_changed,
+  if (!overlay_renderer_.Render(animation_renderer_.GenieParameters(width_, height_),
                                 animation_renderer_.texture_view(), render_target_view_.Get(),
                                 width_, height_, animation_renderer_.opacity(eased_progress))) {
     return false;

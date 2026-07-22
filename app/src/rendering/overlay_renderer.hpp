@@ -13,7 +13,7 @@ class OverlayRenderer final {
 public:
   [[nodiscard]] bool Initialize(D3dDevice* device);
   void Shutdown();
-  [[nodiscard]] bool Render(const animation::MinimizeMesh& mesh, bool indices_changed,
+  [[nodiscard]] bool Render(const animation::GenieConstants& genie_constants,
                             ID3D11ShaderResourceView* texture,
                             ID3D11RenderTargetView* render_target, UINT width, UINT height,
                             float opacity);
@@ -21,8 +21,9 @@ public:
 
 private:
   [[nodiscard]] bool CompileShaders();
-  [[nodiscard]] bool UploadMesh(const animation::MinimizeMesh& mesh, bool upload_indices);
-  [[nodiscard]] bool UpdateConstants(UINT width, UINT height, float opacity);
+  [[nodiscard]] bool CreateStaticGrid();
+  [[nodiscard]] bool UpdateConstants(const animation::GenieConstants& genie_constants,
+                                     float opacity);
   void MarkDeviceLost(HRESULT result);
 
   D3dDevice* device_ = nullptr;
@@ -31,7 +32,8 @@ private:
   Microsoft::WRL::ComPtr<ID3D11InputLayout> input_layout_;
   Microsoft::WRL::ComPtr<ID3D11Buffer> vertex_buffer_;
   Microsoft::WRL::ComPtr<ID3D11Buffer> index_buffer_;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> constant_buffer_;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> genie_constant_buffer_;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> pixel_constant_buffer_;
   Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_state_;
   Microsoft::WRL::ComPtr<ID3D11BlendState> blend_state_;
   Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizer_state_;

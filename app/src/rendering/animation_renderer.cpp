@@ -100,10 +100,24 @@ float AnimationRenderer::opacity(float rendered_progress) const {
   return 1.0f - std::clamp(fade_strength_, 0.0f, 0.65f) * std::clamp(progress_, 0.0f, 1.0f);
 }
 
-bool AnimationRenderer::GenerateMesh(float viewport_height) {
-  mesh_generator_.SetStrength(minimize_strength_);
-  return mesh_generator_.GenerateInto(source_, target_, edge_, animation::MinimizeDirection::kMinimize,
-                                      style_, eased_progress(), viewport_height, &reusable_mesh_);
+animation::GenieConstants AnimationRenderer::GenieParameters(UINT viewport_width,
+                                                              UINT viewport_height) const {
+  const float width = static_cast<float>(std::max(viewport_width, 1U));
+  const float height = static_cast<float>(std::max(viewport_height, 1U));
+  return animation::GenieConstants{
+      .source = {.left = source_.left / width,
+                 .top = source_.top / height,
+                 .right = source_.right / width,
+                 .bottom = source_.bottom / height},
+      .target = {.left = target_.left / width,
+                 .top = target_.top / height,
+                 .right = target_.right / width,
+                 .bottom = target_.bottom / height},
+      .progress = eased_progress(),
+      .strength = minimize_strength_,
+      .edge = static_cast<std::uint32_t>(edge_),
+      .style = static_cast<std::uint32_t>(style_),
+  };
 }
 
 }  // namespace minimize::rendering

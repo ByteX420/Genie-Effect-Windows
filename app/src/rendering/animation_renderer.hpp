@@ -19,7 +19,7 @@ public:
   void SetDuration(float seconds) { configured_duration_seconds_ = seconds; }
   void SetEasing(animation::EasingCurve easing, animation::CubicBezier custom);
   void SetStyle(animation::AnimationStyle style) { configured_style_ = style; }
-  void SetMeshSegmentCount(int count) { mesh_generator_.SetLongGridSegmentCount(count); }
+  void SetMeshSegmentCount(int count) { (void)count; }
   void SetMinimizeStrength(float strength) { configured_minimize_strength_ = strength; }
   void SetFadeStrength(float strength) { configured_fade_strength_ = strength; }
 
@@ -41,8 +41,8 @@ public:
   [[nodiscard]] float target_progress() const { return target_progress_; }
   [[nodiscard]] float eased_progress() const;
   [[nodiscard]] float opacity(float rendered_progress) const;
-  [[nodiscard]] bool GenerateMesh(float viewport_height);
-  [[nodiscard]] const animation::MinimizeMesh& mesh() const { return reusable_mesh_; }
+  [[nodiscard]] animation::GenieConstants GenieParameters(UINT viewport_width,
+                                                           UINT viewport_height) const;
   [[nodiscard]] CapturedTexture* mutable_texture() { return &texture_; }
   [[nodiscard]] ID3D11ShaderResourceView* texture_view() const {
     return texture_.shader_resource_view.Get();
@@ -74,8 +74,6 @@ private:
   animation::AnimationStyle configured_style_ = animation::AnimationStyle::kClassic;
   float configured_minimize_strength_ = 1.0f;
   float configured_fade_strength_ = 0.0f;
-  animation::MinimizeMeshGenerator mesh_generator_;
-  animation::MinimizeMesh reusable_mesh_;
 };
 
 }  // namespace minimize::rendering
