@@ -8,13 +8,17 @@
 #include "animation/geometry.hpp"
 #include "rendering/d3d_device.hpp"
 #include "rendering/desktop_duplication_session.hpp"
+#include "rendering/window_visual_metadata.hpp"
 
 namespace minimize::rendering {
 
 struct CapturedTexture {
   Microsoft::WRL::ComPtr<ID3D11Texture2D> texture;
   Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shader_resource_view;
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> mask_texture;
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mask_shader_resource_view;
   minimize::animation::SizeF size;
+  WindowVisualMetadata visual_metadata;
 };
 
 class DesktopCapture {
@@ -24,7 +28,8 @@ public:
   DesktopCapture(const DesktopCapture&) = delete;
   DesktopCapture& operator=(const DesktopCapture&) = delete;
 
-  [[nodiscard]] bool CaptureRegion(const RECT& screen_rect, CapturedTexture* captured_texture);
+  [[nodiscard]] bool CaptureRegion(HWND window, const RECT& screen_rect,
+                                   CapturedTexture* captured_texture);
   [[nodiscard]] bool CaptureWindow(HWND window, const RECT& requested_screen_rect,
                                    CapturedTexture* captured_texture, RECT* captured_screen_rect);
   [[nodiscard]] bool RefreshCapturedTexture(const RECT& screen_rect,
@@ -44,6 +49,10 @@ private:
                                          CapturedTexture* captured_texture);
   [[nodiscard]] bool CopyRegionIntoTexture(OutputCapture* output, const RECT& screen_rect,
                                            CapturedTexture* captured_texture);
+  [[nodiscard]] bool AttachWindowVisuals(
+      HWND window, const RECT& capture_rect, WindowVisualMetadata metadata,
+      CapturedTexture* captured_texture,
+      const std::vector<std::uint8_t>* captured_pixels = nullptr);
   void MarkDeviceLost(const wchar_t* context, HRESULT hr);
 
   D3dDevice* d3d_device_ = nullptr;

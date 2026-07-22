@@ -204,6 +204,9 @@
     <ClCompile Include="src\rendering\window_capture_mask.cpp">
       <Filter>src\rendering</Filter>
     </ClCompile>
+    <ClCompile Include="src\rendering\window_visual_metadata.cpp">
+      <Filter>src\rendering</Filter>
+    </ClCompile>
     <ClCompile Include="src\runtime\animation_run_coordinator.cpp">
       <Filter>src\runtime</Filter>
     </ClCompile>
@@ -482,6 +485,9 @@
     <ClInclude Include="src\rendering\window_capture_mask.hpp">
       <Filter>src\rendering</Filter>
     </ClInclude>
+    <ClInclude Include="src\rendering\window_visual_metadata.hpp">
+      <Filter>src\rendering</Filter>
+    </ClInclude>
     <ClInclude Include="src\runtime\animation_run.hpp">
       <Filter>src\runtime</Filter>
     </ClInclude>
@@ -642,7 +648,7 @@
     <None Include="third_party\imgui\imgui_demo.cpp">
       <Filter>third_party\imgui</Filter>
     </None>
-    <None Include="shaders\minimize_mesh.hlsl">
+    <None Include="shaders\genie_mesh.hlsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

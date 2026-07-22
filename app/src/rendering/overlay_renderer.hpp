@@ -4,6 +4,7 @@
 #include <wrl/client.h>
 
 #include "animation/minimize_mesh.hpp"
+#include "rendering/window_visual_metadata.hpp"
 
 namespace minimize::rendering {
 
@@ -15,6 +16,8 @@ public:
   void Shutdown();
   [[nodiscard]] bool Render(const animation::GenieConstants& genie_constants,
                             ID3D11ShaderResourceView* texture,
+                            ID3D11ShaderResourceView* mask_texture,
+                            const WindowVisualMetadata& visual_metadata,
                             ID3D11RenderTargetView* render_target, UINT width, UINT height,
                             float opacity);
   [[nodiscard]] bool device_lost() const { return device_lost_; }
@@ -24,6 +27,9 @@ private:
   [[nodiscard]] bool CreateStaticGrid();
   [[nodiscard]] bool UpdateConstants(const animation::GenieConstants& genie_constants,
                                      float opacity);
+  [[nodiscard]] bool UpdateVisualConstants(const WindowVisualMetadata& metadata,
+                                           float texture_width, float texture_height,
+                                           float progress, bool render_shadow);
   void MarkDeviceLost(HRESULT result);
 
   D3dDevice* device_ = nullptr;
@@ -34,7 +40,9 @@ private:
   Microsoft::WRL::ComPtr<ID3D11Buffer> index_buffer_;
   Microsoft::WRL::ComPtr<ID3D11Buffer> genie_constant_buffer_;
   Microsoft::WRL::ComPtr<ID3D11Buffer> pixel_constant_buffer_;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> visual_constant_buffer_;
   Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler_state_;
+  Microsoft::WRL::ComPtr<ID3D11SamplerState> mask_sampler_state_;
   Microsoft::WRL::ComPtr<ID3D11BlendState> blend_state_;
   Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizer_state_;
   UINT index_count_ = 0;

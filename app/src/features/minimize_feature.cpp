@@ -191,13 +191,18 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
   auto pre_minimize = snapshots_.PreMinimize().find(window);
   const bool has_cached = pre_minimize != snapshots_.PreMinimize().end() &&
                           pre_minimize->second.texture.shader_resource_view != nullptr;
+  const bool prefer_window_capture = rendering::QueryWindowVisualMetadata(window).is_layered;
   const auto capture_started = std::chrono::steady_clock::now();
   if (already_minimized && has_cached) {
     source_bounds = pre_minimize->second.bounds;
     captured_texture = pre_minimize->second.texture;
+  } else if (!already_minimized && prefer_window_capture &&
+             context.capture->CaptureWindow(window, *animation_bounds, &captured_texture,
+                                            &captured_window_bounds)) {
+    source_bounds = captured_window_bounds;
   } else if (!already_minimized &&
-             context.capture->CaptureRegion(*animation_bounds, &captured_texture)) {
-  } else if (!already_minimized &&
+             context.capture->CaptureRegion(window, *animation_bounds, &captured_texture)) {
+  } else if (!already_minimized && !prefer_window_capture &&
              context.capture->CaptureWindow(window, *animation_bounds, &captured_texture,
                                             &captured_window_bounds)) {
     source_bounds = captured_window_bounds;
@@ -214,8 +219,7 @@ bool MinimizeFeature::Execute(HWND window, const MinimizeExecutionContext& conte
   // Capture cost is known only after this sample — if it was already too slow, abort Minimize
   // for this minimize and latch smart-skip so subsequent events stay native while pressure cools.
   constexpr float kAbortCaptureMs = 28.0f;
-  if (policy_.smart_skip_enabled() && !already_minimized &&
-      capture_duration >= kAbortCaptureMs) {
+  if (policy_.smart_skip_enabled() && !already_minimized && capture_duration >= kAbortCaptureMs) {
     core::LogDebug(L"Minimize", L"Smart-skip: abort after slow capture (" +
                                     std::to_wstring(capture_duration) + L" ms)");
     policy_.NoteSmartSkip(now_ms);
@@ -355,14 +359,23 @@ void MinimizeFeature::UpdatePreMinimizeSnapshot(HWND window, HWND overlay,
   RECT snapshot_bounds = *animation_bounds;
   bool captured = false;
   snapshots_.Prune();
+  const bool prefer_window_capture = rendering::QueryWindowVisualMetadata(window).is_layered;
   auto existing = snapshots_.PreMinimize().find(window);
-  if (existing != snapshots_.PreMinimize().end() &&
+  if (!prefer_window_capture && existing != snapshots_.PreMinimize().end() &&
       EqualRect(&existing->second.bounds, &snapshot_bounds) &&
       existing->second.texture.texture != nullptr) {
     captured_texture = existing->second.texture;
     captured = capture->RefreshCapturedTexture(*animation_bounds, &captured_texture);
   }
-  if (!captured) captured = capture->CaptureRegion(*animation_bounds, &captured_texture);
+  if (!captured && prefer_window_capture) {
+    RECT captured_window_bounds{};
+    captured = capture->CaptureWindow(window, *animation_bounds, &captured_texture,
+                                      &captured_window_bounds);
+    if (captured) snapshot_bounds = captured_window_bounds;
+  }
+  if (!captured) {
+    captured = capture->CaptureRegion(window, *animation_bounds, &captured_texture);
+  }
   if (!captured) {
     RECT captured_window_bounds{};
     if (!capture->CaptureWindow(window, *animation_bounds, &captured_texture,
@@ -390,9 +403,7 @@ void MinimizeFeature::UpdatePreMinimizeSnapshot(HWND window, HWND overlay,
   core::LogTrace(L"Minimize", L"Pre-minimize snapshot updated");
 }
 
-bool MinimizeFeature::SeedSnapshotsInProgress() const {
-  return seed_phase_ != SeedPhase::kIdle;
-}
+bool MinimizeFeature::SeedSnapshotsInProgress() const { return seed_phase_ != SeedPhase::kIdle; }
 
 void MinimizeFeature::CancelSeedSnapshotsForIconicWindows() {
   if (seed_phase_ == SeedPhase::kIdle) return;
@@ -521,7 +532,7 @@ bool MinimizeFeature::TickSeedSnapshotsForIconicWindows() {
   if (ok && IsUsableRect(captured_window_bounds)) {
     bounds = captured_window_bounds;
   } else if (!ok) {
-    ok = seed_capture_->CaptureRegion(bounds, &texture);
+    ok = seed_capture_->CaptureRegion(candidate.window, bounds, &texture);
   }
   if (!ok || texture.shader_resource_view == nullptr) {
     core::LogDebug(L"Minimize", L"Startup seed capture failed for iconic window");

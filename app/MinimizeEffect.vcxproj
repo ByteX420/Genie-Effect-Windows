@@ -169,6 +169,7 @@
     <ClCompile Include="src\rendering\overlay_renderer.cpp" />
     <ClCompile Include="src\rendering\overlay_window.cpp" />
     <ClCompile Include="src\rendering\window_capture_mask.cpp" />
+    <ClCompile Include="src\rendering\window_visual_metadata.cpp" />
     <ClCompile Include="src\runtime\animation_run_coordinator.cpp" />
     <ClCompile Include="src\runtime\animation_run_pool.cpp" />
     <ClCompile Include="src\runtime\effect_runtime_coordinator.cpp" />
@@ -285,6 +286,7 @@
     <ClInclude Include="src\rendering\overlay_renderer.hpp" />
     <ClInclude Include="src\rendering\overlay_window.hpp" />
     <ClInclude Include="src\rendering\window_capture_mask.hpp" />
+    <ClInclude Include="src\rendering\window_visual_metadata.hpp" />
     <ClInclude Include="src\runtime\animation_run.hpp" />
     <ClInclude Include="src\runtime\animation_run_pool.hpp" />
     <ClInclude Include="src\runtime\frame_scheduler.hpp" />

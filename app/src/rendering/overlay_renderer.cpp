@@ -2,6 +2,7 @@
 
 #include "rendering/overlay_renderer.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <d3dcompiler.h>
@@ -21,6 +22,16 @@ struct PixelConstants {
   float padding[3]{};
 };
 
+struct VisualConstants {
+  float texture_size[2]{};
+  float shadow_radius = 0.0f;
+  float shadow_opacity = 0.0f;
+  std::uint32_t render_shadow = 0;
+  float animation_progress = 0.0f;
+  std::uint32_t has_per_pixel_alpha = 0;
+  float padding = 0.0f;
+};
+
 constexpr char kVertexShaderSource[] = R"(
 cbuffer GenieConstants : register(b0) {
   float4 source;
@@ -29,6 +40,15 @@ cbuffer GenieConstants : register(b0) {
   float strength;
   uint edge;
   uint style;
+};
+cbuffer VisualConstants : register(b2) {
+  float2 texture_size;
+  float shadow_radius;
+  float shadow_opacity;
+  uint render_shadow;
+  float animation_progress;
+  uint has_per_pixel_alpha;
+  float visual_padding;
 };
 
 struct VertexInput {
@@ -189,15 +209,21 @@ float2 curvy_position(float2 uv) {
 
 PixelInput Main(VertexInput input) {
   PixelInput output;
-  float2 base_position = linear_position(input.texcoord);
+  float shadow_progress = 1.0f - saturate(progress);
+  float2 shadow_extension =
+      (2.0f * shadow_radius * shadow_progress) / max(texture_size, float2(1.0f, 1.0f));
+  float2 shape_texcoord = render_shadow != 0
+                              ? lerp(-shadow_extension, 1.0f + shadow_extension, input.texcoord)
+                              : input.texcoord;
+  float2 base_position = linear_position(shape_texcoord);
   float2 deformed = base_position;
   if (style == STYLE_CLASSIC) {
-    deformed = lerp(base_position, classic_position(input.texcoord), saturate(strength));
+    deformed = lerp(base_position, classic_position(shape_texcoord), saturate(strength));
   } else if (style == STYLE_CURVY) {
-    deformed = curvy_position(input.texcoord);
+    deformed = curvy_position(shape_texcoord);
   }
   output.position = float4(deformed.x * 2.0f - 1.0f, 1.0f - deformed.y * 2.0f, 0.0f, 1.0f);
-  output.texcoord = input.texcoord;
+  output.texcoord = shape_texcoord;
   return output;
 }
 )";
@@ -207,12 +233,54 @@ cbuffer PixelConstants : register(b1) {
   float opacity;
   float3 padding;
 };
+cbuffer VisualConstants : register(b2) {
+  float2 texture_size;
+  float shadow_radius;
+  float shadow_opacity;
+  uint render_shadow;
+  float animation_progress;
+  uint has_per_pixel_alpha;
+  float visual_padding;
+};
 Texture2D source_texture : register(t0);
+Texture2D mask_texture : register(t1);
 SamplerState linear_sampler : register(s0);
+SamplerState mask_sampler : register(s1);
+
+float shape_alpha(float2 texcoord) {
+  return mask_texture.Sample(mask_sampler, texcoord).r;
+}
+
 float4 Main(float4 position : SV_POSITION, float2 texcoord : TEXCOORD0) : SV_TARGET {
+  if (render_shadow != 0) {
+    float remaining = 1.0f - saturate(animation_progress);
+    float2 radius = (shadow_radius * remaining) / max(texture_size, float2(1.0f, 1.0f));
+    float alpha = shape_alpha(texcoord) * 0.20f;
+    alpha += (shape_alpha(texcoord + float2(radius.x * 0.33f, 0.0f)) +
+              shape_alpha(texcoord - float2(radius.x * 0.33f, 0.0f)) +
+              shape_alpha(texcoord + float2(0.0f, radius.y * 0.33f)) +
+              shape_alpha(texcoord - float2(0.0f, radius.y * 0.33f))) * 0.10f;
+    alpha += (shape_alpha(texcoord + float2(radius.x * 0.66f, 0.0f)) +
+              shape_alpha(texcoord - float2(radius.x * 0.66f, 0.0f)) +
+              shape_alpha(texcoord + float2(0.0f, radius.y * 0.66f)) +
+              shape_alpha(texcoord - float2(0.0f, radius.y * 0.66f))) * 0.05f;
+    float2 diagonal = radius * 0.47f;
+    alpha += (shape_alpha(texcoord + diagonal) + shape_alpha(texcoord - diagonal) +
+              shape_alpha(texcoord + float2(diagonal.x, -diagonal.y)) +
+              shape_alpha(texcoord + float2(-diagonal.x, diagonal.y))) * 0.05f;
+    alpha *= shadow_opacity * pow(remaining, 1.35f);
+    return float4(0.0f, 0.0f, 0.0f, alpha);
+  }
   float4 color = source_texture.Sample(linear_sampler, texcoord);
-  color.a *= opacity;
-  color.rgb *= color.a;
+  float mask_alpha = mask_texture.Sample(mask_sampler, texcoord).r;
+  if (has_per_pixel_alpha != 0) {
+    float shape_factor = color.a > 0.0001f ? saturate(mask_alpha / color.a) : 0.0f;
+    color.rgb *= shape_factor * opacity;
+    color.a = mask_alpha * opacity;
+  } else {
+    color.a *= mask_alpha * opacity;
+    color.rgb *= color.a;
+  }
   return color;
 }
 )";
@@ -246,6 +314,10 @@ bool OverlayRenderer::Initialize(D3dDevice* device) {
   if (FAILED(device_->device()->CreateBuffer(&constants, nullptr, &pixel_constant_buffer_))) {
     return false;
   }
+  constants.ByteWidth = sizeof(VisualConstants);
+  if (FAILED(device_->device()->CreateBuffer(&constants, nullptr, &visual_constant_buffer_))) {
+    return false;
+  }
 
   D3D11_SAMPLER_DESC sampler{};
   sampler.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -253,6 +325,8 @@ bool OverlayRenderer::Initialize(D3dDevice* device) {
   sampler.ComparisonFunc = D3D11_COMPARISON_NEVER;
   sampler.MaxLOD = D3D11_FLOAT32_MAX;
   if (FAILED(device_->device()->CreateSamplerState(&sampler, &sampler_state_))) return false;
+  sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+  if (FAILED(device_->device()->CreateSamplerState(&sampler, &mask_sampler_state_))) return false;
 
   D3D11_BLEND_DESC blend{};
   blend.RenderTarget[0].BlendEnable = TRUE;
@@ -275,7 +349,9 @@ bool OverlayRenderer::Initialize(D3dDevice* device) {
 void OverlayRenderer::Shutdown() {
   rasterizer_state_.Reset();
   blend_state_.Reset();
+  mask_sampler_state_.Reset();
   sampler_state_.Reset();
+  visual_constant_buffer_.Reset();
   pixel_constant_buffer_.Reset();
   genie_constant_buffer_.Reset();
   index_buffer_.Reset();
@@ -327,11 +403,9 @@ bool OverlayRenderer::CreateStaticGrid() {
   indices.reserve(kGridIndexCount);
   for (UINT row = 0; row < kGridSegments; ++row) {
     for (UINT column = 0; column < kGridSegments; ++column) {
-      const auto lower_left =
-          static_cast<std::uint16_t>(row * (kGridSegments + 1) + column);
+      const auto lower_left = static_cast<std::uint16_t>(row * (kGridSegments + 1) + column);
       const auto lower_right = static_cast<std::uint16_t>(lower_left + 1);
-      const auto upper_left =
-          static_cast<std::uint16_t>((row + 1) * (kGridSegments + 1) + column);
+      const auto upper_left = static_cast<std::uint16_t>((row + 1) * (kGridSegments + 1) + column);
       const auto upper_right = static_cast<std::uint16_t>(upper_left + 1);
       indices.insert(indices.end(),
                      {lower_left, upper_left, lower_right, lower_right, upper_left, upper_right});
@@ -383,11 +457,36 @@ bool OverlayRenderer::UpdateConstants(const animation::GenieConstants& genie_con
   return true;
 }
 
+bool OverlayRenderer::UpdateVisualConstants(const WindowVisualMetadata& metadata,
+                                            float texture_width, float texture_height,
+                                            float progress, bool render_shadow) {
+  const VisualConstants constants{
+      .texture_size = {std::max(texture_width, 1.0f), std::max(texture_height, 1.0f)},
+      .shadow_radius = std::max(metadata.shadow_radius, 0.0f),
+      .shadow_opacity = std::clamp(metadata.shadow_opacity, 0.0f, 1.0f),
+      .render_shadow = render_shadow ? 1U : 0U,
+      .animation_progress = std::clamp(progress, 0.0f, 1.0f),
+      .has_per_pixel_alpha = metadata.has_per_pixel_alpha ? 1U : 0U,
+  };
+  D3D11_MAPPED_SUBRESOURCE mapped{};
+  const HRESULT result = device_->context()->Map(visual_constant_buffer_.Get(), 0,
+                                                 D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+  if (FAILED(result)) {
+    MarkDeviceLost(result);
+    return false;
+  }
+  std::memcpy(mapped.pData, &constants, sizeof(constants));
+  device_->context()->Unmap(visual_constant_buffer_.Get(), 0);
+  return true;
+}
+
 bool OverlayRenderer::Render(const animation::GenieConstants& genie_constants,
                              ID3D11ShaderResourceView* texture,
+                             ID3D11ShaderResourceView* mask_texture,
+                             const WindowVisualMetadata& visual_metadata,
                              ID3D11RenderTargetView* render_target, UINT width, UINT height,
                              float opacity) {
-  if (device_lost_ || texture == nullptr || render_target == nullptr ||
+  if (device_lost_ || texture == nullptr || mask_texture == nullptr || render_target == nullptr ||
       !UpdateConstants(genie_constants, opacity)) {
     return false;
   }
@@ -409,16 +508,36 @@ bool OverlayRenderer::Render(const animation::GenieConstants& genie_constants,
   context->VSSetShader(vertex_shader_.Get(), nullptr, 0);
   ID3D11Buffer* genie_constants_buffer = genie_constant_buffer_.Get();
   context->VSSetConstantBuffers(0, 1, &genie_constants_buffer);
+  ID3D11Buffer* visual_constants_buffer = visual_constant_buffer_.Get();
+  context->VSSetConstantBuffers(2, 1, &visual_constants_buffer);
   context->PSSetShader(pixel_shader_.Get(), nullptr, 0);
   ID3D11Buffer* pixel_constants_buffer = pixel_constant_buffer_.Get();
   context->PSSetConstantBuffers(1, 1, &pixel_constants_buffer);
-  context->PSSetShaderResources(0, 1, &texture);
-  context->PSSetSamplers(0, 1, sampler_state_.GetAddressOf());
+  context->PSSetConstantBuffers(2, 1, &visual_constants_buffer);
+  const std::array<ID3D11ShaderResourceView*, 2> resources = {texture, mask_texture};
+  context->PSSetShaderResources(0, static_cast<UINT>(resources.size()), resources.data());
+  const std::array<ID3D11SamplerState*, 2> samplers = {sampler_state_.Get(),
+                                                       mask_sampler_state_.Get()};
+  context->PSSetSamplers(0, static_cast<UINT>(samplers.size()), samplers.data());
   constexpr std::array<float, 4> kBlend = {0.0f, 0.0f, 0.0f, 0.0f};
   context->OMSetBlendState(blend_state_.Get(), kBlend.data(), 0xffffffff);
+  const float texture_width = (genie_constants.source.right - genie_constants.source.left) * width;
+  const float texture_height =
+      (genie_constants.source.bottom - genie_constants.source.top) * height;
+  if (visual_metadata.shadow_radius > 0.0f && visual_metadata.shadow_opacity > 0.0f) {
+    if (!UpdateVisualConstants(visual_metadata, texture_width, texture_height,
+                               genie_constants.progress, true)) {
+      return false;
+    }
+    context->DrawIndexed(index_count_, 0, 0);
+  }
+  if (!UpdateVisualConstants(visual_metadata, texture_width, texture_height,
+                             genie_constants.progress, false)) {
+    return false;
+  }
   context->DrawIndexed(index_count_, 0, 0);
-  ID3D11ShaderResourceView* null_resource = nullptr;
-  context->PSSetShaderResources(0, 1, &null_resource);
+  constexpr std::array<ID3D11ShaderResourceView*, 2> kNullResources = {nullptr, nullptr};
+  context->PSSetShaderResources(0, static_cast<UINT>(kNullResources.size()), kNullResources.data());
   return true;
 }
 

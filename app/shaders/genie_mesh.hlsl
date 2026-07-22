@@ -6,6 +6,15 @@ cbuffer GenieConstants : register(b0) {
   uint edge;
   uint style;
 };
+cbuffer VisualConstants : register(b2) {
+  float2 texture_size;
+  float shadow_radius;
+  float shadow_opacity;
+  uint render_shadow;
+  float animation_progress;
+  uint has_per_pixel_alpha;
+  float visual_padding;
+};
 
 struct VertexInput {
   float2 texcoord : TEXCOORD0;
@@ -165,15 +174,21 @@ float2 curvy_position(float2 uv) {
 
 PixelInput VertexMain(VertexInput input) {
   PixelInput output;
-  float2 base_position = linear_position(input.texcoord);
+  float shadow_progress = 1.0f - saturate(progress);
+  float2 shadow_extension =
+      (2.0f * shadow_radius * shadow_progress) / max(texture_size, float2(1.0f, 1.0f));
+  float2 shape_texcoord = render_shadow != 0
+                              ? lerp(-shadow_extension, 1.0f + shadow_extension, input.texcoord)
+                              : input.texcoord;
+  float2 base_position = linear_position(shape_texcoord);
   float2 deformed = base_position;
   if (style == STYLE_CLASSIC) {
-    deformed = lerp(base_position, classic_position(input.texcoord), saturate(strength));
+    deformed = lerp(base_position, classic_position(shape_texcoord), saturate(strength));
   } else if (style == STYLE_CURVY) {
-    deformed = curvy_position(input.texcoord);
+    deformed = curvy_position(shape_texcoord);
   }
   output.position = float4(deformed.x * 2.0f - 1.0f, 1.0f - deformed.y * 2.0f, 0.0f, 1.0f);
-  output.texcoord = input.texcoord;
+  output.texcoord = shape_texcoord;
   return output;
 }
 
@@ -182,10 +197,43 @@ cbuffer PixelConstants : register(b1) {
   float3 padding;
 };
 Texture2D source_texture : register(t0);
+Texture2D mask_texture : register(t1);
 SamplerState linear_sampler : register(s0);
+SamplerState mask_sampler : register(s1);
+
+float shape_alpha(float2 texcoord) {
+  return mask_texture.Sample(mask_sampler, texcoord).r;
+}
+
 float4 PixelMain(float4 position : SV_POSITION, float2 texcoord : TEXCOORD0) : SV_TARGET {
+  if (render_shadow != 0) {
+    float remaining = 1.0f - saturate(animation_progress);
+    float2 radius = (shadow_radius * remaining) / max(texture_size, float2(1.0f, 1.0f));
+    float alpha = shape_alpha(texcoord) * 0.20f;
+    alpha += (shape_alpha(texcoord + float2(radius.x * 0.33f, 0.0f)) +
+              shape_alpha(texcoord - float2(radius.x * 0.33f, 0.0f)) +
+              shape_alpha(texcoord + float2(0.0f, radius.y * 0.33f)) +
+              shape_alpha(texcoord - float2(0.0f, radius.y * 0.33f))) * 0.10f;
+    alpha += (shape_alpha(texcoord + float2(radius.x * 0.66f, 0.0f)) +
+              shape_alpha(texcoord - float2(radius.x * 0.66f, 0.0f)) +
+              shape_alpha(texcoord + float2(0.0f, radius.y * 0.66f)) +
+              shape_alpha(texcoord - float2(0.0f, radius.y * 0.66f))) * 0.05f;
+    float2 diagonal = radius * 0.47f;
+    alpha += (shape_alpha(texcoord + diagonal) + shape_alpha(texcoord - diagonal) +
+              shape_alpha(texcoord + float2(diagonal.x, -diagonal.y)) +
+              shape_alpha(texcoord + float2(-diagonal.x, diagonal.y))) * 0.05f;
+    alpha *= shadow_opacity * pow(remaining, 1.35f);
+    return float4(0.0f, 0.0f, 0.0f, alpha);
+  }
   float4 color = source_texture.Sample(linear_sampler, texcoord);
-  color.a *= opacity;
-  color.rgb *= color.a;
+  float mask_alpha = mask_texture.Sample(mask_sampler, texcoord).r;
+  if (has_per_pixel_alpha != 0) {
+    float shape_factor = color.a > 0.0001f ? saturate(mask_alpha / color.a) : 0.0f;
+    color.rgb *= shape_factor * opacity;
+    color.a = mask_alpha * opacity;
+  } else {
+    color.a *= mask_alpha * opacity;
+    color.rgb *= color.a;
+  }
   return color;
 }

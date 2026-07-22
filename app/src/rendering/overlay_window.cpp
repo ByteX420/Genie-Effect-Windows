@@ -36,13 +36,13 @@ minimize::animation::RectF RectToRectF(const RECT& rect) {
 }
 
 RECT AnimationSurfaceRect(const minimize::animation::RectF& source,
-                          const minimize::animation::RectF& target, const RECT& virtual_screen) {
+                          const minimize::animation::RectF& target, const RECT& virtual_screen,
+                          LONG padding) {
   RECT requested{
-      .left = static_cast<LONG>(std::floor(std::min(source.left, target.left))) - kOverlayPadding,
-      .top = static_cast<LONG>(std::floor(std::min(source.top, target.top))) - kOverlayPadding,
-      .right = static_cast<LONG>(std::ceil(std::max(source.right, target.right))) + kOverlayPadding,
-      .bottom =
-          static_cast<LONG>(std::ceil(std::max(source.bottom, target.bottom))) + kOverlayPadding,
+      .left = static_cast<LONG>(std::floor(std::min(source.left, target.left))) - padding,
+      .top = static_cast<LONG>(std::floor(std::min(source.top, target.top))) - padding,
+      .right = static_cast<LONG>(std::ceil(std::max(source.right, target.right))) + padding,
+      .bottom = static_cast<LONG>(std::ceil(std::max(source.bottom, target.bottom))) + padding,
   };
   RECT clipped{};
   if (!IntersectRect(&clipped, &requested, &virtual_screen) || RectWidth(clipped) <= 0 ||
@@ -68,13 +68,14 @@ void AllowCrossIntegrityMessage(HWND window, UINT message, const wchar_t* messag
   filter_status.cbSize = sizeof(filter_status);
   if (!ChangeWindowMessageFilterEx(window, message, MSGFLT_ALLOW, &filter_status)) {
     minimize::core::LogDebug(L"Overlay", std::wstring(L"ChangeWindowMessageFilterEx failed for ") +
-                                          message_name + L" message=" + std::to_wstring(message) +
-                                          L" error=" + std::to_wstring(GetLastError()));
+                                             message_name + L" message=" +
+                                             std::to_wstring(message) + L" error=" +
+                                             std::to_wstring(GetLastError()));
     return;
   }
 
   minimize::core::LogDebug(L"Overlay", std::wstring(L"Allowed cross-integrity window message ") +
-                                        message_name + L" message=" + std::to_wstring(message));
+                                           message_name + L" message=" + std::to_wstring(message));
 }
 
 }  // namespace
@@ -150,11 +151,14 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
     return false;
   }
 
+  const LONG shadow_padding =
+      static_cast<LONG>(std::ceil(captured_texture.visual_metadata.shadow_radius * 2.0f));
   const RECT animation_surface =
-      AnimationSurfaceRect(source_screen_rect, target_screen_rect, virtual_screen_rect_);
+      AnimationSurfaceRect(source_screen_rect, target_screen_rect, virtual_screen_rect_,
+                           std::max(kOverlayPadding, shadow_padding));
   if (RectWidth(animation_surface) <= 0 || RectHeight(animation_surface) <= 0) {
     minimize::core::LogTrace(L"Overlay",
-                          L"StartAnimation failed: animation surface is outside virtual screen");
+                             L"StartAnimation failed: animation surface is outside virtual screen");
     return false;
   }
 
@@ -162,8 +166,8 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   (void)minimize::platform::SetOwnedWindowRegion(window_, hidden_region, false);
   if (!ResizeOverlaySurface(animation_surface)) {
     minimize::core::LogTrace(L"Overlay",
-                          L"StartAnimation failed: ResizeOverlaySurface returned "
-                          L"false");
+                             L"StartAnimation failed: ResizeOverlaySurface returned "
+                             L"false");
     HideOverlay();
     return false;
   }
@@ -206,7 +210,7 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
   if (FAILED(hr)) {
     MarkDeviceLost(L"WaitForCommitCompletion", hr);
     minimize::core::LogTrace(L"Overlay", L"StartAnimation failed: WaitForCommitCompletion hr=0x" +
-                                          std::to_wstring(static_cast<unsigned long>(hr)));
+                                             std::to_wstring(static_cast<unsigned long>(hr)));
     animation_renderer_.Cancel();
     HideOverlay();
     std::wcerr << L"Overlay start failed: first frame commit did not "
@@ -215,9 +219,9 @@ bool OverlayWindow::StartAnimation(CapturedTexture captured_texture,
     return false;
   }
   minimize::core::LogTrace(L"Overlay", L"StartAnimation first frame visible overlay_source=" +
-                                        RectFTraceString(ToOverlayRect(source_screen_rect)) +
-                                        L" overlay_target=" +
-                                        RectFTraceString(ToOverlayRect(target_screen_rect)));
+                                           RectFTraceString(ToOverlayRect(source_screen_rect)) +
+                                           L" overlay_target=" +
+                                           RectFTraceString(ToOverlayRect(target_screen_rect)));
   std::wcout << L"Overlay first frame visible: source=(" << source_screen_rect.left << L","
              << source_screen_rect.top << L"," << source_screen_rect.right << L","
              << source_screen_rect.bottom << L") target=(" << target_screen_rect.left << L","
@@ -291,7 +295,7 @@ LRESULT OverlayWindow::HandleMessage(HWND hwnd, UINT message, WPARAM w_param, LP
       ShowWindow(minimize_window, SW_MINIMIZE);
       RemovePropW(minimize_window, platform::windows::properties::kAllowMinimize);
       minimize::core::LogTrace(L"Overlay",
-                            L"Minimize callback failed; allowed native minimize fallback");
+                               L"Minimize callback failed; allowed native minimize fallback");
     }
     return 0;
   }
@@ -512,7 +516,8 @@ bool OverlayWindow::Render(float progress) {
   }
   const float eased_progress = animation_renderer_.eased_progress();
   if (!overlay_renderer_.Render(animation_renderer_.GenieParameters(width_, height_),
-                                animation_renderer_.texture_view(), render_target_view_.Get(),
+                                animation_renderer_.texture_view(), animation_renderer_.mask_view(),
+                                animation_renderer_.visual_metadata(), render_target_view_.Get(),
                                 width_, height_, animation_renderer_.opacity(eased_progress))) {
     return false;
   }

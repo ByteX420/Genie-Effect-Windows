@@ -14,12 +14,51 @@ namespace {
 
 bool IsDeviceLostError(HRESULT hr) { return D3dDevice::IsDeviceLostError(hr); }
 
+void NormalizeCapturedAlpha(HWND window, WindowVisualMetadata* metadata,
+                            std::vector<std::uint8_t>* pixels) {
+  if (metadata == nullptr || pixels == nullptr) return;
+
+  bool has_nonzero_alpha = false;
+  if (metadata->has_per_pixel_alpha) {
+    for (std::size_t i = 3; i < pixels->size(); i += 4) {
+      if ((*pixels)[i] != 0) {
+        has_nonzero_alpha = true;
+        break;
+      }
+    }
+    if (!has_nonzero_alpha) metadata->has_per_pixel_alpha = false;
+  }
+  if (!metadata->has_per_pixel_alpha) {
+    for (std::size_t i = 3; i < pixels->size(); i += 4) (*pixels)[i] = 0xff;
+  }
+
+  if (!metadata->is_layered) return;
+  COLORREF color_key = 0;
+  BYTE global_alpha = 255;
+  DWORD flags = 0;
+  if (!GetLayeredWindowAttributes(window, &color_key, &global_alpha, &flags)) return;
+  const BYTE key_red = GetRValue(color_key);
+  const BYTE key_green = GetGValue(color_key);
+  const BYTE key_blue = GetBValue(color_key);
+  for (std::size_t i = 0; i + 3 < pixels->size(); i += 4) {
+    if ((flags & LWA_COLORKEY) != 0 && (*pixels)[i] == key_blue && (*pixels)[i + 1] == key_green &&
+        (*pixels)[i + 2] == key_red) {
+      (*pixels)[i + 3] = 0;
+    }
+    if ((flags & LWA_ALPHA) != 0) {
+      (*pixels)[i + 3] = static_cast<std::uint8_t>(
+          (static_cast<unsigned int>((*pixels)[i + 3]) * global_alpha + 127U) / 255U);
+    }
+  }
+}
+
 }  // namespace
 
 DesktopCapture::DesktopCapture(D3dDevice* d3d_device)
     : d3d_device_(d3d_device), duplication_session_(d3d_device) {}
 
-bool DesktopCapture::CaptureRegion(const RECT& screen_rect, CapturedTexture* captured_texture) {
+bool DesktopCapture::CaptureRegion(HWND window, const RECT& screen_rect,
+                                   CapturedTexture* captured_texture) {
   if (captured_texture == nullptr || capture_geometry::Width(screen_rect) <= 0 ||
       capture_geometry::Height(screen_rect) <= 0) {
     return false;
@@ -36,7 +75,11 @@ bool DesktopCapture::CaptureRegion(const RECT& screen_rect, CapturedTexture* cap
     return false;
   }
 
-  return CopyRegionFromFrame(output, screen_rect, captured_texture);
+  if (!CopyRegionFromFrame(output, screen_rect, captured_texture)) return false;
+  const RECT captured_rect =
+      capture_geometry::ClampToOutput(screen_rect, output->desktop_coordinates);
+  return AttachWindowVisuals(window, captured_rect, QueryWindowVisualMetadata(window),
+                             captured_texture);
 }
 
 bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rect,
@@ -46,6 +89,7 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
     return false;
   }
 
+  WindowVisualMetadata visual_metadata = QueryWindowVisualMetadata(window);
   RECT window_rect{};
   if (!GetWindowRect(window, &window_rect)) {
     return false;
@@ -123,15 +167,7 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
       auto* dest_row = pixels.data() + static_cast<size_t>(row) * dest_stride;
       std::memcpy(dest_row, source_row, dest_stride);
     }
-    RECT extended_bounds{};
-    HRESULT hr_ext = DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, &extended_bounds,
-                                           sizeof(extended_bounds));
-    if (FAILED(hr_ext)) {
-      extended_bounds = window_rect;
-    }
-    const int radius = window_capture_mask::CornerRadius(window);
-    window_capture_mask::Apply(&pixels, capture_width, capture_height, radius, window_rect,
-                               extended_bounds);
+    NormalizeCapturedAlpha(window, &visual_metadata, &pixels);
   }
 
   SelectObject(memory_dc, old_bitmap);
@@ -140,9 +176,9 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
 
   if (printed == FALSE) {
     minimize::core::LogTrace(L"DesktopCapture",
-                          L"CaptureWindow PrintWindow failed hwnd=0x" +
-                              std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) +
-                              L" error=" + std::to_wstring(GetLastError()));
+                             L"CaptureWindow PrintWindow failed hwnd=0x" +
+                                 std::to_wstring(reinterpret_cast<std::uintptr_t>(window)) +
+                                 L" error=" + std::to_wstring(GetLastError()));
     return false;
   }
 
@@ -167,8 +203,9 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
       MarkDeviceLost(L"CreateTexture2D PrintWindow capture", hr);
       return false;
     }
-    minimize::core::LogTrace(L"DesktopCapture", L"CaptureWindow CreateTexture2D failed hr=0x" +
-                                                 std::to_wstring(static_cast<unsigned long>(hr)));
+    minimize::core::LogTrace(L"DesktopCapture",
+                             L"CaptureWindow CreateTexture2D failed hr=0x" +
+                                 std::to_wstring(static_cast<unsigned long>(hr)));
     return false;
   }
 
@@ -186,9 +223,9 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
       return false;
     }
     minimize::core::LogTrace(L"DesktopCapture",
-                          L"CaptureWindow CreateShaderResourceView failed "
-                          L"hr=0x" +
-                              std::to_wstring(static_cast<unsigned long>(hr)));
+                             L"CaptureWindow CreateShaderResourceView failed "
+                             L"hr=0x" +
+                                 std::to_wstring(static_cast<unsigned long>(hr)));
     return false;
   }
 
@@ -198,6 +235,10 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
       .width = static_cast<float>(capture_width),
       .height = static_cast<float>(capture_height),
   };
+  if (!AttachWindowVisuals(window, capture_rect, std::move(visual_metadata), captured_texture,
+                           &pixels)) {
+    return false;
+  }
   *captured_screen_rect = capture_rect;
   minimize::core::LogTrace(
       L"DesktopCapture",
@@ -209,6 +250,68 @@ bool DesktopCapture::CaptureWindow(HWND window, const RECT& requested_screen_rec
           std::to_wstring(capture_rect.bottom) + L") window_rect=(" +
           std::to_wstring(window_rect.left) + L"," + std::to_wstring(window_rect.top) + L"," +
           std::to_wstring(window_rect.right) + L"," + std::to_wstring(window_rect.bottom) + L")");
+  return true;
+}
+
+bool DesktopCapture::AttachWindowVisuals(HWND window, const RECT& capture_rect,
+                                         WindowVisualMetadata metadata,
+                                         CapturedTexture* captured_texture,
+                                         const std::vector<std::uint8_t>* captured_pixels) {
+  if (window == nullptr || captured_texture == nullptr || captured_texture->texture == nullptr) {
+    return false;
+  }
+  RECT window_rect{};
+  if (!GetWindowRect(window, &window_rect)) return false;
+  RECT extended_bounds{};
+  if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, &extended_bounds,
+                                   sizeof(extended_bounds)))) {
+    extended_bounds = window_rect;
+  }
+
+  const int width = static_cast<int>(captured_texture->size.width);
+  const int height = static_cast<int>(captured_texture->size.height);
+  std::vector<std::uint8_t> mask = window_capture_mask::Build(metadata, width, height, window_rect,
+                                                              capture_rect, extended_bounds);
+  if (mask.empty()) return false;
+  if (metadata.has_per_pixel_alpha && captured_pixels != nullptr &&
+      captured_pixels->size() == mask.size() * 4) {
+    for (std::size_t i = 0; i < mask.size(); ++i) {
+      mask[i] = static_cast<std::uint8_t>(
+          (static_cast<unsigned int>(mask[i]) * (*captured_pixels)[i * 4 + 3] + 127U) / 255U);
+    }
+  } else if (metadata.has_per_pixel_alpha) {
+    // Desktop duplication contains the already-composited desktop rather than the source alpha.
+    metadata.has_per_pixel_alpha = false;
+  }
+
+  D3D11_TEXTURE2D_DESC texture_desc{};
+  texture_desc.Width = static_cast<UINT>(width);
+  texture_desc.Height = static_cast<UINT>(height);
+  texture_desc.MipLevels = 1;
+  texture_desc.ArraySize = 1;
+  texture_desc.Format = DXGI_FORMAT_R8_UNORM;
+  texture_desc.SampleDesc.Count = 1;
+  texture_desc.Usage = D3D11_USAGE_IMMUTABLE;
+  texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+  D3D11_SUBRESOURCE_DATA initial_data{};
+  initial_data.pSysMem = mask.data();
+  initial_data.SysMemPitch = static_cast<UINT>(width);
+
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> mask_texture;
+  HRESULT hr = d3d_device_->device()->CreateTexture2D(&texture_desc, &initial_data, &mask_texture);
+  if (FAILED(hr)) {
+    if (IsDeviceLostError(hr)) MarkDeviceLost(L"CreateTexture2D window mask", hr);
+    return false;
+  }
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mask_view;
+  hr = d3d_device_->device()->CreateShaderResourceView(mask_texture.Get(), nullptr, &mask_view);
+  if (FAILED(hr)) {
+    if (IsDeviceLostError(hr)) MarkDeviceLost(L"CreateShaderResourceView window mask", hr);
+    return false;
+  }
+  captured_texture->mask_texture = std::move(mask_texture);
+  captured_texture->mask_shader_resource_view = std::move(mask_view);
+  captured_texture->visual_metadata = std::move(metadata);
   return true;
 }
 

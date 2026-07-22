@@ -42,10 +42,16 @@ public:
   [[nodiscard]] float eased_progress() const;
   [[nodiscard]] float opacity(float rendered_progress) const;
   [[nodiscard]] animation::GenieConstants GenieParameters(UINT viewport_width,
-                                                           UINT viewport_height) const;
+                                                          UINT viewport_height) const;
   [[nodiscard]] CapturedTexture* mutable_texture() { return &texture_; }
   [[nodiscard]] ID3D11ShaderResourceView* texture_view() const {
     return texture_.shader_resource_view.Get();
+  }
+  [[nodiscard]] ID3D11ShaderResourceView* mask_view() const {
+    return texture_.mask_shader_resource_view.Get();
+  }
+  [[nodiscard]] const WindowVisualMetadata& visual_metadata() const {
+    return texture_.visual_metadata;
   }
   [[nodiscard]] ID3D11ShaderResourceView* const* texture_view_address() const {
     return texture_.shader_resource_view.GetAddressOf();
