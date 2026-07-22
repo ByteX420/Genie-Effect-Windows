@@ -13,13 +13,13 @@ namespace minimize::features {
 namespace {
 
 animation::AnimationStyle AnimationStyleFromName(std::string_view style) {
-  if (style == "Minimize curvy") return animation::AnimationStyle::kCurvy;
+  if (style == "Genie curvy") return animation::AnimationStyle::kCurvy;
   if (style == "Squash") return animation::AnimationStyle::kSquash;
   return animation::AnimationStyle::kClassic;
 }
 
 float AnimationStyleDurationScale(std::string_view style) {
-  if (style == "Minimize curvy") return 0.78f;
+  if (style == "Genie curvy") return 0.78f;
   if (style == "Squash") return 0.55f;
   return 1.0f;
 }

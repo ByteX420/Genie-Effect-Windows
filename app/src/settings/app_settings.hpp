@@ -23,7 +23,7 @@ struct AppSettings {
   std::string restore_easing = "Ease In Out";
   animation::CubicBezier minimize_custom_bezier = animation::CubicBezier::EaseInOut();
   animation::CubicBezier restore_custom_bezier = animation::CubicBezier::EaseInOut();
-  std::string animation_style = "Minimize classic";
+  std::string animation_style = "Genie classic";
   std::string quality_mode = "automatic";
   float minimize_strength = 1.0f;
   std::string fade_strength = "Subtle";

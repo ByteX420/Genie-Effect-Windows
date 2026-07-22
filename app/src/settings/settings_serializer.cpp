@@ -51,7 +51,7 @@ bool IsValidEasingName(std::string_view value) {
 }
 
 bool IsValidAnimationStyle(std::string_view value) {
-  return value == "Minimize classic" || value == "Minimize curvy" || value == "Squash" ||
+  return value == "Genie classic" || value == "Genie curvy" || value == "Squash" ||
          value == "Classic Minimize";
 }
 
@@ -485,7 +485,7 @@ std::optional<AppSettings> SettingsSerializer::Deserialize(std::string_view json
     if (binding.virtual_key == 0) binding.modifiers = 0;
   }
   if (loaded.animation_style == "Classic Minimize") {
-    loaded.animation_style = "Minimize classic";
+    loaded.animation_style = "Genie classic";
   }
   // Preserve saved easing names (including Custom) and clamp custom handles.
   if (!IsValidEasingName(loaded.minimize_easing)) loaded.minimize_easing = "Ease In Out";

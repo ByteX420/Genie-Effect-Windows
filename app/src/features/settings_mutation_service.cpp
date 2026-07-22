@@ -95,7 +95,7 @@ bool SettingsMutationService::SetCustomEasingBezier(bool minimize, animation::Cu
 }
 
 bool SettingsMutationService::SetAnimationStyle(const std::string& style) {
-  if (style != "Minimize classic" && style != "Minimize curvy" && style != "Squash") return false;
+  if (style != "Genie classic" && style != "Genie curvy" && style != "Squash") return false;
   auto proposed = settings_.Get();
   proposed.animation_style = style;
   return settings_.Update(std::move(proposed));

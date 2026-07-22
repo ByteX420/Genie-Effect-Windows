@@ -28,8 +28,8 @@ bool IsValidEasing(std::string_view value) {
 
 bool IsValidStyle(std::string_view value) {
   constexpr std::array choices = {
-      std::string_view{"Minimize classic"},
-      std::string_view{"Minimize curvy"},
+      std::string_view{"Genie classic"},
+      std::string_view{"Genie curvy"},
       std::string_view{"Squash"},
       std::string_view{"Classic Minimize"},
   };
@@ -47,9 +47,9 @@ AppSettings SettingsValidator::Normalize(AppSettings settings) {
   settings.minimize_custom_bezier.ClampHandles();
   settings.restore_custom_bezier.ClampHandles();
   if (settings.animation_style == "Classic Minimize") {
-    settings.animation_style = "Minimize classic";
+    settings.animation_style = "Genie classic";
   }
-  if (!IsValidStyle(settings.animation_style)) settings.animation_style = "Minimize classic";
+  if (!IsValidStyle(settings.animation_style)) settings.animation_style = "Genie classic";
   if (settings.quality_mode != "automatic" && settings.quality_mode != "best_quality" &&
       settings.quality_mode != "power_saving") {
     settings.quality_mode = "automatic";

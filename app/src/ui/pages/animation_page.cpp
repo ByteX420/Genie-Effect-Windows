@@ -188,8 +188,8 @@ void AnimationPage::Render(::minimize::ui::SettingsWindow& window, components::P
       "Linear", "Ease In", "Ease Out", "Ease In Out", "Cubic", "Back", "Elastic", "Custom",
   };
   constexpr std::array style_names = {
-      "Minimize classic",
-      "Minimize curvy",
+      "Genie classic",
+      "Genie curvy",
       "Squash",
   };
   const float combo_width = layout.ControlMaxWidth(340.0f);
