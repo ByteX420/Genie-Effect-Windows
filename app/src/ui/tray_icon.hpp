@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <string_view>
 #include <windows.h>
 
 namespace minimize::ui {
@@ -27,6 +28,7 @@ public:
   [[nodiscard]] bool Add(HWND owner, const SettingsViewModel& view_model);
   void Remove(HWND owner);
   void UpdateTooltip(HWND owner, const SettingsViewModel& view_model);
+  void ShowUpdateAvailable(HWND owner, std::wstring_view version);
   [[nodiscard]] bool IsTaskbarCreatedMessage(UINT message) const;
   void OnTaskbarCreated();
   [[nodiscard]] TrayCommand HandleCallback(HWND owner, LPARAM parameter,

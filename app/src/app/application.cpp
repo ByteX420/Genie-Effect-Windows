@@ -9,9 +9,15 @@ namespace minimize::app {
 Application::Application() : runtime_(std::make_unique<ApplicationRuntime>()) {}
 Application::~Application() = default;
 
-bool Application::Initialize(HINSTANCE instance) { return runtime_->Initialize(instance); }
+bool Application::Initialize(HINSTANCE instance, const ApplicationLaunchOptions& options) {
+  return runtime_->Initialize(instance, options);
+}
 
 int Application::Run() { return runtime_->Run(); }
+
+void Application::RenderUpdateHandoverFrame() { runtime_->RenderUpdateHandoverFrame(); }
+
+void Application::CompleteUpdateHandover() { runtime_->CompleteUpdateHandover(); }
 
 void Application::RequestShutdown() { runtime_->RequestShutdown(); }
 

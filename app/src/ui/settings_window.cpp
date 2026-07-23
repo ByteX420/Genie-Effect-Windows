@@ -1,4 +1,4 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "ui/settings_window.hpp"
 
@@ -69,10 +69,35 @@ bool SettingsWindow::Initialize(HINSTANCE instance, ui::SettingsActions& actions
   font_title_ = renderer_.title_font();
   tray_icon_.Initialize();
   UpdateReducedMotion();
+  update_service_.Start(hwnd_);
   return true;
 }
 
+void SettingsWindow::PrepareUpdateResume(int page, float page_scroll, bool maximized) {
+  selected_page_ = static_cast<Page>(std::clamp(page, 0, 7));
+  initial_page_scroll_ = std::max(0.0f, page_scroll);
+  initial_maximized_ = maximized;
+  update_workspace_engaged_ = true;
+  update_resume_active_ = true;
+  update_installer_started_ = true;
+  motion_system_.Set(ui::motion::MotionKey("update", "workspace", "show"), 1.0f);
+  motion_system_.Set(ui::motion::MotionKey("update", "workspace", "loader"), 1.0f);
+  motion_system_.Set(ui::motion::MotionKey("update", "shell", "content"), 0.0f);
+}
+
+void SettingsWindow::CompleteUpdateHandover() {
+  update_resume_active_ = false;
+  update_workspace_engaged_ = false;
+  update_installer_started_ = false;
+  motion_system_.Set(ui::motion::MotionKey("window", "settings", "alpha"), 1.0f);
+  motion_system_.Set(ui::motion::MotionKey("window", "settings", "offset"), ImVec2(0.0f, 0.0f));
+  motion_system_.Set(ui::motion::MotionKey("page", "content", "alpha"), 0.0f);
+  motion_system_.Set(ui::motion::MotionKey("page", "content", "offset"), ImVec2(0.0f, 10.0f));
+  ForceRender();
+}
+
 void SettingsWindow::Shutdown() {
+  update_service_.Stop();
   FlushPendingSpeedSave();
   animation_preview_.Close();
   tray_icon_.Remove(hwnd_);
@@ -333,6 +358,16 @@ void SettingsWindow::UpdateReducedMotion() {
   motion_system_.SetReducedMotion(reduced);
   motion_tokens_ =
       reduced ? ui::motion::MotionTokens::Reduced() : ui::motion::MotionTokens::Default();
+}
+
+void SettingsWindow::HandleUpdateStateChanged() {
+  const features::UpdateSnapshot update = update_service_.GetSnapshot();
+  if (update.phase == features::UpdatePhase::kAvailable &&
+      update_notified_version_ != update.latest_version) {
+    update_card_dismissed_ = false;
+    update_notified_version_ = update.latest_version;
+  }
+  ForceRender();
 }
 
 bool SettingsWindow::DetectStartupEnterMotionActive() const {

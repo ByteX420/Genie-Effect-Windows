@@ -74,6 +74,10 @@ public:
   [[nodiscard]] virtual features::DiagnosticsSnapshot GetDiagnostics() const = 0;
   virtual bool ExecuteDiagnosticsAction(features::DiagnosticsAction action) = 0;
   virtual void HealWindows() = 0;
+  // Quiesces hooks and hotkeys while keeping the settings HWND alive for a seamless
+  // updater process handover.
+  virtual void PrepareForUpdateHandover() = 0;
+  virtual void ResumeAfterUpdateHandoverFailure() = 0;
   virtual void RequestExit() = 0;
 };
 

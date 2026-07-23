@@ -117,6 +117,9 @@
     <ClCompile Include="src\features\settings_mutation_service.cpp">
       <Filter>src\features</Filter>
     </ClCompile>
+    <ClCompile Include="src\features\update_service.cpp">
+      <Filter>src\features</Filter>
+    </ClCompile>
     <ClCompile Include="src\features\window_exclusion_service.cpp">
       <Filter>src\features</Filter>
     </ClCompile>
@@ -160,6 +163,9 @@
       <Filter>src\platform\windows</Filter>
     </ClCompile>
     <ClCompile Include="src\platform\windows\startup_manager.cpp">
+      <Filter>src\platform\windows</Filter>
+    </ClCompile>
+    <ClCompile Include="src\platform\windows\update_installer.cpp">
       <Filter>src\platform\windows</Filter>
     </ClCompile>
     <ClCompile Include="src\platform\windows\taskbar_locator.cpp">
@@ -318,6 +324,9 @@
     <ClCompile Include="src\ui\tray_icon.cpp">
       <Filter>src\ui</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\update_presenter.cpp">
+      <Filter>src\ui</Filter>
+    </ClCompile>
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <Filter>third_party\imgui</Filter>
     </ClCompile>
@@ -398,6 +407,9 @@
     <ClInclude Include="src\features\settings_mutation_service.hpp">
       <Filter>src\features</Filter>
     </ClInclude>
+    <ClInclude Include="src\features\update_service.hpp">
+      <Filter>src\features</Filter>
+    </ClInclude>
     <ClInclude Include="src\features\window_exclusion_service.hpp">
       <Filter>src\features</Filter>
     </ClInclude>
@@ -441,6 +453,9 @@
       <Filter>src\platform\windows</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\windows\startup_manager.hpp">
+      <Filter>src\platform\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform\windows\update_installer.hpp">
       <Filter>src\platform\windows</Filter>
     </ClInclude>
     <ClInclude Include="src\platform\windows\taskbar_locator.hpp">
@@ -609,6 +624,9 @@
       <Filter>src\ui\theme</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\tray_icon.hpp">
+      <Filter>src\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\update_presenter.hpp">
       <Filter>src\ui</Filter>
     </ClInclude>
     <ClInclude Include="third_party\imgui\backends\imgui_impl_dx11.h">

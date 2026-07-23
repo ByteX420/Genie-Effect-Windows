@@ -28,6 +28,7 @@ It is a native **C++ / Direct3D 11 / DirectComposition** project with a polished
 - **Repair / diagnostics** — status for effect, hook, renderer, D3D device, display
 - **Native animation suppression** — disables classic shell + DWM transitions while running
 - **Device-lost recovery** — recreates capture/overlay/settings renderers after GPU resets
+- **Opt-in software updates** — checks GitHub Releases, then updates only after you press the button
 
 ---
 
@@ -115,6 +116,26 @@ MSBuild.exe MinimizeEffect.slnx /p:Configuration=Release /p:Platform=x64 /m
 | **Hotkeys** | Global shortcuts |
 | **Repair** | Live diagnostics (hook, renderer, display, etc.) |
 | **About** | Product version, licenses |
+
+### Software updates
+
+Minimize Effect checks the repository's latest stable GitHub Release in the background. It never
+installs an update automatically:
+
+1. A small animated card and, when the app is in the tray, a Windows notification announce a new
+   version.
+2. Press **Update now** to download it, or **Later** to keep using the current version.
+3. The existing settings window becomes the update workspace: its content animates away while
+   the traffic-light window controls remain fixed. Download, verification, staging, and retry
+   states are rendered there through the shared motion system.
+4. The verified files are swapped transactionally. The replacement process paints the same
+   update frame at the exact window bounds before the old process exits, then restores the
+   selected page, scroll position, maximized state, and normal content without opening a visible
+   helper window. If handover fails, the running version rolls back the files in place.
+
+The updater uses only the public releases from
+`ByteX420/Genie-Effect-Windows`; it requires no account, token, or background service. Update
+status and a manual **Check again** action also live on the **About** page.
 
 Settings persist to:
 
@@ -238,7 +259,8 @@ When the **product version** in `app/MinimizeEffect.rc` changes on the **`stable
 
 1. Builds **Release | x64**
 2. Packs `MinimizeEffect.exe` + `MinimizeEffectHook.dll` into `MinimizeEffect-windows-x64.zip`
-3. Creates or updates the GitHub Release for tag `vX.Y.Z` and uploads the ZIP
+3. Publishes a matching `MinimizeEffect-windows-x64.zip.sha256` integrity file
+4. Creates or updates the GitHub Release for tag `vX.Y.Z` and uploads both files
 
 Workflow file: [`.github/workflows/release.yml`](.github/workflows/release.yml)
 

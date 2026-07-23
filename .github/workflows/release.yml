@@ -149,9 +149,13 @@ jobs:
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path "$bin\MinimizeEffect.exe", "$bin\MinimizeEffectHook.dll" -DestinationPath $zip -Force
           $item = Get-Item $zip
+          $checksum = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          $checksumPath = "$zip.sha256"
+          "$checksum  $zipName" | Set-Content -LiteralPath $checksumPath -Encoding ascii -NoNewline
           "path=$($item.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "checksum_path=$checksumPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "name=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          Write-Host "Packaged $($item.FullName) ($([math]::Round($item.Length/1MB, 2)) MB)"
+          Write-Host "Packaged $($item.FullName) ($([math]::Round($item.Length/1MB, 2)) MB, SHA-256 $checksum)"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -160,7 +164,9 @@ jobs:
           name: Minimize Effect ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           # Create if missing; replace assets if the same tag is re-published (e.g. rebuild)
-          files: ${{ steps.package.outputs.path }}
+          files: |
+            ${{ steps.package.outputs.path }}
+            ${{ steps.package.outputs.checksum_path }}
           fail_on_unmatched_files: true
           generate_release_notes: true
           body: |

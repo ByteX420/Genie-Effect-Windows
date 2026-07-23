@@ -81,6 +81,21 @@ void TrayIcon::UpdateTooltip(HWND owner, const SettingsViewModel& view_model) {
   Shell_NotifyIconW(NIM_MODIFY, &icon);
 }
 
+void TrayIcon::ShowUpdateAvailable(HWND owner, std::wstring_view version) {
+  if (owner == nullptr || !added_) return;
+  NOTIFYICONDATAW icon{};
+  icon.cbSize = sizeof(icon);
+  icon.hWnd = owner;
+  icon.uID = kIconId;
+  icon.uFlags = NIF_INFO;
+  icon.dwInfoFlags = NIIF_INFO | NIIF_RESPECT_QUIET_TIME;
+  wcscpy_s(icon.szInfoTitle, L"Minimize Effect update available");
+  const std::wstring message =
+      L"Version " + std::wstring(version) + L" is ready. Open settings when you want to update.";
+  wcsncpy_s(icon.szInfo, message.c_str(), _TRUNCATE);
+  Shell_NotifyIconW(NIM_MODIFY, &icon);
+}
+
 bool TrayIcon::IsTaskbarCreatedMessage(UINT message) const {
   return taskbar_created_message_ != 0 && message == taskbar_created_message_;
 }
@@ -89,7 +104,8 @@ void TrayIcon::OnTaskbarCreated() { added_ = false; }
 
 TrayCommand TrayIcon::HandleCallback(HWND owner, LPARAM parameter,
                                      const SettingsViewModel& view_model) const {
-  if (parameter == WM_LBUTTONUP || parameter == WM_LBUTTONDBLCLK) {
+  if (parameter == WM_LBUTTONUP || parameter == WM_LBUTTONDBLCLK ||
+      parameter == NIN_BALLOONUSERCLICK) {
     return TrayCommand::kShowSettings;
   }
   if (parameter != WM_RBUTTONUP) return TrayCommand::kNone;

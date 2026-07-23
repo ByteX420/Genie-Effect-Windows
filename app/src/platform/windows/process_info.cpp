@@ -129,13 +129,8 @@ std::wstring ExecutableDirectory() {
   return slash == std::wstring::npos ? L".\\" : path.substr(0, slash + 1);
 }
 
-std::string ExecutableProductVersion() {
-  std::wstring module_path(32768, L'\0');
-  const DWORD length =
-      GetModuleFileNameW(nullptr, module_path.data(), static_cast<DWORD>(module_path.size()));
-  if (length == 0 || length >= module_path.size()) return {};
-  module_path.resize(length);
-
+std::string FileProductVersion(std::wstring_view file_path) {
+  const std::wstring module_path(file_path);
   DWORD handle = 0;
   const DWORD size = GetFileVersionInfoSizeW(module_path.c_str(), &handle);
   if (size == 0) return {};
@@ -180,6 +175,15 @@ std::string ExecutableProductVersion() {
   const DWORD build = LOWORD(fixed->dwProductVersionLS);
   return build == 0 ? std::format("{}.{}.{}", major, minor, patch)
                     : std::format("{}.{}.{}.{}", major, minor, patch, build);
+}
+
+std::string ExecutableProductVersion() {
+  std::wstring module_path(32768, L'\0');
+  const DWORD length =
+      GetModuleFileNameW(nullptr, module_path.data(), static_cast<DWORD>(module_path.size()));
+  if (length == 0 || length >= module_path.size()) return {};
+  module_path.resize(length);
+  return FileProductVersion(module_path);
 }
 
 }  // namespace minimize::platform

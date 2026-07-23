@@ -40,6 +40,8 @@
 
 namespace minimize::app {
 
+struct ApplicationLaunchOptions;
+
 class ApplicationRuntime : public ui::SettingsActions {
 public:
   ApplicationRuntime() = default;
@@ -48,8 +50,12 @@ public:
   ApplicationRuntime(const ApplicationRuntime&) = delete;
   ApplicationRuntime& operator=(const ApplicationRuntime&) = delete;
 
-  bool Initialize(HINSTANCE instance);
+  bool Initialize(HINSTANCE instance, const ApplicationLaunchOptions& options);
   int Run();
+  void RenderUpdateHandoverFrame();
+  void CompleteUpdateHandover();
+  void PrepareForUpdateHandover() override;
+  void ResumeAfterUpdateHandoverFailure() override;
   void RequestShutdown();
   void CleanupAndRestoreAll();
   void HealLeftoverWindows();
@@ -109,6 +115,7 @@ private:
   void UpdateTemporaryPause();
   void RegisterConfiguredHotkeys();
   void UnregisterAllHotkeys();
+  [[nodiscard]] bool StartRuntimeServices();
   [[nodiscard]] features::DiagnosticsSnapshot BuildDiagnosticsSnapshot() const;
   [[nodiscard]] bool IsTemporarilyPaused() const;
   [[nodiscard]] bool IsEffectActive() const;
@@ -163,22 +170,23 @@ private:
   minimize::features::SettingsMutationService settings_mutations_{settings_service_};
   minimize::features::EffectPolicy effect_policy_;
   minimize::features::AnimationConfiguration animation_configuration_{settings_service_,
-                                                                   effect_policy_};
+                                                                      effect_policy_};
   minimize::features::DiagnosticsService diagnostics_service_;
   minimize::features::PauseController pause_controller_;
   minimize::features::WindowRecoveryService window_recovery_service_{snapshot_cache_};
   minimize::features::WindowExclusionService window_exclusion_service_;
   minimize::features::OpenWindowsService open_windows_service_{window_exclusion_service_};
-  minimize::features::MinimizeFeature minimize_feature_{effect_policy_, window_recovery_service_,
-                                                     runs_, snapshot_cache_,
-                                                     window_exclusion_service_};
-  minimize::features::RestoreFeature restore_feature_{
-      effect_policy_, window_recovery_service_, snapshot_cache_, runs_, minimize_feature_,
-      window_exclusion_service_};
+  minimize::features::MinimizeFeature minimize_feature_{
+      effect_policy_, window_recovery_service_, runs_, snapshot_cache_, window_exclusion_service_};
+  minimize::features::RestoreFeature restore_feature_{effect_policy_,    window_recovery_service_,
+                                                      snapshot_cache_,   runs_,
+                                                      minimize_feature_, window_exclusion_service_};
   minimize::features::EffectController effect_controller_{effect_policy_, pause_controller_,
-                                                       minimize_feature_, restore_feature_};
+                                                          minimize_feature_, restore_feature_};
   std::atomic<bool> shutting_down_{false};
   std::atomic<bool> cleaned_up_{false};
+  std::atomic<bool> update_handover_prepared_{false};
+  bool runtime_services_started_ = false;
   ui::SettingsWindow settings_window_;
   MessageLoop message_loop_;
 };

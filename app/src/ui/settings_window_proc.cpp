@@ -28,7 +28,13 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
     settings->tray_icon_.OnTaskbarCreated();
     if (!IsWindowVisible(hwnd)) {
       (void)settings->tray_icon_.Add(hwnd, settings->controller_->view_model());
+      settings->HandleUpdateStateChanged();
     }
+    return 0;
+  }
+
+  if (settings != nullptr && message == features::UpdateService::kStateChangedMessage) {
+    settings->HandleUpdateStateChanged();
     return 0;
   }
 
@@ -106,7 +112,7 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
         settings->controller_ != nullptr
             ? settings->controller_->actions().SetHotkey(
                   action, minimize::settings::HotkeyBinding{.modifiers = modifiers,
-                                                         .virtual_key = virtual_key})
+                                                            .virtual_key = virtual_key})
             : ui::HotkeyUpdateResult::kInvalid;
     settings->hotkey_feedback_ = ui::HotkeyUpdateMessage(result);
     if (result == ui::HotkeyUpdateResult::kSuccess) settings->editing_hotkey_ = -1;
@@ -213,6 +219,7 @@ LRESULT CALLBACK SettingsWindow::WindowProc(HWND hwnd, UINT message, WPARAM w_pa
     case WM_TIMER:
       if (settings != nullptr && w_param == ui::TrayIcon::kRetryTimerId) {
         (void)settings->tray_icon_.Add(hwnd, settings->controller_->view_model());
+        settings->HandleUpdateStateChanged();
         return 0;
       }
       return DefWindowProcW(hwnd, message, w_param, l_param);
