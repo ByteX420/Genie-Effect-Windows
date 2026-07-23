@@ -1,4 +1,4 @@
-﻿# Build Release x64 and publish/update a GitHub Release when the product version changes.
+# Build Release x64 and publish/update a GitHub Release when the product version changes.
 #
 # Security model (no personal tokens in the repo):
 # - Uses only the job-scoped GITHUB_TOKEN (auto-injected by Actions).
@@ -168,9 +168,11 @@ jobs:
 
             Automated **stable** release build (Windows x64, MultiByte, LTCG /O2).
 
-            ### Changes in 1.3.2
-            - **Fullscreen restore stability** — layered Chromium apps such as Spotify now stay hidden until their restored DWM frame is composed, preventing restore flicker and duplicate minimize callbacks
-            - **Reliable animation reversal** — reverse minimize/restore transitions now update the run state, restart their timing basis, and use the correct watchdog timeout
+            ### Changes in 1.3.3
+            - **Taskbar icon target detection** — exact taskbar icon bounding box detection via UI Automation and HWND matching
+            - **GPU mesh deformation** — hardware-accelerated vertex mesh deformation moved to HLSL GPU shaders
+            - **Window shape & shadow animation** — animated window transparency, corner shape, and shadow transitions
+            - **C++ safety & performance hardening** — C-ABI exception safety guards, Win32 RAII handle management, and zero-allocation hot paths across hook DLL and runtime
 
             ### Install
             1. Download **MinimizeEffect-windows-x64.zip**
