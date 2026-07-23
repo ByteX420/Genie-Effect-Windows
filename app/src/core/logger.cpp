@@ -1,4 +1,4 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "core/logger.hpp"
 
@@ -22,68 +22,107 @@ bool IsSynchronousLoggingEnabled() {
 #endif
 }
 
+class [[nodiscard]] SRWLockGuard final {
+public:
+  explicit SRWLockGuard(SRWLOCK& lock) noexcept : lock_(lock) { AcquireSRWLockExclusive(&lock_); }
+  ~SRWLockGuard() noexcept { ReleaseSRWLockExclusive(&lock_); }
+  SRWLockGuard(const SRWLockGuard&) = delete;
+  SRWLockGuard& operator=(const SRWLockGuard&) = delete;
+
+private:
+  SRWLOCK& lock_;
+};
+
+class SafeFileHandle final {
+public:
+  SafeFileHandle() noexcept = default;
+  explicit SafeFileHandle(HANDLE h) noexcept : handle_(h) {}
+  ~SafeFileHandle() noexcept { Close(); }
+
+  SafeFileHandle(const SafeFileHandle&) = delete;
+  SafeFileHandle& operator=(const SafeFileHandle&) = delete;
+  SafeFileHandle(SafeFileHandle&& o) noexcept
+      : handle_(std::exchange(o.handle_, INVALID_HANDLE_VALUE)) {}
+  SafeFileHandle& operator=(SafeFileHandle&& o) noexcept {
+    if (this != &o) {
+      Close();
+      handle_ = std::exchange(o.handle_, INVALID_HANDLE_VALUE);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] HANDLE get() const noexcept { return handle_; }
+  [[nodiscard]] bool valid() const noexcept { return handle_ != INVALID_HANDLE_VALUE; }
+
+  void Close() noexcept {
+    if (handle_ != INVALID_HANDLE_VALUE) {
+      CloseHandle(handle_);
+      handle_ = INVALID_HANDLE_VALUE;
+    }
+  }
+
+private:
+  HANDLE handle_ = INVALID_HANDLE_VALUE;
+};
+
 class LoggerState final {
 public:
-  ~LoggerState() { Close(); }
+  ~LoggerState() noexcept { Close(); }
 
   LoggerState(const LoggerState&) = delete;
   LoggerState& operator=(const LoggerState&) = delete;
 
-  static LoggerState& Instance() {
+  static LoggerState& Instance() noexcept {
     static LoggerState state;
     return state;
   }
 
   void Write(std::string_view entry) {
 #ifdef _DEBUG
-    AcquireSRWLockExclusive(&lock_);
-    if (file_ == INVALID_HANDLE_VALUE) {
-      file_ = CreateFileW(DebugLogPath().c_str(), FILE_APPEND_DATA,
-                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-                          OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-      if (file_ != INVALID_HANDLE_VALUE) {
+    if (entry.empty()) return;
+
+    SRWLockGuard lock(lock_);
+    if (!file_.valid()) {
+      HANDLE h = CreateFileW(DebugLogPath().c_str(), FILE_APPEND_DATA,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (h != INVALID_HANDLE_VALUE) {
+        file_ = SafeFileHandle(h);
         LARGE_INTEGER size{};
-        if (GetFileSizeEx(file_, &size) && size.QuadPart == 0) {
+        if (GetFileSizeEx(file_.get(), &size) && size.QuadPart == 0) {
           constexpr unsigned char kUtf8Bom[] = {0xef, 0xbb, 0xbf};
           DWORD written = 0;
-          WriteFile(file_, kUtf8Bom, static_cast<DWORD>(sizeof(kUtf8Bom)), &written, nullptr);
+          WriteFile(file_.get(), kUtf8Bom, static_cast<DWORD>(sizeof(kUtf8Bom)), &written, nullptr);
         }
       }
     }
 
-    if (file_ != INVALID_HANDLE_VALUE && !entry.empty()) {
+    if (file_.valid()) {
       DWORD written = 0;
-      if (!WriteFile(file_, entry.data(), static_cast<DWORD>(entry.size()), &written, nullptr)) {
-        CloseUnlocked();
+      const DWORD requested = static_cast<DWORD>(entry.size());
+      if (!WriteFile(file_.get(), entry.data(), requested, &written, nullptr) ||
+          written != requested) {
+        file_.Close();
       } else if (IsSynchronousLoggingEnabled()) {
-        FlushFileBuffers(file_);
+        FlushFileBuffers(file_.get());
       }
     }
-    ReleaseSRWLockExclusive(&lock_);
 #else
     (void)entry;
 #endif
   }
 
-  void Close() {
+  void Close() noexcept {
 #ifdef _DEBUG
-    AcquireSRWLockExclusive(&lock_);
-    CloseUnlocked();
-    ReleaseSRWLockExclusive(&lock_);
+    SRWLockGuard lock(lock_);
+    file_.Close();
 #endif
   }
 
 private:
-  LoggerState() = default;
+  LoggerState() noexcept = default;
 
-  void CloseUnlocked() {
-    if (file_ != INVALID_HANDLE_VALUE) {
-      CloseHandle(file_);
-      file_ = INVALID_HANDLE_VALUE;
-    }
-  }
-
-  HANDLE file_ = INVALID_HANDLE_VALUE;
+  SafeFileHandle file_;
   SRWLOCK lock_ = SRWLOCK_INIT;
 };
 
@@ -122,33 +161,57 @@ const std::wstring& ProcessName() {
 
 #ifdef _DEBUG
 void WriteLogLine(std::wstring_view module_name, std::wstring_view level,
-                  std::wstring_view message) {
-  SYSTEMTIME time{};
-  GetLocalTime(&time);
+                  std::wstring_view message) noexcept {
+  try {
+    SYSTEMTIME time{};
+    GetLocalTime(&time);
 
-  wchar_t time_string[64]{};
-  swprintf_s(time_string, L"%04d-%02d-%02d %02d:%02d:%02d.%03d", time.wYear, time.wMonth, time.wDay,
-             time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
+    wchar_t buffer[1024]{};
+    const std::wstring& process_name = ProcessName();
+    const std::size_t variable_length =
+        process_name.size() + level.size() + module_name.size() + message.size();
+    int formatted = -1;
+    if (variable_length + 128 < std::size(buffer)) {
+      formatted = swprintf_s(
+          buffer, std::size(buffer),
+          L"[%04d-%02d-%02d %02d:%02d:%02d.%03d] [%ls:%lu:%lu] [%.*ls] [%.*ls] %.*ls\r\n",
+          time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond,
+          time.wMilliseconds, process_name.c_str(), GetCurrentProcessId(), GetCurrentThreadId(),
+          static_cast<int>(level.size()), level.data(), static_cast<int>(module_name.size()),
+          module_name.data(), static_cast<int>(message.size()), message.data());
+    }
 
-  std::wstring line;
-  line.reserve(module_name.size() + message.size() + 128);
-  line.append(L"[");
-  line.append(time_string);
-  line.append(L"] [");
-  line.append(ProcessName());
-  line.append(L":");
-  line.append(std::to_wstring(GetCurrentProcessId()));
-  line.append(L":");
-  line.append(std::to_wstring(GetCurrentThreadId()));
-  line.append(L"] [");
-  line.append(level);
-  line.append(L"] [");
-  line.append(module_name);
-  line.append(L"] ");
-  line.append(message);
-  line.append(L"\r\n");
+    if (formatted > 0) {
+      LoggerState::Instance().Write(
+          WideToUtf8(std::wstring_view(buffer, static_cast<std::size_t>(formatted))));
+      return;
+    }
 
-  LoggerState::Instance().Write(WideToUtf8(line));
+    // Preserve complete diagnostics when a line exceeds the allocation-free fast-path buffer.
+    std::wstring line;
+    line.reserve(module_name.size() + message.size() + 128);
+    line.append(L"[");
+    wchar_t time_string[64]{};
+    swprintf_s(time_string, L"%04d-%02d-%02d %02d:%02d:%02d.%03d", time.wYear, time.wMonth,
+               time.wDay, time.wHour, time.wMinute, time.wSecond, time.wMilliseconds);
+    line.append(time_string);
+    line.append(L"] [");
+    line.append(process_name);
+    line.append(L":");
+    line.append(std::to_wstring(GetCurrentProcessId()));
+    line.append(L":");
+    line.append(std::to_wstring(GetCurrentThreadId()));
+    line.append(L"] [");
+    line.append(level);
+    line.append(L"] [");
+    line.append(module_name);
+    line.append(L"] ");
+    line.append(message);
+    line.append(L"\r\n");
+    LoggerState::Instance().Write(WideToUtf8(line));
+  } catch (...) {
+    // Logging must never terminate the host process, including the injected hook callback.
+  }
 }
 #endif
 
@@ -235,22 +298,23 @@ void CleanupDebugLogs(std::size_t maximum_files, std::uintmax_t maximum_total_by
     error.clear();
   }
 
-  std::sort(logs.begin(), logs.end(), [&error](const auto& left, const auto& right) {
+  std::sort(logs.begin(), logs.end(), [&error](const auto& left, const auto& right) noexcept {
     const auto left_time = left.last_write_time(error);
     error.clear();
     const auto right_time = right.last_write_time(error);
     error.clear();
-    return left_time < right_time;
+    return left_time > right_time;
   });
 
   std::uintmax_t total = DebugLogFolderSize();
   while (!logs.empty() && (logs.size() + 1 > maximum_files || total > maximum_total_bytes)) {
-    const std::uintmax_t size = logs.front().file_size(error);
+    const auto& oldest = logs.back();
+    const std::uintmax_t size = oldest.file_size(error);
     error.clear();
-    std::filesystem::remove(logs.front().path(), error);
+    std::filesystem::remove(oldest.path(), error);
     error.clear();
-    total = total > size ? total - size : 0;
-    logs.erase(logs.begin());
+    total = (total > size) ? (total - size) : 0;
+    logs.pop_back();
   }
 }
 

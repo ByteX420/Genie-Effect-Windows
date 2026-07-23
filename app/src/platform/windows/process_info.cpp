@@ -1,9 +1,12 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "platform/windows/process_info.hpp"
 
+#include <array>
 #include <format>
+#include <memory>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #pragma comment(lib, "version.lib")
@@ -26,6 +29,39 @@ std::string WideToUtf8(std::wstring_view value) {
   return result;
 }
 
+class [[nodiscard]] UniqueHandle final {
+public:
+  UniqueHandle() noexcept = default;
+  explicit UniqueHandle(HANDLE h) noexcept : handle_(h) {}
+  ~UniqueHandle() noexcept { Close(); }
+
+  UniqueHandle(const UniqueHandle&) = delete;
+  UniqueHandle& operator=(const UniqueHandle&) = delete;
+  UniqueHandle(UniqueHandle&& o) noexcept : handle_(std::exchange(o.handle_, nullptr)) {}
+  UniqueHandle& operator=(UniqueHandle&& o) noexcept {
+    if (this != &o) {
+      Close();
+      handle_ = std::exchange(o.handle_, nullptr);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] HANDLE get() const noexcept { return handle_; }
+  [[nodiscard]] explicit operator bool() const noexcept {
+    return handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE;
+  }
+
+  void Close() noexcept {
+    if (handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE) {
+      CloseHandle(handle_);
+      handle_ = nullptr;
+    }
+  }
+
+private:
+  HANDLE handle_ = nullptr;
+};
+
 }  // namespace
 
 DWORD WindowProcessId(HWND window) {
@@ -39,32 +75,45 @@ std::optional<std::string> GetWindowExecutableName(HWND window) {
   const DWORD process_id = WindowProcessId(window);
   if (process_id == 0) return std::nullopt;
 
-  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
-  if (process == nullptr) return std::nullopt;
-  std::vector<wchar_t> path(32768);
-  DWORD length = static_cast<DWORD>(path.size());
-  const BOOL queried = QueryFullProcessImageNameW(process, 0, path.data(), &length);
-  CloseHandle(process);
-  if (!queried || length == 0) return std::nullopt;
+  UniqueHandle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id));
+  if (!process) return std::nullopt;
 
-  const std::wstring_view full_path(path.data(), length);
-  const std::size_t separator = full_path.find_last_of(L"\\/");
-  const std::wstring_view filename =
-      separator == std::wstring_view::npos ? full_path : full_path.substr(separator + 1);
-  std::string utf8 = WideToUtf8(filename);
-  return utf8.empty() ? std::nullopt : std::optional<std::string>(std::move(utf8));
+  std::array<wchar_t, MAX_PATH> stack_path{};
+  DWORD length = static_cast<DWORD>(stack_path.size());
+  if (QueryFullProcessImageNameW(process.get(), 0, stack_path.data(), &length) && length > 0) {
+    const std::wstring_view full_path(stack_path.data(), length);
+    const std::size_t separator = full_path.find_last_of(L"\\/");
+    const std::wstring_view filename =
+        separator == std::wstring_view::npos ? full_path : full_path.substr(separator + 1);
+    std::string utf8 = WideToUtf8(filename);
+    return utf8.empty() ? std::nullopt : std::optional<std::string>(std::move(utf8));
+  }
+
+  if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+    std::vector<wchar_t> heap_path(32768);
+    length = static_cast<DWORD>(heap_path.size());
+    if (QueryFullProcessImageNameW(process.get(), 0, heap_path.data(), &length) && length > 0) {
+      const std::wstring_view full_path(heap_path.data(), length);
+      const std::size_t separator = full_path.find_last_of(L"\\/");
+      const std::wstring_view filename =
+          separator == std::wstring_view::npos ? full_path : full_path.substr(separator + 1);
+      std::string utf8 = WideToUtf8(filename);
+      return utf8.empty() ? std::nullopt : std::optional<std::string>(std::move(utf8));
+    }
+  }
+
+  return std::nullopt;
 }
 
 bool IsCurrentProcessElevated() {
   HANDLE token = nullptr;
   if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
+  UniqueHandle token_guard(token);
   TOKEN_ELEVATION elevation{};
   DWORD size = sizeof(elevation);
-  const bool elevated =
-      GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size) &&
-      elevation.TokenIsElevated != 0;
-  CloseHandle(token);
-  return elevated;
+  return GetTokenInformation(token_guard.get(), TokenElevation, &elevation, sizeof(elevation),
+                             &size) &&
+         elevation.TokenIsElevated != 0;
 }
 
 std::wstring ExecutableDirectory() {

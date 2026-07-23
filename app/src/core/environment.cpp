@@ -1,26 +1,29 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "core/environment.hpp"
 
-#include <array>
-#include <string>
+#include <cstring>
 
 namespace minimize::core {
 
-bool EnvironmentFlagEnabled(std::string_view name) {
-  if (name.empty()) {
+bool EnvironmentFlagEnabled(std::string_view name) noexcept {
+  if (name.empty() || name.size() >= 256) {
     return false;
   }
 
-  const std::string variable_name(name);
-  std::array<char, 2> value{};
-  if (GetEnvironmentVariableA(variable_name.c_str(), value.data(),
-                              static_cast<DWORD>(value.size())) == 0) {
+  char stack_name[256];
+  std::memcpy(stack_name, name.data(), name.size());
+  stack_name[name.size()] = '\0';
+
+  char value[8]{};
+  const DWORD length =
+      GetEnvironmentVariableA(stack_name, value, static_cast<DWORD>(sizeof(value)));
+  if (length == 0 || length >= sizeof(value)) {
     return false;
   }
 
-  return value[0] == '1' || value[0] == 'y' || value[0] == 'Y' || value[0] == 't' ||
-         value[0] == 'T';
+  const char c = value[0];
+  return c == '1' || c == 'y' || c == 'Y' || c == 't' || c == 'T';
 }
 
 }  // namespace minimize::core

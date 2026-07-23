@@ -22,28 +22,31 @@ float WindowCornerRadius(HWND window) {
   return static_cast<float>(MulDiv(base_radius, std::max(GetDpiForWindow(window), 96U), 96));
 }
 
+struct GdiObjectDeleter {
+  void operator()(HGDIOBJ handle) const noexcept {
+    if (handle != nullptr) ::DeleteObject(handle);
+  }
+};
+using UniqueRgn = std::unique_ptr<std::remove_pointer_t<HRGN>, GdiObjectDeleter>;
+
 Region WindowRegion(HWND window) {
   Region result;
-  HRGN region = CreateRectRgn(0, 0, 0, 0);
-  if (region == nullptr) return result;
+  UniqueRgn region(CreateRectRgn(0, 0, 0, 0));
+  if (!region) return result;
 
-  const int region_type = GetWindowRgn(window, region);
-  if (region_type == ERROR) {
-    DeleteObject(region);
-    return result;
-  }
+  const int region_type = GetWindowRgn(window, region.get());
+  if (region_type == ERROR) return result;
+
   result.is_set = true;
-
-  const DWORD bytes = GetRegionData(region, 0, nullptr);
+  const DWORD bytes = GetRegionData(region.get(), 0, nullptr);
   if (bytes >= sizeof(RGNDATAHEADER)) {
     std::vector<std::byte> storage(bytes);
     auto* data = reinterpret_cast<RGNDATA*>(storage.data());
-    if (GetRegionData(region, bytes, data) == bytes) {
+    if (GetRegionData(region.get(), bytes, data) == bytes) {
       const auto* rectangles = reinterpret_cast<const RECT*>(data->Buffer);
       result.rectangles.assign(rectangles, rectangles + data->rdh.nCount);
     }
   }
-  DeleteObject(region);
   return result;
 }
 

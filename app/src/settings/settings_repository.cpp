@@ -1,4 +1,4 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "settings/settings_repository.hpp"
 
@@ -24,12 +24,24 @@ std::wstring SettingsRepository::Path() {
 AppSettings SettingsRepository::Load() const {
   const std::wstring path = Path();
   if (path.empty()) return {};
-  std::ifstream input(std::filesystem::path(path), std::ios::binary);
-  if (!input) return {};
-  std::string json((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
-  if (json.size() > 1024 * 1024) {
-    core::LogDebug(L"Settings", L"Ignoring settings file larger than 1 MiB");
+  const std::filesystem::path settings_path(path);
+  std::error_code ec;
+  const auto file_size = std::filesystem::file_size(settings_path, ec);
+  if (ec || file_size > 1024 * 1024) {
+    if (!ec && file_size > 1024 * 1024) {
+      core::LogDebug(L"Settings", L"Ignoring settings file larger than 1 MiB");
+    }
     return {};
+  }
+  std::ifstream input(settings_path, std::ios::binary);
+  if (!input) return {};
+  std::string json(static_cast<std::size_t>(file_size), '\0');
+  if (file_size != 0) {
+    input.read(json.data(), static_cast<std::streamsize>(file_size));
+    if (input.gcount() != static_cast<std::streamsize>(file_size)) {
+      core::LogDebug(L"Settings", L"Ignoring settings file that changed while being read");
+      return {};
+    }
   }
   auto deserialized = SettingsSerializer::Deserialize(json);
   if (!deserialized.has_value()) {

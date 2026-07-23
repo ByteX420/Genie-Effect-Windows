@@ -44,12 +44,17 @@ std::vector<std::uint8_t> Build(const WindowVisualMetadata& metadata, int width,
   const int visible_bottom =
       std::clamp(static_cast<int>(extended_bounds.bottom - capture_rect.top), 0, height);
   if (visible_right > visible_left && visible_bottom > visible_top) {
-    for (int y = 0; y < height; ++y) {
-      for (int x = 0; x < width; ++x) {
-        if (x < visible_left || x >= visible_right || y < visible_top || y >= visible_bottom) {
-          mask[static_cast<std::size_t>(y) * width + x] = 0;
-        }
-      }
+    for (int y = 0; y < visible_top; ++y) {
+      std::fill_n(mask.begin() + static_cast<std::size_t>(y) * width, width, std::uint8_t{0});
+    }
+    for (int y = visible_top; y < visible_bottom; ++y) {
+      const std::size_t row_offset = static_cast<std::size_t>(y) * width;
+      std::fill_n(mask.begin() + row_offset, visible_left, std::uint8_t{0});
+      std::fill_n(mask.begin() + row_offset + visible_right, width - visible_right,
+                  std::uint8_t{0});
+    }
+    for (int y = visible_bottom; y < height; ++y) {
+      std::fill_n(mask.begin() + static_cast<std::size_t>(y) * width, width, std::uint8_t{0});
     }
   }
 
