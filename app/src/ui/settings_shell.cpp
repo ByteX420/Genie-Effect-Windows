@@ -1,4 +1,4 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "ui/settings_shell.hpp"
 
@@ -13,13 +13,14 @@
 #include "ui/pages/animation_page.hpp"
 #include "ui/pages/applications_page.hpp"
 #include "ui/pages/diagnostics_page.hpp"
+#include "ui/pages/displays_page.hpp"
 #include "ui/pages/general_page.hpp"
 #include "ui/pages/hotkeys_page.hpp"
-#include "ui/pages/displays_page.hpp"
 #include "ui/pages/windows_integration_page.hpp"
 #include "ui/settings_window.hpp"
 #include "ui/theme/theme.hpp"
 #include "ui/theme/theme_tokens.hpp"
+#include "ui/update_presenter.hpp"
 
 namespace minimize::ui {
 namespace settings_ui = ::minimize::ui::theme;
@@ -30,9 +31,19 @@ void SettingsShell::Render(SettingsWindow& window) {
   const float scale = window.ui_scale_;
   const auto px = [scale](float value) { return value * scale; };
   motion::MotionContext widget_motion{window.motion_system_, window.motion_tokens_};
-  float content_alpha =
+  const float window_alpha =
       window.motion_system_.AnimateValue(ui::motion::MotionKey("window", "settings", "alpha"), 1.0f,
                                          window.motion_tokens_.panel_enter_fade, 0.0f);
+  const bool update_workspace_active =
+      window.update_workspace_engaged_ || window.update_resume_active_;
+  const float shell_content = window.motion_system_.AnimateValue(
+      ui::motion::MotionKey("update", "shell", "content"),
+      update_workspace_active ? 0.0f : 1.0f,
+      update_workspace_active
+          ? ui::motion::MotionSpec::Timed(0.54f, ui::motion::MotionEasing::kSmootherStep)
+          : ui::motion::MotionSpec::Timed(0.50f, ui::motion::MotionEasing::kSmootherStep),
+      update_workspace_active ? 1.0f : 0.0f);
+  float content_alpha = window_alpha * shell_content;
   const ImVec2 window_offset = window.motion_system_.AnimateVector(
       ui::motion::MotionKey("window", "settings", "offset"), ImVec2(0.0f, 0.0f),
       window.motion_tokens_.panel_enter_offset, ImVec2(0.0f, 6.0f));
@@ -55,31 +66,23 @@ void SettingsShell::Render(SettingsWindow& window) {
   // Shell: compact rail + solid content pane (outer radius matches DWM round corners).
   const float shell_round = px(theme::Metrics::kWindowRounding);
   ImVec4 main_background = ui::theme::kMainColor;
-  main_background.w *= content_alpha;
+  main_background.w *= window_alpha;
   draw->AddRectFilled(window_point(sidebar_width, 0.0f), window_point(window_size.x, window_size.y),
                       ImGui::GetColorU32(main_background), shell_round,
                       ImDrawFlags_RoundCornersRight);
   ImVec4 sidebar_background = ui::theme::kSidebarColor;
-  sidebar_background.w *= content_alpha;
+  sidebar_background.w *= window_alpha;
   draw->AddRectFilled(window_origin, window_point(sidebar_width, window_size.y),
                       ImGui::GetColorU32(sidebar_background), shell_round,
                       ImDrawFlags_RoundCornersLeft);
   draw->AddLine(window_point(sidebar_width, 0.0f), window_point(sidebar_width, window_size.y),
                 WithAlpha(theme::kBorder, content_alpha * 0.45f));
-
-  switch (theme::DrawTrafficLights(widget_motion, window_origin, scale, content_alpha)) {
-    case theme::TrafficLightAction::kClose:
-      window.HandleCloseRequest();
-      break;
-    case theme::TrafficLightAction::kMinimize:
-      ShowWindow(window.hwnd_, SW_MINIMIZE);
-      break;
-    case theme::TrafficLightAction::kZoom:
-      ShowWindow(window.hwnd_, IsZoomed(window.hwnd_) != FALSE ? SW_RESTORE : SW_MAXIMIZE);
-      window.ForceRender();
-      break;
-    case theme::TrafficLightAction::kNone:
-      break;
+  if (update_workspace_active || shell_content < 0.999f) {
+    const float workspace_base_alpha = window_alpha * (1.0f - shell_content);
+    draw->AddRectFilled(window_origin, window_point(window_size.x, window_size.y),
+                        IM_COL32(20, 20, 22,
+                                 static_cast<int>(255.0f * workspace_base_alpha)),
+                        shell_round);
   }
 
   // Brand under traffic lights — same left inset as nav.
@@ -116,7 +119,8 @@ void SettingsShell::Render(SettingsWindow& window) {
   const float nav_x = px(theme::Metrics::kSidebarMargin);
   const float nav_w = px(theme::Metrics::kSidebarContentWidth);
   const float nav_h = px(theme::Metrics::kNavigationRowHeight);
-  const float nav_step = px(theme::Metrics::kNavigationRowHeight + theme::Metrics::kNavigationSpacing);
+  const float nav_step =
+      px(theme::Metrics::kNavigationRowHeight + theme::Metrics::kNavigationSpacing);
   const float nav_base_y = px(theme::Metrics::kNavigationY);
 
   std::array<float, pages.size()> item_offsets{};
@@ -227,6 +231,10 @@ void SettingsShell::Render(SettingsWindow& window) {
     ImGui::SetScrollY(0.0f);
     window.reset_page_scroll_ = false;
   }
+  if (window.initial_page_scroll_) {
+    ImGui::SetScrollY(*window.initial_page_scroll_);
+    window.initial_page_scroll_.reset();
+  }
   draw = ImGui::GetWindowDrawList();
   const ImVec2 size = ImGui::GetWindowSize();
   const ImVec2 origin = ImGui::GetWindowPos();
@@ -309,6 +317,7 @@ void SettingsShell::Render(SettingsWindow& window) {
   ImGui::Dummy(ImVec2(1.0f, 1.0f));
 
   const float scroll_y = ImGui::GetScrollY();
+  window.current_page_scroll_ = scroll_y;
   const float scroll_max = ImGui::GetScrollMaxY();
   const float fade_height = px(theme::Metrics::kScrollFadeHeight);
   // Keep fades clear of the overlay scrollbar strip on the right edge.
@@ -487,6 +496,24 @@ void SettingsShell::Render(SettingsWindow& window) {
     }
   }
 
+  UpdatePresenter::Render(window);
+
+  // Window chrome is intentionally last. During an update the complete application content
+  // can dissolve into the updater workspace while the traffic lights remain pixel-stable.
+  switch (theme::DrawTrafficLights(widget_motion, window_origin, scale, window_alpha)) {
+    case theme::TrafficLightAction::kClose:
+      window.HandleCloseRequest();
+      break;
+    case theme::TrafficLightAction::kMinimize:
+      ShowWindow(window.hwnd_, SW_MINIMIZE);
+      break;
+    case theme::TrafficLightAction::kZoom:
+      ShowWindow(window.hwnd_, IsZoomed(window.hwnd_) != FALSE ? SW_RESTORE : SW_MAXIMIZE);
+      window.ForceRender();
+      break;
+    case theme::TrafficLightAction::kNone:
+      break;
+  }
   ImGui::End();
 }
 

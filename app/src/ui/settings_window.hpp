@@ -2,10 +2,12 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <windows.h>
 
 #include "features/diagnostics_service.hpp"
 #include "features/open_windows_service.hpp"
+#include "features/update_service.hpp"
 #include "settings/app_settings.hpp"
 #include "ui/animation_preview.hpp"
 #include "ui/application_list_provider.hpp"
@@ -32,6 +34,7 @@ class WindowsIntegrationPage;
 
 namespace minimize::ui {
 class SettingsShell;
+class UpdatePresenter;
 
 class SettingsWindow {
 public:
@@ -43,6 +46,9 @@ public:
   bool Initialize(HINSTANCE instance, ui::SettingsActions& actions);
   void Shutdown();
   void Show(bool show);
+  void SetInitialBounds(const RECT& bounds) { initial_bounds_ = bounds; }
+  void PrepareUpdateResume(int page, float page_scroll, bool maximized);
+  void CompleteUpdateHandover();
   void UpdateState(const minimize::settings::AppSettings& settings);
   void UpdatePauseState(bool paused, bool until_restart);
   void SetHotkeyRegistrationStatus(minimize::settings::HotkeyAction action, bool available);
@@ -57,6 +63,7 @@ public:
 
 private:
   friend class SettingsShell;
+  friend class UpdatePresenter;
   friend class ui::pages::AboutPage;
   friend class ui::pages::AnimationPage;
   friend class ui::pages::ApplicationsPage;
@@ -85,6 +92,7 @@ private:
   void RecordSaveResult(bool saved);
   void RecordFileOperationResult(const SettingsFileOperationResult& result);
   void HandleCloseRequest();
+  void HandleUpdateStateChanged();
   void UpdateStartupEnterMotionGate();
   [[nodiscard]] bool DetectStartupEnterMotionActive() const;
 
@@ -137,6 +145,16 @@ private:
   ImFont* font_title_ = nullptr;
   ui::motion::MotionSystem motion_system_;
   ui::motion::MotionTokens motion_tokens_ = ui::motion::MotionTokens::Default();
+  features::UpdateService update_service_;
+  std::string update_notified_version_;
+  bool update_card_dismissed_ = false;
+  bool update_workspace_engaged_ = false;
+  bool update_resume_active_ = false;
+  bool update_installer_started_ = false;
+  float current_page_scroll_ = 0.0f;
+  std::optional<float> initial_page_scroll_;
+  bool initial_maximized_ = false;
+  std::optional<RECT> initial_bounds_;
 };
 
 }  // namespace minimize::ui

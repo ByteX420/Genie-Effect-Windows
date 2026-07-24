@@ -138,6 +138,7 @@
     <ClCompile Include="src\features\restore_feature.cpp" />
     <ClCompile Include="src\features\settings_actions_controller.cpp" />
     <ClCompile Include="src\features\settings_mutation_service.cpp" />
+    <ClCompile Include="src\features\update_service.cpp" />
     <ClCompile Include="src\features\window_exclusion_service.cpp" />
     <ClCompile Include="src\features\open_windows_service.cpp" />
     <ClCompile Include="src\features\window_recovery_service.cpp" />
@@ -155,6 +156,7 @@
     <ClCompile Include="src\platform\windows\process_runtime.cpp" />
     <ClCompile Include="src\platform\windows\single_instance_guard.cpp" />
     <ClCompile Include="src\platform\windows\startup_manager.cpp" />
+    <ClCompile Include="src\platform\windows\update_installer.cpp" />
     <ClCompile Include="src\platform\windows\taskbar_locator.cpp" />
     <ClCompile Include="src\platform\windows\taskbar_target_provider.cpp" />
     <ClCompile Include="src\platform\windows\window_diagnostics.cpp" />
@@ -207,6 +209,7 @@
     <ClCompile Include="src\ui\settings_window_proc.cpp" />
     <ClCompile Include="src\ui\theme\theme.cpp" />
     <ClCompile Include="src\ui\tray_icon.cpp" />
+    <ClCompile Include="src\ui\update_presenter.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ProgramDataBaseFileName>$(IntDir)imgui.pdb</ProgramDataBaseFileName>
@@ -257,6 +260,7 @@
     <ClInclude Include="src\features\pause_controller.hpp" />
     <ClInclude Include="src\features\restore_feature.hpp" />
     <ClInclude Include="src\features\settings_mutation_service.hpp" />
+    <ClInclude Include="src\features\update_service.hpp" />
     <ClInclude Include="src\features\window_exclusion_service.hpp" />
     <ClInclude Include="src\features\open_windows_service.hpp" />
     <ClInclude Include="src\features\window_recovery_service.hpp" />
@@ -272,6 +276,7 @@
     <ClInclude Include="src\platform\windows\process_runtime.hpp" />
     <ClInclude Include="src\platform\windows\single_instance_guard.hpp" />
     <ClInclude Include="src\platform\windows\startup_manager.hpp" />
+    <ClInclude Include="src\platform\windows\update_installer.hpp" />
     <ClInclude Include="src\platform\windows\taskbar_locator.hpp" />
     <ClInclude Include="src\platform\windows\taskbar_target_provider.hpp" />
     <ClInclude Include="src\platform\windows\window_diagnostics.hpp" />
@@ -328,6 +333,7 @@
     <ClInclude Include="src\ui\theme\theme.hpp" />
     <ClInclude Include="src\ui\theme\theme_tokens.hpp" />
     <ClInclude Include="src\ui\tray_icon.hpp" />
+    <ClInclude Include="src\ui\update_presenter.hpp" />
     <ClInclude Include="third_party\imgui\backends\imgui_impl_dx11.h" />
     <ClInclude Include="third_party\imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="third_party\imgui\imconfig.h" />
@@ -346,7 +352,8 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
-  <Target Name="BuildMinimizeHook" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+  <Target Name="BuildMinimizeHook" BeforeTargets="PrepareForBuild"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(SkipMinimizeHookBuild)' != 'true'">
     <MSBuild Projects="$(ProjectDir)..\hook\MinimizeHook.vcxproj"
              Targets="Build"
              Properties="Configuration=$(Configuration);Platform=$(Platform)"

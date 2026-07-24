@@ -26,7 +26,8 @@ constexpr ImU32 kSecondaryTextColor = ::minimize::ui::theme::kMutedText;
 }  // namespace
 
 void AboutPage::Render(::minimize::ui::SettingsWindow& window, components::PageLayout& layout,
-                       const ::minimize::ui::motion::MotionContext& motion, float scale, float alpha) {
+                       const ::minimize::ui::motion::MotionContext& motion, float scale,
+                       float alpha) {
   auto px = [scale](float value) { return value * scale; };
   const ULONGLONG now = GetTickCount64();
   auto& diagnostics = window.controller_->view_model().diagnostics;
@@ -42,8 +43,8 @@ void AboutPage::Render(::minimize::ui::SettingsWindow& window, components::PageL
   layout.BeginGroup();
   layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightHero);
   layout.RowTitle(window.font_medium_, kSectionTitleTextSize, "Minimize Effect", kPrimaryTextColor);
-  layout.RowSubtitle(window.font_small_, kHelperTextSize,
-                     "Custom minimize and restore for Windows", kSecondaryTextColor);
+  layout.RowSubtitle(window.font_small_, kHelperTextSize, "Custom minimize and restore for Windows",
+                     kSecondaryTextColor);
   layout.EndRow();
   layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeight);
   layout.ReserveControl(layout.content_width() * 0.55f);
@@ -53,6 +54,73 @@ void AboutPage::Render(::minimize::ui::SettingsWindow& window, components::PageL
   layout.EndGroup();
 
   const float button_height = ::minimize::ui::theme::Metrics::kButtonHeight * scale;
+  const features::UpdateSnapshot update = window.update_service_.GetSnapshot();
+  std::string update_value;
+  const char* update_button = nullptr;
+  switch (update.phase) {
+    case features::UpdatePhase::kIdle:
+      update_value = "Waiting to check";
+      update_button = "Check now";
+      break;
+    case features::UpdatePhase::kChecking:
+      update_value = "Checking GitHub...";
+      break;
+    case features::UpdatePhase::kUpToDate:
+      update_value = "Up to date";
+      update_button = "Check again";
+      break;
+    case features::UpdatePhase::kAvailable:
+      update_value = "v" + update.latest_version + " available";
+      update_button = "Update now";
+      break;
+    case features::UpdatePhase::kDownloading:
+      update_value = "Downloading...";
+      break;
+    case features::UpdatePhase::kVerifying:
+      update_value = "Verifying SHA-256...";
+      break;
+    case features::UpdatePhase::kStaging:
+      update_value = "Preparing restart...";
+      break;
+    case features::UpdatePhase::kReadyToInstall:
+    case features::UpdatePhase::kInstalling:
+      update_value = "Switching versions...";
+      break;
+    case features::UpdatePhase::kError:
+      update_value = update.error.empty() ? "Check failed" : "Needs attention";
+      update_button = update.latest_version.empty() ? "Try again" : "Retry";
+      break;
+  }
+
+  layout.SectionCaption(window.font_small_, kCaptionTextSize, "UPDATES");
+  layout.BeginGroup();
+  layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
+  const float update_button_width = px(118.0f);
+  if (update_button != nullptr) layout.ReserveControl(update_button_width);
+  layout.RowTitle(window.font_body_, kLabelTextSize, "Software update", kPrimaryTextColor);
+  layout.RowSubtitle(window.font_small_, kHelperTextSize, update_value.c_str(),
+                     update.phase == features::UpdatePhase::kError ? IM_COL32(222, 142, 142, 255)
+                                                                   : kSecondaryTextColor);
+  if (update_button != nullptr) {
+    const ImVec2 update_cursor = layout.ControlCursor(update_button_width, button_height);
+    layout.SetCursor(update_cursor.x, update_cursor.y);
+    if (ui::components::CompactButton(
+            motion, "##software_update", update_button, ImVec2(update_button_width, button_height),
+            window.font_body_, scale, alpha, update.phase == features::UpdatePhase::kAvailable)) {
+      window.update_card_dismissed_ = false;
+      if (update.phase == features::UpdatePhase::kAvailable ||
+          (update.phase == features::UpdatePhase::kError && !update.latest_version.empty())) {
+        window.update_workspace_engaged_ = true;
+        window.update_service_.DownloadUpdate();
+      } else {
+        window.update_service_.CheckForUpdates(true);
+      }
+      window.ForceRender();
+    }
+  }
+  layout.EndRow();
+  layout.EndGroup();
+
   layout.SectionCaption(window.font_small_, kCaptionTextSize, "FONTS");
   layout.BeginGroup();
   layout.BeginRow(::minimize::ui::theme::Metrics::kRowHeightTall);
@@ -79,7 +147,8 @@ void AboutPage::Render(::minimize::ui::SettingsWindow& window, components::PageL
                                  viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
                           ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(px(22.0f), px(20.0f)));
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, px(::minimize::ui::theme::Metrics::kCardRounding));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,
+                      px(::minimize::ui::theme::Metrics::kCardRounding));
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, std::max(1.0f, scale));
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(px(8.0f), px(8.0f)));
   ImGui::PushStyleColor(ImGuiCol_PopupBg, ui::theme::kPanelColor);

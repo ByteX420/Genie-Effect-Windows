@@ -1,0 +1,1161 @@
+#include "pch.hpp"
+
+#include "features/update_service.hpp"
+
+#include <array>
+#include <bcrypt.h>
+#include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <limits>
+#include <optional>
+#include <sstream>
+#include <string_view>
+#include <utility>
+#include <winhttp.h>
+
+#include "platform/windows/process_info.hpp"
+
+#pragma comment(lib, "bcrypt.lib")
+#pragma comment(lib, "winhttp.lib")
+
+namespace minimize::features {
+namespace {
+
+constexpr wchar_t kReleaseApiUrl[] =
+    L"https://api.github.com/repos/ByteX420/Genie-Effect-Windows/releases/latest";
+constexpr char kPackageName[] = "MinimizeEffect-windows-x64.zip";
+constexpr char kChecksumName[] = "MinimizeEffect-windows-x64.zip.sha256";
+constexpr std::uint64_t kMaximumDownloadBytes = 256ULL * 1024ULL * 1024ULL;
+
+template <typename T, auto CloseFunction>
+class UniqueResource final {
+public:
+  UniqueResource() = default;
+  explicit UniqueResource(T value) : value_(value) {}
+  ~UniqueResource() { Reset(); }
+  UniqueResource(const UniqueResource&) = delete;
+  UniqueResource& operator=(const UniqueResource&) = delete;
+  UniqueResource(UniqueResource&& other) noexcept : value_(std::exchange(other.value_, {})) {}
+  UniqueResource& operator=(UniqueResource&& other) noexcept {
+    if (this != &other) {
+      Reset();
+      value_ = std::exchange(other.value_, {});
+    }
+    return *this;
+  }
+  [[nodiscard]] T Get() const { return value_; }
+  [[nodiscard]] explicit operator bool() const { return value_ != T{}; }
+  void Reset(T value = {}) {
+    if (value_ != T{}) CloseFunction(value_);
+    value_ = value;
+  }
+
+private:
+  T value_{};
+};
+
+using UniqueInternet = UniqueResource<HINTERNET, WinHttpCloseHandle>;
+using UniqueHandle = UniqueResource<HANDLE, CloseHandle>;
+void CloseAlgorithm(BCRYPT_ALG_HANDLE handle) { (void)BCryptCloseAlgorithmProvider(handle, 0); }
+using UniqueAlgorithm = UniqueResource<BCRYPT_ALG_HANDLE, CloseAlgorithm>;
+using UniqueHash = UniqueResource<BCRYPT_HASH_HANDLE, BCryptDestroyHash>;
+
+std::wstring Utf8ToWide(std::string_view value) {
+  if (value.empty()) return {};
+  const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
+                                         static_cast<int>(value.size()), nullptr, 0);
+  if (length <= 0) return {};
+  std::wstring result(static_cast<std::size_t>(length), L'\0');
+  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
+                          static_cast<int>(value.size()), result.data(), length) != length) {
+    return {};
+  }
+  return result;
+}
+
+std::wstring QuoteArgument(std::wstring_view argument) {
+  std::wstring result = L"\"";
+  std::size_t backslashes = 0;
+  for (const wchar_t character : argument) {
+    if (character == L'\\') {
+      ++backslashes;
+      continue;
+    }
+    if (character == L'"') {
+      result.append(backslashes * 2 + 1, L'\\');
+      result.push_back(L'"');
+      backslashes = 0;
+      continue;
+    }
+    result.append(backslashes, L'\\');
+    backslashes = 0;
+    result.push_back(character);
+  }
+  result.append(backslashes * 2, L'\\');
+  result.push_back(L'"');
+  return result;
+}
+
+std::wstring CurrentExecutablePath() {
+  std::wstring path(32768, L'\0');
+  const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+  if (length == 0 || length >= path.size()) return {};
+  path.resize(length);
+  return path;
+}
+
+std::filesystem::path UpdateRoot() {
+  std::wstring local_app_data(32768, L'\0');
+  const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", local_app_data.data(),
+                                               static_cast<DWORD>(local_app_data.size()));
+  if (length == 0 || length >= local_app_data.size()) {
+    return std::filesystem::temp_directory_path() / L"MinimizeEffect" / L"updates";
+  }
+  local_app_data.resize(length);
+  return std::filesystem::path(local_app_data) / L"MinimizeEffect" / L"updates";
+}
+
+std::filesystem::path UpdateSibling(const std::filesystem::path& target,
+                                    std::wstring_view suffix) {
+  return std::filesystem::path(target.wstring() + std::wstring(suffix));
+}
+
+bool RemoveIfPresent(const std::filesystem::path& path) {
+  if (!std::filesystem::exists(path)) return true;
+  return DeleteFileW(path.c_str()) != FALSE || GetLastError() == ERROR_FILE_NOT_FOUND;
+}
+
+void RestoreInstalledBackups(const std::filesystem::path& target_executable,
+                             const std::filesystem::path& target_hook) {
+  const std::filesystem::path executable_backup =
+      UpdateSibling(target_executable, L".update-backup");
+  const std::filesystem::path hook_backup = UpdateSibling(target_hook, L".update-backup");
+  const std::filesystem::path executable_incoming =
+      UpdateSibling(target_executable, L".update-new");
+  const std::filesystem::path hook_incoming = UpdateSibling(target_hook, L".update-new");
+  RemoveIfPresent(executable_incoming);
+  RemoveIfPresent(hook_incoming);
+  if (std::filesystem::exists(executable_backup)) {
+    RemoveIfPresent(target_executable);
+    MoveFileExW(executable_backup.c_str(), target_executable.c_str(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+  }
+  if (std::filesystem::exists(hook_backup)) {
+    RemoveIfPresent(target_hook);
+    MoveFileExW(hook_backup.c_str(), target_hook.c_str(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+  }
+}
+
+bool InstallStagedFiles(const std::filesystem::path& source_executable,
+                        const std::filesystem::path& source_hook,
+                        const std::filesystem::path& target_executable,
+                        const std::filesystem::path& target_hook) {
+  const std::filesystem::path executable_backup =
+      UpdateSibling(target_executable, L".update-backup");
+  const std::filesystem::path hook_backup = UpdateSibling(target_hook, L".update-backup");
+  const std::filesystem::path executable_incoming =
+      UpdateSibling(target_executable, L".update-new");
+  const std::filesystem::path hook_incoming = UpdateSibling(target_hook, L".update-new");
+  if (!RemoveIfPresent(executable_backup) || !RemoveIfPresent(hook_backup) ||
+      !RemoveIfPresent(executable_incoming) || !RemoveIfPresent(hook_incoming)) {
+    return false;
+  }
+  if (!CopyFileW(source_executable.c_str(), executable_incoming.c_str(), TRUE) ||
+      !CopyFileW(source_hook.c_str(), hook_incoming.c_str(), TRUE)) {
+    RemoveIfPresent(executable_incoming);
+    RemoveIfPresent(hook_incoming);
+    return false;
+  }
+
+  const bool executable_moved =
+      MoveFileExW(target_executable.c_str(), executable_backup.c_str(),
+                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+  const bool hook_moved =
+      executable_moved &&
+      MoveFileExW(target_hook.c_str(), hook_backup.c_str(),
+                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+  const bool executable_installed =
+      hook_moved && MoveFileExW(executable_incoming.c_str(), target_executable.c_str(),
+                               MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+  const bool hook_installed =
+      executable_installed &&
+      MoveFileExW(hook_incoming.c_str(), target_hook.c_str(),
+                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+  if (hook_installed) return true;
+  RestoreInstalledBackups(target_executable, target_hook);
+  return false;
+}
+
+void CleanupInstalledBackups(std::stop_token stop_token) {
+  const std::filesystem::path executable = CurrentExecutablePath();
+  if (executable.empty()) return;
+  const std::filesystem::path hook = executable.parent_path() / L"MinimizeEffectHook.dll";
+  const std::array leftovers = {
+      UpdateSibling(executable, L".update-backup"), UpdateSibling(hook, L".update-backup"),
+      UpdateSibling(executable, L".update-new"), UpdateSibling(hook, L".update-new")};
+  for (int attempt = 0; attempt < 120 && !stop_token.stop_requested(); ++attempt) {
+    bool clean = true;
+    for (const auto& leftover : leftovers) clean = RemoveIfPresent(leftover) && clean;
+    if (clean) return;
+    Sleep(50);
+  }
+}
+
+struct ParsedVersion {
+  std::array<unsigned long, 4> parts{};
+  std::size_t count = 0;
+};
+
+std::optional<ParsedVersion> ParseVersion(std::string_view value) {
+  while (!value.empty() && (value.front() == 'v' || value.front() == 'V' || value.front() == ' ')) {
+    value.remove_prefix(1);
+  }
+  ParsedVersion result{};
+  std::size_t position = 0;
+  while (position < value.size() && result.count < result.parts.size()) {
+    if (value[position] < '0' || value[position] > '9') return std::nullopt;
+    unsigned long part = 0;
+    while (position < value.size() && value[position] >= '0' && value[position] <= '9') {
+      const unsigned digit = static_cast<unsigned>(value[position] - '0');
+      if (part > (std::numeric_limits<unsigned long>::max() - digit) / 10) {
+        return std::nullopt;
+      }
+      part = part * 10 + digit;
+      ++position;
+    }
+    result.parts[result.count++] = part;
+    if (position == value.size()) break;
+    if (value[position] != '.') return std::nullopt;
+    ++position;
+  }
+  if (position != value.size() || result.count < 3) return std::nullopt;
+  return result;
+}
+
+bool IsNewerVersion(std::string_view candidate, std::string_view current) {
+  const auto candidate_version = ParseVersion(candidate);
+  const auto current_version = ParseVersion(current);
+  if (!candidate_version || !current_version) return false;
+  return candidate_version->parts > current_version->parts;
+}
+
+bool IsSameVersion(std::string_view left, std::string_view right) {
+  const auto left_version = ParseVersion(left);
+  const auto right_version = ParseVersion(right);
+  return left_version && right_version && left_version->parts == right_version->parts;
+}
+
+std::string DecodeJsonString(std::string_view json, std::size_t& position) {
+  std::string result;
+  if (position >= json.size() || json[position] != '"') return result;
+  ++position;
+  while (position < json.size()) {
+    const char character = json[position++];
+    if (character == '"') break;
+    if (character != '\\' || position >= json.size()) {
+      result.push_back(character);
+      continue;
+    }
+    const char escaped = json[position++];
+    switch (escaped) {
+      case '"':
+      case '\\':
+      case '/':
+        result.push_back(escaped);
+        break;
+      case 'b':
+        result.push_back('\b');
+        break;
+      case 'f':
+        result.push_back('\f');
+        break;
+      case 'n':
+        result.push_back('\n');
+        break;
+      case 'r':
+        result.push_back('\r');
+        break;
+      case 't':
+        result.push_back('\t');
+        break;
+      default:
+        break;
+    }
+  }
+  return result;
+}
+
+std::optional<std::string> JsonStringValue(std::string_view json, std::string_view key,
+                                           std::size_t start = 0,
+                                           std::size_t end = std::string_view::npos) {
+  const std::string marker = "\"" + std::string(key) + "\"";
+  const std::size_t key_position = json.find(marker, start);
+  if (key_position == std::string_view::npos || key_position >= end) return std::nullopt;
+  std::size_t position = json.find(':', key_position + marker.size());
+  if (position == std::string_view::npos || position >= end) return std::nullopt;
+  position = json.find('"', position + 1);
+  if (position == std::string_view::npos || position >= end) return std::nullopt;
+  return DecodeJsonString(json, position);
+}
+
+std::optional<std::string> FindAssetValue(std::string_view json, std::string_view asset_name,
+                                          std::string_view key) {
+  const std::string marker = "\"name\":\"" + std::string(asset_name) + "\"";
+  std::size_t name_position = json.find(marker);
+  if (name_position == std::string_view::npos) {
+    const std::string spaced_marker = "\"name\": \"" + std::string(asset_name) + "\"";
+    name_position = json.find(spaced_marker);
+  }
+  if (name_position == std::string_view::npos) return std::nullopt;
+  // GitHub's asset object contains a nested uploader object, so looking for the first
+  // closing brace would stop too early. Asset names are unique within a release.
+  return JsonStringValue(json, key, name_position);
+}
+
+std::optional<std::string> FindAssetUrl(std::string_view json, std::string_view asset_name) {
+  return FindAssetValue(json, asset_name, "browser_download_url");
+}
+
+struct HttpResponse {
+  bool success = false;
+  DWORD status_code = 0;
+  std::string error;
+};
+
+template <typename Sink>
+HttpResponse HttpGet(std::wstring_view url, Sink&& sink, std::stop_token stop_token) {
+  HttpResponse result{};
+  URL_COMPONENTSW components{};
+  components.dwStructSize = sizeof(components);
+  std::array<wchar_t, 512> host{};
+  std::array<wchar_t, 4096> path{};
+  components.lpszHostName = host.data();
+  components.dwHostNameLength = static_cast<DWORD>(host.size());
+  components.lpszUrlPath = path.data();
+  components.dwUrlPathLength = static_cast<DWORD>(path.size());
+  components.dwSchemeLength = 0;
+  if (!WinHttpCrackUrl(url.data(), static_cast<DWORD>(url.size()), 0, &components)) {
+    result.error = "The update URL is invalid.";
+    return result;
+  }
+  const bool secure = components.nScheme == INTERNET_SCHEME_HTTPS;
+  UniqueInternet session(WinHttpOpen(L"MinimizeEffect-Updater/1.0",
+                                     WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME,
+                                     WINHTTP_NO_PROXY_BYPASS, 0));
+  if (!session) {
+    result.error = "Could not initialize the network connection.";
+    return result;
+  }
+  WinHttpSetTimeouts(session.Get(), 8000, 8000, 15000, 15000);
+  UniqueInternet connection(WinHttpConnect(session.Get(), host.data(), components.nPort, 0));
+  if (!connection) {
+    result.error = "Could not connect to GitHub.";
+    return result;
+  }
+  const DWORD flags = secure ? WINHTTP_FLAG_SECURE : 0;
+  UniqueInternet request(WinHttpOpenRequest(connection.Get(), L"GET", path.data(), nullptr,
+                                            WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                            flags));
+  if (!request) {
+    result.error = "Could not create the update request.";
+    return result;
+  }
+  constexpr wchar_t kHeaders[] =
+      L"Accept: application/vnd.github+json\r\nX-GitHub-Api-Version: 2022-11-28\r\n";
+  if (!WinHttpSendRequest(request.Get(), kHeaders, static_cast<DWORD>(-1L), WINHTTP_NO_REQUEST_DATA,
+                          0, 0, 0) ||
+      !WinHttpReceiveResponse(request.Get(), nullptr)) {
+    result.error = "GitHub did not respond. Check your connection and try again.";
+    return result;
+  }
+  DWORD status_size = sizeof(result.status_code);
+  if (!WinHttpQueryHeaders(request.Get(), WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                           nullptr, &result.status_code, &status_size, nullptr) ||
+      result.status_code < 200 || result.status_code >= 300) {
+    result.error = "GitHub returned HTTP " + std::to_string(result.status_code) + ".";
+    return result;
+  }
+
+  std::uint64_t received = 0;
+  for (;;) {
+    if (stop_token.stop_requested()) {
+      result.error = "Cancelled.";
+      return result;
+    }
+    DWORD available = 0;
+    if (!WinHttpQueryDataAvailable(request.Get(), &available)) {
+      result.error = "The update download was interrupted.";
+      return result;
+    }
+    if (available == 0) break;
+    std::vector<std::byte> buffer(std::min<DWORD>(available, 64 * 1024));
+    DWORD read = 0;
+    if (!WinHttpReadData(request.Get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read)) {
+      result.error = "The update download was interrupted.";
+      return result;
+    }
+    if (read == 0) break;
+    received += read;
+    if (received > kMaximumDownloadBytes || !sink(buffer.data(), read, received, request.Get())) {
+      result.error = received > kMaximumDownloadBytes ? "The update package is unexpectedly large."
+                                                      : "Could not save the update package.";
+      return result;
+    }
+  }
+  result.success = true;
+  return result;
+}
+
+std::optional<std::uint64_t> ContentLength(HINTERNET request) {
+  wchar_t value[64]{};
+  DWORD size = sizeof(value);
+  if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_CONTENT_LENGTH, nullptr, value, &size, nullptr)) {
+    return std::nullopt;
+  }
+  try {
+    return std::stoull(value);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+std::optional<std::string> GetText(std::wstring_view url, std::stop_token stop_token,
+                                   std::string& error) {
+  std::string text;
+  auto response = HttpGet(
+      url,
+      [&text](const std::byte* data, DWORD size, std::uint64_t, HINTERNET) {
+        if (text.size() + size > 4 * 1024 * 1024) return false;
+        text.append(reinterpret_cast<const char*>(data), size);
+        return true;
+      },
+      stop_token);
+  if (!response.success) {
+    error = response.error;
+    return std::nullopt;
+  }
+  return text;
+}
+
+bool DownloadFile(std::wstring_view url, const std::filesystem::path& destination,
+                  std::stop_token stop_token,
+                  const std::function<void(std::uint64_t, std::uint64_t)>& progress,
+                  const std::function<bool()>& should_cancel, std::string& error) {
+  std::ofstream file(destination, std::ios::binary | std::ios::trunc);
+  if (!file) {
+    error = "Could not create the update file.";
+    return false;
+  }
+  std::optional<std::uint64_t> total;
+  auto response = HttpGet(
+      url,
+      [&](const std::byte* data, DWORD size, std::uint64_t received, HINTERNET request) {
+        if (should_cancel()) return false;
+        if (!total) total = ContentLength(request);
+        file.write(reinterpret_cast<const char*>(data), size);
+        if (!file) return false;
+        progress(received, total.value_or(0));
+        return true;
+      },
+      stop_token);
+  file.close();
+  if (!response.success) {
+    error = response.error;
+    return false;
+  }
+  return true;
+}
+
+std::optional<std::string> Sha256(const std::filesystem::path& path) {
+  UniqueAlgorithm algorithm;
+  BCRYPT_ALG_HANDLE algorithm_handle = nullptr;
+  if (!BCRYPT_SUCCESS(
+          BCryptOpenAlgorithmProvider(&algorithm_handle, BCRYPT_SHA256_ALGORITHM, nullptr, 0))) {
+    return std::nullopt;
+  }
+  algorithm.Reset(algorithm_handle);
+  DWORD object_size = 0;
+  DWORD bytes = 0;
+  if (!BCRYPT_SUCCESS(BCryptGetProperty(algorithm.Get(), BCRYPT_OBJECT_LENGTH,
+                                        reinterpret_cast<PUCHAR>(&object_size), sizeof(object_size),
+                                        &bytes, 0))) {
+    return std::nullopt;
+  }
+  std::vector<UCHAR> object(object_size);
+  BCRYPT_HASH_HANDLE hash_handle = nullptr;
+  if (!BCRYPT_SUCCESS(BCryptCreateHash(algorithm.Get(), &hash_handle, object.data(), object_size,
+                                       nullptr, 0, 0))) {
+    return std::nullopt;
+  }
+  UniqueHash hash(hash_handle);
+  std::ifstream file(path, std::ios::binary);
+  if (!file) return std::nullopt;
+  std::array<char, 64 * 1024> buffer{};
+  while (file) {
+    file.read(buffer.data(), buffer.size());
+    const std::streamsize count = file.gcount();
+    if (count > 0 &&
+        !BCRYPT_SUCCESS(BCryptHashData(hash.Get(), reinterpret_cast<PUCHAR>(buffer.data()),
+                                       static_cast<ULONG>(count), 0))) {
+      return std::nullopt;
+    }
+  }
+  std::array<UCHAR, 32> digest{};
+  if (!BCRYPT_SUCCESS(
+          BCryptFinishHash(hash.Get(), digest.data(), static_cast<ULONG>(digest.size()), 0))) {
+    return std::nullopt;
+  }
+  std::ostringstream output;
+  output << std::hex << std::setfill('0');
+  for (const UCHAR byte : digest) output << std::setw(2) << static_cast<unsigned>(byte);
+  return output.str();
+}
+
+std::optional<std::string> ParseChecksum(std::string_view value) {
+  for (std::size_t start = 0; start + 64 <= value.size(); ++start) {
+    bool valid = true;
+    for (std::size_t index = 0; index < 64; ++index) {
+      const char character = value[start + index];
+      if (!((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') ||
+            (character >= 'A' && character <= 'F'))) {
+        valid = false;
+        break;
+      }
+    }
+    if (!valid) continue;
+    std::string checksum(value.substr(start, 64));
+    std::transform(checksum.begin(), checksum.end(), checksum.begin(), [](unsigned char character) {
+      return static_cast<char>(std::tolower(character));
+    });
+    return checksum;
+  }
+  return std::nullopt;
+}
+
+std::wstring EscapePowerShellLiteral(std::wstring value) {
+  std::size_t position = 0;
+  while ((position = value.find(L'\'', position)) != std::wstring::npos) {
+    value.insert(position, 1, L'\'');
+    position += 2;
+  }
+  return value;
+}
+
+bool ExtractZip(const std::filesystem::path& archive, const std::filesystem::path& destination,
+                std::string& error) {
+  const std::wstring system_root = [] {
+    std::wstring value(32768, L'\0');
+    const DWORD length =
+        GetEnvironmentVariableW(L"SystemRoot", value.data(), static_cast<DWORD>(value.size()));
+    if (length == 0 || length >= value.size()) return std::wstring(L"C:\\Windows");
+    value.resize(length);
+    return value;
+  }();
+  const std::filesystem::path powershell = std::filesystem::path(system_root) / L"System32" /
+                                           L"WindowsPowerShell" / L"v1.0" / L"powershell.exe";
+  const std::wstring command = L"& { $ErrorActionPreference='Stop'; Expand-Archive -LiteralPath '" +
+                               EscapePowerShellLiteral(archive.wstring()) +
+                               L"' -DestinationPath '" +
+                               EscapePowerShellLiteral(destination.wstring()) + L"' -Force }";
+  std::wstring command_line = QuoteArgument(powershell.wstring()) +
+                              L" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass "
+                              L"-WindowStyle Hidden -Command " +
+                              QuoteArgument(command);
+  STARTUPINFOW startup{};
+  startup.cb = sizeof(startup);
+  startup.dwFlags = STARTF_USESHOWWINDOW;
+  startup.wShowWindow = SW_HIDE;
+  PROCESS_INFORMATION process{};
+  if (!CreateProcessW(powershell.c_str(), command_line.data(), nullptr, nullptr, FALSE,
+                      CREATE_NO_WINDOW, nullptr, destination.parent_path().c_str(), &startup,
+                      &process)) {
+    error = "Could not start the built-in ZIP extractor.";
+    return false;
+  }
+  UniqueHandle process_handle(process.hProcess);
+  UniqueHandle thread_handle(process.hThread);
+  if (WaitForSingleObject(process_handle.Get(), 120000) != WAIT_OBJECT_0) {
+    TerminateProcess(process_handle.Get(), ERROR_TIMEOUT);
+    error = "Extracting the update timed out.";
+    return false;
+  }
+  DWORD exit_code = 1;
+  GetExitCodeProcess(process_handle.Get(), &exit_code);
+  if (exit_code != 0) {
+    error = "The update package could not be extracted.";
+    return false;
+  }
+  return true;
+}
+
+bool LooksLikeX64PeFile(const std::filesystem::path& path) {
+  std::ifstream file(path, std::ios::binary);
+  char magic[2]{};
+  file.read(magic, sizeof(magic));
+  if (file.gcount() != sizeof(magic) || magic[0] != 'M' || magic[1] != 'Z') return false;
+  file.seekg(0x3c, std::ios::beg);
+  std::uint32_t pe_offset = 0;
+  file.read(reinterpret_cast<char*>(&pe_offset), sizeof(pe_offset));
+  if (!file || pe_offset > 16 * 1024 * 1024) return false;
+  file.seekg(pe_offset, std::ios::beg);
+  std::array<char, 4> signature{};
+  std::uint16_t machine = 0;
+  file.read(signature.data(), signature.size());
+  file.read(reinterpret_cast<char*>(&machine), sizeof(machine));
+  return file && signature == std::array<char, 4>{'P', 'E', '\0', '\0'} &&
+         machine == IMAGE_FILE_MACHINE_AMD64;
+}
+
+std::string CleanReleaseNotes(std::string notes) {
+  notes.erase(std::remove(notes.begin(), notes.end(), '\r'), notes.end());
+  while (!notes.empty() && (notes.front() == '\n' || notes.front() == ' ')) {
+    notes.erase(notes.begin());
+  }
+  if (notes.size() > 1600) notes.resize(1600);
+  return notes;
+}
+
+}  // namespace
+
+UpdateService::~UpdateService() { Stop(); }
+
+void UpdateService::Start(HWND notification_window) {
+  {
+    std::scoped_lock lock(mutex_);
+    notification_window_ = notification_window;
+    if (snapshot_.current_version.empty()) {
+      snapshot_.current_version = platform::ExecutableProductVersion();
+      if (snapshot_.current_version.empty()) snapshot_.current_version = "0.0.0";
+    }
+  }
+  if (!worker_.joinable()) {
+    worker_ = std::jthread([this](std::stop_token stop_token) { WorkerLoop(stop_token); });
+  }
+  CheckForUpdates(false);
+}
+
+void UpdateService::Stop() {
+  if (!worker_.joinable()) return;
+  worker_.request_stop();
+  condition_.notify_all();
+  worker_.join();
+  std::scoped_lock lock(mutex_);
+  notification_window_ = nullptr;
+  if (installer_ready_event_ != nullptr) {
+    CloseHandle(installer_ready_event_);
+    installer_ready_event_ = nullptr;
+  }
+  if (installer_process_ != nullptr) {
+    CloseHandle(installer_process_);
+    installer_process_ = nullptr;
+  }
+  installer_started_at_ms_ = 0;
+}
+
+void UpdateService::CheckForUpdates(bool user_initiated) {
+  {
+    std::scoped_lock lock(mutex_);
+    if (snapshot_.phase == UpdatePhase::kDownloading ||
+        snapshot_.phase == UpdatePhase::kVerifying || snapshot_.phase == UpdatePhase::kStaging ||
+        snapshot_.phase == UpdatePhase::kReadyToInstall ||
+        snapshot_.phase == UpdatePhase::kInstalling) {
+      return;
+    }
+    pending_action_ = PendingAction::kCheck;
+    pending_check_user_initiated_ = user_initiated;
+    cancel_requested_ = false;
+  }
+  condition_.notify_one();
+}
+
+void UpdateService::DownloadUpdate() {
+  {
+    std::scoped_lock lock(mutex_);
+    if (snapshot_.phase != UpdatePhase::kAvailable && snapshot_.phase != UpdatePhase::kError) {
+      return;
+    }
+    if (package_url_.empty() || (checksum_url_.empty() && expected_checksum_.empty())) {
+      pending_action_ = PendingAction::kCheck;
+      pending_check_user_initiated_ = true;
+    } else {
+      pending_action_ = PendingAction::kDownload;
+    }
+    cancel_requested_ = false;
+  }
+  condition_.notify_one();
+}
+
+void UpdateService::CancelDownload() {
+  std::scoped_lock lock(mutex_);
+  cancel_requested_ = true;
+}
+
+UpdateSnapshot UpdateService::GetSnapshot() const {
+  std::scoped_lock lock(mutex_);
+  return snapshot_;
+}
+
+void UpdateService::WorkerLoop(std::stop_token stop_token) {
+  // Best-effort cleanup from an earlier handover, off the startup/UI thread. The currently
+  // running helper may keep its own staged EXE locked briefly; a later launch removes it.
+  CleanupInstalledBackups(stop_token);
+  std::error_code cleanup_error;
+  std::filesystem::remove_all(UpdateRoot(), cleanup_error);
+  constexpr auto kBackgroundCheckInterval = std::chrono::hours(6);
+  while (!stop_token.stop_requested()) {
+    PendingAction action = PendingAction::kNone;
+    bool user_initiated = false;
+    {
+      std::unique_lock lock(mutex_);
+      const bool signaled =
+          condition_.wait_for(lock, kBackgroundCheckInterval, [this, &stop_token] {
+            return stop_token.stop_requested() || pending_action_ != PendingAction::kNone;
+          });
+      if (stop_token.stop_requested()) return;
+      if (signaled) {
+        action = std::exchange(pending_action_, PendingAction::kNone);
+        user_initiated = pending_check_user_initiated_;
+      } else {
+        action = PendingAction::kCheck;
+        user_initiated = false;
+      }
+    }
+    if (action == PendingAction::kCheck) {
+      CheckWorker(stop_token, user_initiated);
+    } else if (action == PendingAction::kDownload) {
+      DownloadWorker(stop_token);
+    }
+  }
+}
+
+void UpdateService::CheckWorker(std::stop_token stop_token, bool user_initiated) {
+  UpdateSnapshot checking = GetSnapshot();
+  checking.phase = UpdatePhase::kChecking;
+  checking.status = "Checking GitHub for updates...";
+  checking.error.clear();
+  checking.user_initiated = user_initiated;
+  checking.downloaded_bytes = 0;
+  checking.total_bytes = 0;
+  checking.progress = 0.0f;
+  SetSnapshot(std::move(checking));
+
+  std::string error;
+  const auto response = GetText(kReleaseApiUrl, stop_token, error);
+  if (!response) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = user_initiated ? "Update check failed" : "Could not check for updates";
+    failed.error = std::move(error);
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  const auto tag = JsonStringValue(*response, "tag_name");
+  const auto release_page = JsonStringValue(*response, "html_url");
+  const auto release_notes = JsonStringValue(*response, "body");
+  const auto package_url = FindAssetUrl(*response, kPackageName);
+  const auto package_digest = FindAssetValue(*response, kPackageName, "digest");
+  const auto api_checksum =
+      package_digest ? ParseChecksum(*package_digest) : std::optional<std::string>{};
+  const auto checksum_url = FindAssetUrl(*response, kChecksumName);
+  if (!tag || !release_page) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "The GitHub release is incomplete";
+    failed.error = "The latest release metadata could not be read.";
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  std::string latest = *tag;
+  if (!latest.empty() && (latest.front() == 'v' || latest.front() == 'V')) latest.erase(0, 1);
+  UpdateSnapshot next = GetSnapshot();
+  next.latest_version = latest;
+  next.release_page_url = *release_page;
+  next.release_notes = CleanReleaseNotes(release_notes.value_or(""));
+  next.error.clear();
+  if (!IsNewerVersion(latest, next.current_version)) {
+    next.phase = UpdatePhase::kUpToDate;
+    next.status = "You are up to date";
+    {
+      std::scoped_lock lock(mutex_);
+      package_url_.clear();
+      checksum_url_.clear();
+      expected_checksum_.clear();
+    }
+    SetSnapshot(std::move(next));
+    return;
+  }
+  if (!package_url || (!checksum_url && !api_checksum)) {
+    next.phase = UpdatePhase::kError;
+    next.status = "Update v" + latest + " is available on GitHub";
+    next.error =
+        "This release has no verified update package. Install it manually from the release page.";
+    SetSnapshot(std::move(next));
+    return;
+  }
+  {
+    std::scoped_lock lock(mutex_);
+    package_url_ = *package_url;
+    checksum_url_ = checksum_url.value_or("");
+    expected_checksum_ = api_checksum.value_or("");
+  }
+  next.phase = UpdatePhase::kAvailable;
+  next.status = "Update v" + latest + " is ready";
+  SetSnapshot(std::move(next));
+}
+
+void UpdateService::DownloadWorker(std::stop_token stop_token) {
+  std::string package_url;
+  std::string checksum_url;
+  std::string expected_checksum_value;
+  UpdateSnapshot downloading = GetSnapshot();
+  {
+    std::scoped_lock lock(mutex_);
+    package_url = package_url_;
+    checksum_url = checksum_url_;
+    expected_checksum_value = expected_checksum_;
+  }
+  if (package_url.empty() || (checksum_url.empty() && expected_checksum_value.empty())) return;
+
+  downloading.phase = UpdatePhase::kDownloading;
+  downloading.status = "Downloading update...";
+  downloading.error.clear();
+  downloading.user_initiated = true;
+  downloading.downloaded_bytes = 0;
+  downloading.total_bytes = 0;
+  downloading.progress = 0.0f;
+  SetSnapshot(std::move(downloading));
+
+  const std::filesystem::path version_root =
+      UpdateRoot() / Utf8ToWide(GetSnapshot().latest_version);
+  const std::filesystem::path package_partial = version_root / L"package.zip.partial";
+  const std::filesystem::path package = version_root / L"package.zip";
+  const std::filesystem::path staging = version_root / L"staged";
+  std::error_code filesystem_error;
+  std::filesystem::remove_all(version_root, filesystem_error);
+  filesystem_error.clear();
+  std::filesystem::create_directories(version_root, filesystem_error);
+  if (filesystem_error) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Could not prepare the update";
+    failed.error = "Check disk space and permissions for Local AppData.";
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  std::string error;
+  std::optional<std::string> expected_checksum = ParseChecksum(expected_checksum_value);
+  if (!expected_checksum && !checksum_url.empty()) {
+    const auto checksum_text = GetText(Utf8ToWide(checksum_url), stop_token, error);
+    expected_checksum =
+        checksum_text ? ParseChecksum(*checksum_text) : std::optional<std::string>{};
+  }
+  if (!expected_checksum) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Could not verify the update";
+    failed.error = error.empty() ? "The release checksum is invalid." : error;
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  const auto progress = [this](std::uint64_t downloaded, std::uint64_t total) {
+    MutateSnapshot([downloaded, total](UpdateSnapshot& snapshot) {
+      snapshot.downloaded_bytes = downloaded;
+      snapshot.total_bytes = total;
+      if (total > 0) {
+        snapshot.progress =
+            std::clamp(static_cast<float>(downloaded) / static_cast<float>(total), 0.0f, 1.0f);
+      }
+    });
+  };
+  const auto should_cancel = [this] {
+    std::scoped_lock lock(mutex_);
+    return cancel_requested_;
+  };
+  const bool downloaded = DownloadFile(Utf8ToWide(package_url), package_partial, stop_token,
+                                       progress, should_cancel, error);
+  bool cancelled = false;
+  {
+    std::scoped_lock lock(mutex_);
+    cancelled = cancel_requested_;
+  }
+  if (!downloaded || cancelled || stop_token.stop_requested()) {
+    std::filesystem::remove(package_partial, filesystem_error);
+    if (stop_token.stop_requested()) return;
+    UpdateSnapshot next = GetSnapshot();
+    if (cancelled) {
+      next.phase = UpdatePhase::kAvailable;
+      next.status = "Update v" + next.latest_version + " is ready";
+      next.error.clear();
+      next.downloaded_bytes = 0;
+      next.total_bytes = 0;
+      next.progress = 0.0f;
+    } else {
+      next.phase = UpdatePhase::kError;
+      next.status = "Download failed";
+      next.error = error;
+    }
+    SetSnapshot(std::move(next));
+    return;
+  }
+  std::filesystem::rename(package_partial, package, filesystem_error);
+  if (filesystem_error) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Could not finalize the download";
+    failed.error = "The downloaded file could not be moved into place.";
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  MutateSnapshot([](UpdateSnapshot& snapshot) {
+    snapshot.phase = UpdatePhase::kVerifying;
+    snapshot.status = "Verifying SHA-256 checksum...";
+    snapshot.progress = 1.0f;
+  });
+  const auto actual_checksum = Sha256(package);
+  if (!actual_checksum || *actual_checksum != *expected_checksum) {
+    std::filesystem::remove(package, filesystem_error);
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Update verification failed";
+    failed.error = "The package checksum does not match. Nothing was installed.";
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  MutateSnapshot([](UpdateSnapshot& snapshot) {
+    snapshot.phase = UpdatePhase::kStaging;
+    snapshot.status = "Preparing the seamless restart...";
+  });
+  std::filesystem::create_directories(staging, filesystem_error);
+  if (filesystem_error || !ExtractZip(package, staging, error)) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Could not prepare the update";
+    failed.error = error.empty() ? "The staging directory could not be created." : error;
+    SetSnapshot(std::move(failed));
+    return;
+  }
+  const std::filesystem::path staged_executable = staging / L"MinimizeEffect.exe";
+  const std::filesystem::path staged_hook = staging / L"MinimizeEffectHook.dll";
+  if (!LooksLikeX64PeFile(staged_executable) || !LooksLikeX64PeFile(staged_hook)) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "The update package is incomplete";
+    failed.error = "Expected MinimizeEffect.exe and MinimizeEffectHook.dll were not found.";
+    SetSnapshot(std::move(failed));
+    return;
+  }
+  const std::string staged_version = platform::FileProductVersion(staged_executable.wstring());
+  if (!IsSameVersion(staged_version, GetSnapshot().latest_version)) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "The update package has the wrong version";
+    failed.error = "The verified executable does not match release v" + failed.latest_version + ".";
+    SetSnapshot(std::move(failed));
+    return;
+  }
+
+  {
+    std::scoped_lock lock(mutex_);
+    staged_directory_ = staging;
+  }
+  UpdateSnapshot ready = GetSnapshot();
+  ready.phase = UpdatePhase::kReadyToInstall;
+  ready.status = "Ready — switching to v" + ready.latest_version;
+  ready.progress = 1.0f;
+  SetSnapshot(std::move(ready));
+}
+
+bool UpdateService::LaunchInstaller(const RECT& window_bounds, int selected_page,
+                                    float page_scroll, bool maximized) {
+  std::filesystem::path staging;
+  {
+    std::scoped_lock lock(mutex_);
+    if (snapshot_.phase != UpdatePhase::kReadyToInstall || staged_directory_.empty()) return false;
+    staging = staged_directory_;
+  }
+  const std::filesystem::path staged_executable = staging / L"MinimizeEffect.exe";
+  const std::filesystem::path staged_hook = staging / L"MinimizeEffectHook.dll";
+  const std::filesystem::path current = CurrentExecutablePath();
+  if (current.empty() || !std::filesystem::exists(staged_executable) ||
+      !std::filesystem::exists(staged_hook)) {
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Update files missing";
+    failed.error = "The downloaded update package is incomplete or missing.";
+    SetSnapshot(std::move(failed));
+    return false;
+  }
+  const std::filesystem::path target_directory = current.parent_path();
+  const std::filesystem::path target_hook = target_directory / L"MinimizeEffectHook.dll";
+  const std::filesystem::path executable_backup =
+      target_directory / L"MinimizeEffect.exe.update-backup";
+  const std::filesystem::path hook_backup =
+      target_directory / L"MinimizeEffectHook.dll.update-backup";
+
+  std::error_code ec;
+  std::filesystem::remove(executable_backup, ec);
+  ec.clear();
+  std::filesystem::remove(hook_backup, ec);
+  ec.clear();
+
+  if (!MoveFileExW(current.c_str(), executable_backup.c_str(),
+                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    return false;
+  }
+  if (!CopyFileW(staged_executable.c_str(), current.c_str(), FALSE)) {
+    MoveFileExW(executable_backup.c_str(), current.c_str(), MOVEFILE_REPLACE_EXISTING);
+    return false;
+  }
+  MoveFileExW(target_hook.c_str(), hook_backup.c_str(), MOVEFILE_REPLACE_EXISTING);
+  if (!CopyFileW(staged_hook.c_str(), target_hook.c_str(), FALSE)) {
+    MoveFileExW(hook_backup.c_str(), target_hook.c_str(), MOVEFILE_REPLACE_EXISTING);
+    MoveFileExW(executable_backup.c_str(), current.c_str(), MOVEFILE_REPLACE_EXISTING);
+    return false;
+  }
+
+  const DWORD parent_process_id = GetCurrentProcessId();
+  const std::wstring ready_event_name = L"Local\\MinimizeEffect.UpdateReady." +
+                                        std::to_wstring(parent_process_id) + L"." +
+                                        std::to_wstring(GetTickCount64());
+  HANDLE ready_event = CreateEventW(nullptr, TRUE, FALSE, ready_event_name.c_str());
+  if (ready_event == nullptr) {
+    RestoreInstalledBackups(current, target_hook);
+    return false;
+  }
+  {
+    std::scoped_lock lock(mutex_);
+    if (installer_ready_event_ != nullptr) CloseHandle(installer_ready_event_);
+    if (installer_process_ != nullptr) CloseHandle(installer_process_);
+    installer_ready_event_ = ready_event;
+    installer_process_ = nullptr;
+    installer_started_at_ms_ = 0;
+  }
+
+  const long scroll_milli =
+      static_cast<long>(std::clamp(page_scroll, 0.0f, 2147483.0f) * 1000.0f);
+  std::wstring command_line = QuoteArgument(current.wstring()) + L" --update-resume " +
+                              std::to_wstring(window_bounds.left) + L" " +
+                              std::to_wstring(window_bounds.top) + L" " +
+                              std::to_wstring(window_bounds.right) + L" " +
+                              std::to_wstring(window_bounds.bottom) + L" " +
+                              std::to_wstring(parent_process_id) + L" " +
+                              QuoteArgument(ready_event_name) + L" " +
+                              std::to_wstring(std::clamp(selected_page, 0, 7)) + L" " +
+                              std::to_wstring(scroll_milli) + L" " + (maximized ? L"1" : L"0");
+  STARTUPINFOW startup{};
+  startup.cb = sizeof(startup);
+  PROCESS_INFORMATION process{};
+  if (!CreateProcessW(current.c_str(), command_line.data(), nullptr, nullptr, FALSE,
+                      CREATE_NEW_PROCESS_GROUP, nullptr, target_directory.c_str(), &startup,
+                      &process)) {
+    RestoreInstalledBackups(current, target_hook);
+    {
+      std::scoped_lock lock(mutex_);
+      CloseHandle(installer_ready_event_);
+      installer_ready_event_ = nullptr;
+    }
+    UpdateSnapshot failed = GetSnapshot();
+    failed.phase = UpdatePhase::kError;
+    failed.status = "Could not start the update handover";
+    failed.error = "Windows error " + std::to_string(GetLastError()) +
+                   ". Your current version was restored.";
+    SetSnapshot(std::move(failed));
+    return false;
+  }
+  CloseHandle(process.hThread);
+  {
+    std::scoped_lock lock(mutex_);
+    installer_process_ = process.hProcess;
+    installer_started_at_ms_ = GetTickCount64();
+  }
+  MutateSnapshot([](UpdateSnapshot& snapshot) {
+    snapshot.phase = UpdatePhase::kInstalling;
+    snapshot.status = "The new version is taking over this window...";
+  });
+  return true;
+}
+
+bool UpdateService::InstallerHandoverReady() {
+  std::scoped_lock lock(mutex_);
+  return installer_ready_event_ != nullptr &&
+         WaitForSingleObject(installer_ready_event_, 0) == WAIT_OBJECT_0;
+}
+
+bool UpdateService::InstallerHandoverFailed() {
+  HANDLE process = nullptr;
+  HANDLE ready_event = nullptr;
+  ULONGLONG started_at = 0;
+  {
+    std::scoped_lock lock(mutex_);
+    process = installer_process_;
+    ready_event = installer_ready_event_;
+    started_at = installer_started_at_ms_;
+  }
+  if (process == nullptr || ready_event == nullptr ||
+      WaitForSingleObject(ready_event, 0) == WAIT_OBJECT_0) {
+    return false;
+  }
+  const bool exited = WaitForSingleObject(process, 0) == WAIT_OBJECT_0;
+  const bool timed_out = started_at != 0 && GetTickCount64() - started_at >= 30000;
+  if (!exited && !timed_out) return false;
+  if (timed_out) {
+    TerminateProcess(process, ERROR_TIMEOUT);
+    WaitForSingleObject(process, 3000);
+  }
+
+  const std::filesystem::path current = CurrentExecutablePath();
+  if (!current.empty()) {
+    RestoreInstalledBackups(current, current.parent_path() / L"MinimizeEffectHook.dll");
+  }
+  {
+    std::scoped_lock lock(mutex_);
+    if (installer_process_ != nullptr) CloseHandle(installer_process_);
+    if (installer_ready_event_ != nullptr) CloseHandle(installer_ready_event_);
+    installer_process_ = nullptr;
+    installer_ready_event_ = nullptr;
+    installer_started_at_ms_ = 0;
+  }
+  UpdateSnapshot failed = GetSnapshot();
+  failed.phase = UpdatePhase::kError;
+  failed.status = "The new version could not take over";
+  failed.error = timed_out ? "The handover timed out. Your current version was restored."
+                           : "The new process closed early. Your current version was restored.";
+  SetSnapshot(std::move(failed));
+  return true;
+}
+
+void UpdateService::SetSnapshot(UpdateSnapshot snapshot) {
+  {
+    std::scoped_lock lock(mutex_);
+    snapshot_ = std::move(snapshot);
+  }
+  NotifyStateChanged();
+}
+
+void UpdateService::MutateSnapshot(const std::function<void(UpdateSnapshot&)>& mutation) {
+  {
+    std::scoped_lock lock(mutex_);
+    mutation(snapshot_);
+  }
+  NotifyStateChanged();
+}
+
+void UpdateService::NotifyStateChanged() const {
+  HWND window = nullptr;
+  {
+    std::scoped_lock lock(mutex_);
+    window = notification_window_;
+  }
+  if (window != nullptr) PostMessageW(window, kStateChangedMessage, 0, 0);
+}
+
+}  // namespace minimize::features

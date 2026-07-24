@@ -9,6 +9,19 @@ constexpr wchar_t kMutexName[] = L"Local\\MinimizeEffect.Windows.SingleInstance"
 constexpr wchar_t kSettingsWindowClass[] = L"MinimizeEffectImGuiSettings";
 constexpr UINT kShowSettingsMessage = WM_APP + 101;
 
+std::wstring MutexName() {
+#ifdef _DEBUG
+  // Keeps integration handover tests isolated from a developer's running installation.
+  wchar_t suffix[96]{};
+  const DWORD length =
+      GetEnvironmentVariableW(L"MINIMIZE_TEST_INSTANCE_SUFFIX", suffix, std::size(suffix));
+  if (length > 0 && length < std::size(suffix)) {
+    return std::wstring(kMutexName) + L"." + suffix;
+  }
+#endif
+  return kMutexName;
+}
+
 }  // namespace
 
 SingleInstanceGuard::~SingleInstanceGuard() { Release(); }
@@ -30,7 +43,8 @@ bool SingleInstanceGuard::ActivateExistingInstance(DWORD timeout_ms) {
 SingleInstanceResult SingleInstanceGuard::Acquire() {
   if (mutex_ != nullptr) return SingleInstanceResult::kPrimary;
   SetLastError(ERROR_SUCCESS);
-  mutex_ = CreateMutexW(nullptr, TRUE, kMutexName);
+  const std::wstring mutex_name = MutexName();
+  mutex_ = CreateMutexW(nullptr, TRUE, mutex_name.c_str());
   error_ = GetLastError();
   if (mutex_ == nullptr) {
     return error_ == ERROR_ACCESS_DENIED ? SingleInstanceResult::kAlreadyRunning

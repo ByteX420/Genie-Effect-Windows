@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "animation/geometry.hpp"
+#include "app/application.hpp"
 #include "core/environment.hpp"
 #include "core/logger.hpp"
 #include "platform/windows/app_container_permissions.hpp"
@@ -25,7 +26,7 @@ namespace minimize::app {
 
 ApplicationRuntime::~ApplicationRuntime() { CleanupAndRestoreAll(); }
 
-bool ApplicationRuntime::Initialize(HINSTANCE instance) {
+bool ApplicationRuntime::Initialize(HINSTANCE instance, const ApplicationLaunchOptions& options) {
   minimize::core::CleanupDebugLogs();
   instance_ = instance;
   main_thread_id_ = GetCurrentThreadId();
@@ -37,7 +38,7 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
   window_exclusion_service_.SetExcludedDisplays(settings_service_.Get().excluded_displays);
   if (settings_service_.Get().run_at_startup && !platform::windows::ConfigureRunAtStartup(true)) {
     minimize::core::LogDebug(L"Startup",
-                          L"Could not repair the per-user startup entry; disabling the option");
+                             L"Could not repair the per-user startup entry; disabling the option");
     auto repaired_settings = settings_service_.Get();
     repaired_settings.run_at_startup = false;
     if (!settings_service_.Update(std::move(repaired_settings))) {
@@ -63,24 +64,48 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
 
   frame_scheduler_.Initialize();
 
-  HealLeftoverWindows();
-
   if (!platform::IsCurrentProcessElevated()) {
     std::wcerr << L"WARNING: Not running as Administrator. Elevated windows (like Task Manager, "
                   L"cmd as Admin, etc.)\n"
                << L"         will NOT be hooked due to Windows UIPI security restrictions.\n"
-               << L"         To hook all windows, please run MinimizeEffect.exe as Administrator.\n\n";
+               << L"         To hook all windows, please run MinimizeEffect.exe as "
+                  L"Administrator.\n\n";
     minimize::core::LogDebug(L"App", L"Warning: Not running as Administrator");
   } else {
     minimize::core::LogDebug(L"App", L"Running as Administrator");
   }
 
-  if (!CreateAnimationRenderer()) return false;
-
   if (!settings_window_.Initialize(instance, *this)) {
     return false;
   }
+  if (options.initial_window_bounds) {
+    settings_window_.SetInitialBounds(*options.initial_window_bounds);
+  }
+  if (options.IsUpdateHandover()) {
+    settings_window_.PrepareUpdateResume(options.initial_page, options.initial_page_scroll,
+                                         options.initial_maximized);
+  }
   settings_window_.UpdateState(settings_service_.Get());
+  if (!options.IsUpdateHandover() && !StartRuntimeServices()) return false;
+
+  // During a handover the replacement process paints this window first and starts hooks only
+  // after the old process has acknowledged the frame and exited.
+  settings_window_.Show(options.force_show_settings || !settings_service_.Get().start_minimized ||
+                        settings_service_.Get().close_behavior != "tray");
+
+  std::wcout << L"Minimize minimize monitor is running.\n";
+  minimize::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");
+  std::wcout << L"Set MINIMIZE_TASKBAR_RECT=left,top,right,bottom to aim at a "
+                L"custom taskbar rectangle.\n";
+  std::wcout << L"Close this console window to restore the previous Windows "
+                L"animation setting.\n";
+  return true;
+}
+
+bool ApplicationRuntime::StartRuntimeServices() {
+  if (runtime_services_started_) return true;
+  HealLeftoverWindows();
+  if (!CreateAnimationRenderer()) return false;
   hotkey_controller_.SetWindow(settings_window_.hwnd());
   RegisterConfiguredHotkeys();
   settings_window_.UpdatePauseState(false, false);
@@ -99,19 +124,8 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance) {
                                 })) {
     return false;
   }
-
-  // Show the UI only after hooks/renderer are ready, and only once the message loop is
-  // about to start — never while still blocked in Initialize after SW_SHOW.
-  settings_window_.Show(!settings_service_.Get().start_minimized ||
-                        settings_service_.Get().close_behavior != "tray");
+  runtime_services_started_ = true;
   seed_iconic_snapshots_pending_ = true;
-
-  std::wcout << L"Minimize minimize monitor is running.\n";
-  minimize::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");
-  std::wcout << L"Set MINIMIZE_TASKBAR_RECT=left,top,right,bottom to aim at a "
-                L"custom taskbar rectangle.\n";
-  std::wcout << L"Close this console window to restore the previous Windows "
-                L"animation setting.\n";
   return true;
 }
 
@@ -124,6 +138,32 @@ int ApplicationRuntime::Run() {
       .tick_runtime = [this] { return TickRuntime(); },
       .wait_for_animation = [this] { WaitForAnimationFrameOrMessage(); },
   });
+}
+
+void ApplicationRuntime::RenderUpdateHandoverFrame() { settings_window_.Render(); }
+
+void ApplicationRuntime::PrepareForUpdateHandover() {
+  if (update_handover_prepared_.exchange(true, std::memory_order_acq_rel)) return;
+  UnregisterAllHotkeys();
+  DisableEffectRuntime();
+  frame_scheduler_.Wake();
+}
+
+void ApplicationRuntime::ResumeAfterUpdateHandoverFailure() {
+  if (!update_handover_prepared_.exchange(false, std::memory_order_acq_rel)) return;
+  RegisterConfiguredHotkeys();
+  RefreshEffectRuntimeState();
+  frame_scheduler_.Wake();
+}
+
+void ApplicationRuntime::CompleteUpdateHandover() {
+  if (!StartRuntimeServices()) {
+    minimize::core::LogDebug(L"Update", L"Could not start runtime services after handover");
+    return;
+  }
+  settings_window_.CompleteUpdateHandover();
+  update_handover_prepared_.store(false, std::memory_order_release);
+  frame_scheduler_.Wake();
 }
 
 void ApplicationRuntime::RequestShutdown() {
