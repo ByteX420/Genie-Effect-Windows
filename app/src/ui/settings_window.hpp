@@ -44,10 +44,12 @@ public:
   SettingsWindow& operator=(const SettingsWindow&) = delete;
 
   bool Initialize(HINSTANCE instance, ui::SettingsActions& actions);
+  void StartUpdateService();
   void Shutdown();
   void Show(bool show);
   void SetInitialBounds(const RECT& bounds) { initial_bounds_ = bounds; }
   void PrepareUpdateResume(int page, float page_scroll, bool maximized);
+  [[nodiscard]] bool PublishUpdateHandoverWindow();
   void CompleteUpdateHandover();
   void UpdateState(const minimize::settings::AppSettings& settings);
   void UpdatePauseState(bool paused, bool until_restart);
@@ -95,6 +97,7 @@ private:
   void HandleUpdateStateChanged();
   void UpdateStartupEnterMotionGate();
   [[nodiscard]] bool DetectStartupEnterMotionActive() const;
+  [[nodiscard]] bool RenderFrame(bool allow_hidden);
 
   HWND hwnd_ = nullptr;
   ui::rendering::ImguiRenderer renderer_;
@@ -151,6 +154,7 @@ private:
   bool update_workspace_engaged_ = false;
   bool update_resume_active_ = false;
   bool update_installer_started_ = false;
+  bool update_handover_window_published_ = false;
   float current_page_scroll_ = 0.0f;
   std::optional<float> initial_page_scroll_;
   bool initial_maximized_ = false;

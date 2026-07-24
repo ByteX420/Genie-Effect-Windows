@@ -117,8 +117,7 @@ std::filesystem::path UpdateRoot() {
   return std::filesystem::path(local_app_data) / L"MinimizeEffect" / L"updates";
 }
 
-std::filesystem::path UpdateSibling(const std::filesystem::path& target,
-                                    std::wstring_view suffix) {
+std::filesystem::path UpdateSibling(const std::filesystem::path& target, std::wstring_view suffix) {
   return std::filesystem::path(target.wstring() + std::wstring(suffix));
 }
 
@@ -174,12 +173,11 @@ bool InstallStagedFiles(const std::filesystem::path& source_executable,
       MoveFileExW(target_executable.c_str(), executable_backup.c_str(),
                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
   const bool hook_moved =
-      executable_moved &&
-      MoveFileExW(target_hook.c_str(), hook_backup.c_str(),
-                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+      executable_moved && MoveFileExW(target_hook.c_str(), hook_backup.c_str(),
+                                      MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
   const bool executable_installed =
       hook_moved && MoveFileExW(executable_incoming.c_str(), target_executable.c_str(),
-                               MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
+                                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != FALSE;
   const bool hook_installed =
       executable_installed &&
       MoveFileExW(hook_incoming.c_str(), target_hook.c_str(),
@@ -974,8 +972,8 @@ void UpdateService::DownloadWorker(std::stop_token stop_token) {
   SetSnapshot(std::move(ready));
 }
 
-bool UpdateService::LaunchInstaller(const RECT& window_bounds, int selected_page,
-                                    float page_scroll, bool maximized) {
+bool UpdateService::LaunchInstaller(const RECT& window_bounds, int selected_page, float page_scroll,
+                                    bool maximized) {
   std::filesystem::path staging;
   {
     std::scoped_lock lock(mutex_);
@@ -995,40 +993,22 @@ bool UpdateService::LaunchInstaller(const RECT& window_bounds, int selected_page
     return false;
   }
   const std::filesystem::path target_directory = current.parent_path();
-  const std::filesystem::path target_hook = target_directory / L"MinimizeEffectHook.dll";
-  const std::filesystem::path executable_backup =
-      target_directory / L"MinimizeEffect.exe.update-backup";
-  const std::filesystem::path hook_backup =
-      target_directory / L"MinimizeEffectHook.dll.update-backup";
-
-  std::error_code ec;
-  std::filesystem::remove(executable_backup, ec);
-  ec.clear();
-  std::filesystem::remove(hook_backup, ec);
-  ec.clear();
-
-  if (!MoveFileExW(current.c_str(), executable_backup.c_str(),
-                   MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-    return false;
-  }
-  if (!CopyFileW(staged_executable.c_str(), current.c_str(), FALSE)) {
-    MoveFileExW(executable_backup.c_str(), current.c_str(), MOVEFILE_REPLACE_EXISTING);
-    return false;
-  }
-  MoveFileExW(target_hook.c_str(), hook_backup.c_str(), MOVEFILE_REPLACE_EXISTING);
-  if (!CopyFileW(staged_hook.c_str(), target_hook.c_str(), FALSE)) {
-    MoveFileExW(hook_backup.c_str(), target_hook.c_str(), MOVEFILE_REPLACE_EXISTING);
-    MoveFileExW(executable_backup.c_str(), current.c_str(), MOVEFILE_REPLACE_EXISTING);
-    return false;
-  }
 
   const DWORD parent_process_id = GetCurrentProcessId();
   const std::wstring ready_event_name = L"Local\\MinimizeEffect.UpdateReady." +
                                         std::to_wstring(parent_process_id) + L"." +
                                         std::to_wstring(GetTickCount64());
-  HANDLE ready_event = CreateEventW(nullptr, TRUE, FALSE, ready_event_name.c_str());
+
+  SECURITY_DESCRIPTOR sd{};
+  InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
+  SetSecurityDescriptorDacl(&sd, TRUE, nullptr, FALSE);
+  SECURITY_ATTRIBUTES sa{};
+  sa.nLength = sizeof(sa);
+  sa.lpSecurityDescriptor = &sd;
+  sa.bInheritHandle = FALSE;
+
+  HANDLE ready_event = CreateEventW(&sa, TRUE, FALSE, ready_event_name.c_str());
   if (ready_event == nullptr) {
-    RestoreInstalledBackups(current, target_hook);
     return false;
   }
   {
@@ -1040,24 +1020,27 @@ bool UpdateService::LaunchInstaller(const RECT& window_bounds, int selected_page
     installer_started_at_ms_ = 0;
   }
 
-  const long scroll_milli =
-      static_cast<long>(std::clamp(page_scroll, 0.0f, 2147483.0f) * 1000.0f);
-  std::wstring command_line = QuoteArgument(current.wstring()) + L" --update-resume " +
-                              std::to_wstring(window_bounds.left) + L" " +
-                              std::to_wstring(window_bounds.top) + L" " +
-                              std::to_wstring(window_bounds.right) + L" " +
-                              std::to_wstring(window_bounds.bottom) + L" " +
-                              std::to_wstring(parent_process_id) + L" " +
-                              QuoteArgument(ready_event_name) + L" " +
-                              std::to_wstring(std::clamp(selected_page, 0, 7)) + L" " +
-                              std::to_wstring(scroll_milli) + L" " + (maximized ? L"1" : L"0");
+  const long scroll_milli = static_cast<long>(std::clamp(page_scroll, 0.0f, 2147483.0f) * 1000.0f);
+  std::wstring command_line =
+      QuoteArgument(staged_executable.wstring()) + L" --apply-update " +
+      std::to_wstring(parent_process_id) + L" " +
+      QuoteArgument(staging.wstring()) + L" " +
+      QuoteArgument(target_directory.wstring()) + L" " +
+      std::to_wstring(window_bounds.left) + L" " +
+      std::to_wstring(window_bounds.top) + L" " +
+      std::to_wstring(window_bounds.right) + L" " +
+      std::to_wstring(window_bounds.bottom) + L" " +
+      QuoteArgument(ready_event_name) + L" " +
+      std::to_wstring(std::clamp(selected_page, 0, 7)) + L" " +
+      std::to_wstring(scroll_milli) + L" " +
+      (maximized ? L"1" : L"0");
+
   STARTUPINFOW startup{};
   startup.cb = sizeof(startup);
   PROCESS_INFORMATION process{};
-  if (!CreateProcessW(current.c_str(), command_line.data(), nullptr, nullptr, FALSE,
-                      CREATE_NEW_PROCESS_GROUP, nullptr, target_directory.c_str(), &startup,
+  if (!CreateProcessW(staged_executable.c_str(), command_line.data(), nullptr, nullptr, FALSE,
+                      CREATE_NEW_PROCESS_GROUP, nullptr, staging.c_str(), &startup,
                       &process)) {
-    RestoreInstalledBackups(current, target_hook);
     {
       std::scoped_lock lock(mutex_);
       CloseHandle(installer_ready_event_);
@@ -1066,12 +1049,13 @@ bool UpdateService::LaunchInstaller(const RECT& window_bounds, int selected_page
     UpdateSnapshot failed = GetSnapshot();
     failed.phase = UpdatePhase::kError;
     failed.status = "Could not start the update handover";
-    failed.error = "Windows error " + std::to_string(GetLastError()) +
-                   ". Your current version was restored.";
+    failed.error =
+        "Windows error " + std::to_string(GetLastError()) + ". Your current version was restored.";
     SetSnapshot(std::move(failed));
     return false;
   }
   CloseHandle(process.hThread);
+  AllowSetForegroundWindow(process.dwProcessId);
   {
     std::scoped_lock lock(mutex_);
     installer_process_ = process.hProcess;

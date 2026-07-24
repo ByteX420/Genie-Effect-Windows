@@ -69,9 +69,10 @@ bool SettingsWindow::Initialize(HINSTANCE instance, ui::SettingsActions& actions
   font_title_ = renderer_.title_font();
   tray_icon_.Initialize();
   UpdateReducedMotion();
-  update_service_.Start(hwnd_);
   return true;
 }
+
+void SettingsWindow::StartUpdateService() { update_service_.Start(hwnd_); }
 
 void SettingsWindow::PrepareUpdateResume(int page, float page_scroll, bool maximized) {
   selected_page_ = static_cast<Page>(std::clamp(page, 0, 7));
@@ -80,15 +81,76 @@ void SettingsWindow::PrepareUpdateResume(int page, float page_scroll, bool maxim
   update_workspace_engaged_ = true;
   update_resume_active_ = true;
   update_installer_started_ = true;
+  update_handover_window_published_ = false;
+  startup_enter_motion_active_ = false;
+  startup_enter_motion_seen_ = false;
+  motion_system_.Set(ui::motion::MotionKey("window", "settings", "alpha"), 1.0f);
+  motion_system_.Set(ui::motion::MotionKey("window", "settings", "offset"), ImVec2(0.0f, 0.0f));
   motion_system_.Set(ui::motion::MotionKey("update", "workspace", "show"), 1.0f);
   motion_system_.Set(ui::motion::MotionKey("update", "workspace", "loader"), 1.0f);
   motion_system_.Set(ui::motion::MotionKey("update", "shell", "content"), 0.0f);
+  const BOOL disable_transitions = TRUE;
+  DwmSetWindowAttribute(hwnd_, DWMWA_TRANSITIONS_FORCEDISABLED, &disable_transitions,
+                        sizeof(disable_transitions));
+}
+
+bool SettingsWindow::PublishUpdateHandoverWindow() {
+  if (hwnd_ == nullptr || !IsWindow(hwnd_) || !update_resume_active_) return false;
+  if (update_handover_window_published_) return true;
+
+  // Prime the swap chain while the replacement HWND is still hidden. The old process remains
+  // fully visible until this exact update-workspace frame is ready.
+  ForceRender();
+  bool rendered = false;
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    if (RenderFrame(true)) {
+      rendered = true;
+      break;
+    }
+    Sleep(10);
+  }
+  if (!rendered) return false;
+
+  if (initial_maximized_) {
+    ShowWindow(hwnd_, SW_SHOWMAXIMIZED);
+    SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+  } else {
+    SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+  }
+
+  // Present once more at the final visible size (ShowWindow can resize a maximized HWND), then
+  // wait until DWM has committed the new surface before the parent is allowed to disappear.
+  ForceRender();
+  rendered = false;
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    if (RenderFrame(true)) {
+      rendered = true;
+      break;
+    }
+    Sleep(10);
+  }
+  if (!rendered) {
+    ShowWindow(hwnd_, SW_HIDE);
+    return false;
+  }
+  BringWindowToTop(hwnd_);
+  SetForegroundWindow(hwnd_);
+  DwmFlush();
+
+  shown_at_ms_ = GetTickCount64();
+  update_handover_window_published_ = true;
+  return true;
 }
 
 void SettingsWindow::CompleteUpdateHandover() {
   update_resume_active_ = false;
   update_workspace_engaged_ = false;
   update_installer_started_ = false;
+  const BOOL disable_transitions = FALSE;
+  DwmSetWindowAttribute(hwnd_, DWMWA_TRANSITIONS_FORCEDISABLED, &disable_transitions,
+                        sizeof(disable_transitions));
   motion_system_.Set(ui::motion::MotionKey("window", "settings", "alpha"), 1.0f);
   motion_system_.Set(ui::motion::MotionKey("window", "settings", "offset"), ImVec2(0.0f, 0.0f));
   motion_system_.Set(ui::motion::MotionKey("page", "content", "alpha"), 0.0f);
@@ -174,7 +236,8 @@ void SettingsWindow::UpdateState(const minimize::settings::AppSettings& settings
       controller_->view_model().restore_custom_bezier != settings.restore_custom_bezier ||
       controller_->view_model().animation_style != settings.animation_style ||
       controller_->view_model().quality_mode != settings.quality_mode ||
-      std::abs(controller_->view_model().minimize_strength - settings.minimize_strength) > 0.0001f ||
+      std::abs(controller_->view_model().minimize_strength - settings.minimize_strength) >
+          0.0001f ||
       controller_->view_model().fade_strength != settings.fade_strength ||
       controller_->view_model().show_target_indicator != settings.show_target_indicator ||
       controller_->view_model().close_behavior != settings.close_behavior ||
@@ -223,8 +286,8 @@ void SettingsWindow::FlushPendingSpeedSave() {
   const bool strength_pending = strength_slider_dirty_ || strength_slider_active_;
   if (strength_pending) {
     const bool saved =
-        controller_ == nullptr ||
-        controller_->actions().SetMinimizeStrength(controller_->view_model().minimize_strength, true);
+        controller_ == nullptr || controller_->actions().SetMinimizeStrength(
+                                      controller_->view_model().minimize_strength, true);
     RecordSaveResult(saved);
     if (saved) strength_slider_dirty_ = false;
   }
@@ -247,7 +310,9 @@ void SettingsWindow::RecordSaveResult(bool saved) {
     save_feedback_ = "Could not save settings";
     save_feedback_until_ms_ = GetTickCount64() + 5500;
     save_feedback_error_ = true;
-    minimize::core::LogDebug(L"Settings", L"Settings window could not persist the requested change");
+    minimize::core::LogDebug(L"Settings",
+                             L"Settings window could not persist the requested "
+                             L"change");
   }
   ForceRender();
 }
@@ -308,11 +373,20 @@ bool SettingsWindow::CreateRenderWindow(HINSTANCE instance) {
   const DPI_AWARENESS_CONTEXT old_context =
       SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
   const UINT dpi = GetDpiForSystem();
-  const int width = MulDiv(kWindowWidth, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
-  const int height = MulDiv(kWindowHeight, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  int x = CW_USEDEFAULT;
+  int y = CW_USEDEFAULT;
+  int width = MulDiv(kWindowWidth, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  int height = MulDiv(kWindowHeight, static_cast<int>(dpi), USER_DEFAULT_SCREEN_DPI);
+  if (initial_bounds_ && initial_bounds_->right > initial_bounds_->left &&
+      initial_bounds_->bottom > initial_bounds_->top) {
+    x = initial_bounds_->left;
+    y = initial_bounds_->top;
+    width = initial_bounds_->right - initial_bounds_->left;
+    height = initial_bounds_->bottom - initial_bounds_->top;
+  }
   hwnd_ = CreateWindowExW(WS_EX_APPWINDOW, kSettingsWindowClass, L"Minimize Effect",
-                          WS_POPUP | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU, CW_USEDEFAULT,
-                          CW_USEDEFAULT, width, height, nullptr, nullptr, instance, this);
+                          WS_POPUP | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU, x, y, width,
+                          height, nullptr, nullptr, instance, this);
   if (old_context != nullptr) SetThreadDpiAwarenessContext(old_context);
   if (hwnd_ == nullptr) return false;
   ChangeWindowMessageFilterEx(hwnd_, kShowSettingsMessage, MSGFLT_ALLOW, nullptr);
@@ -397,27 +471,32 @@ void SettingsWindow::UpdateStartupEnterMotionGate() {
   }
 }
 
-void SettingsWindow::Render() {
+bool SettingsWindow::RenderFrame(bool allow_hidden) {
   animation_preview_.Update(hwnd_, controller_->view_model().minimize_duration,
                             controller_->view_model().restore_duration);
-  if (!IsWindowVisible(hwnd_)) return;
+  if (!allow_hidden && !IsWindowVisible(hwnd_)) return false;
   const ULONGLONG now_ms = GetTickCount64();
   const bool is_animating = startup_enter_motion_active_ || (now_ms - shown_at_ms_ < 500);
   const bool is_active = (GetForegroundWindow() == hwnd_);
   const bool feedback_active = !save_feedback_.empty() && now_ms < save_feedback_until_ms_;
-  if (!is_animating && !is_active && !animation_preview_.active() && !feedback_active &&
-      motion_system_.GetStats().active_tracks == 0 && !render_requested_)
-    return;
+  const bool update_active =
+      update_workspace_engaged_ || update_resume_active_ || update_installer_started_;
+  if (!allow_hidden && !is_animating && !is_active && !animation_preview_.active() &&
+      !feedback_active && !update_active && motion_system_.GetStats().active_tracks == 0 &&
+      !render_requested_)
+    return false;
   render_requested_ = false;
   if (!renderer_.BeginFrame()) {
     render_requested_ = true;
-    return;
+    return false;
   }
   motion_system_.BeginFrame(ImGui::GetIO().DeltaTime);
   SettingsShell::Render(*this);
   UpdateStartupEnterMotionGate();
-  renderer_.EndFrame();
+  return renderer_.EndFrame();
 }
+
+void SettingsWindow::Render() { (void)RenderFrame(false); }
 
 void SettingsWindow::ForceRender() { render_requested_ = true; }
 
@@ -425,9 +504,9 @@ bool SettingsWindow::WantsContinuousRendering() const {
   if (!renderer_.ready() || hwnd_ == nullptr || !IsWindowVisible(hwnd_)) {
     return false;
   }
-  return startup_enter_motion_active_ || animation_preview_.active() ||
-         GetForegroundWindow() == hwnd_ || motion_system_.GetStats().active_tracks > 0 ||
-         render_requested_;
+  return startup_enter_motion_active_ || animation_preview_.active() || update_workspace_engaged_ ||
+         update_resume_active_ || update_installer_started_ || GetForegroundWindow() == hwnd_ ||
+         motion_system_.GetStats().active_tracks > 0 || render_requested_;
 }
 
 }  // namespace minimize::ui

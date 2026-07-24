@@ -15,6 +15,8 @@ bool Application::Initialize(HINSTANCE instance, const ApplicationLaunchOptions&
 
 int Application::Run() { return runtime_->Run(); }
 
+bool Application::PublishUpdateHandoverWindow() { return runtime_->PublishUpdateHandoverWindow(); }
+
 void Application::RenderUpdateHandoverFrame() { runtime_->RenderUpdateHandoverFrame(); }
 
 void Application::CompleteUpdateHandover() { runtime_->CompleteUpdateHandover(); }

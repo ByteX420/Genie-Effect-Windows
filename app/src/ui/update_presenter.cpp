@@ -109,16 +109,21 @@ void UpdatePresenter::DrawUpdateWorkspace(SettingsWindow& window) {
   if (show <= 0.005f) return;
 
   const ImVec2 display = ImGui::GetIO().DisplaySize;
-  ImDrawList* draw = ImGui::GetForegroundDrawList();
+  ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+  ImGui::SetNextWindowSize(display);
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+  ImGui::BeginChild("##update_workspace_overlay", display, ImGuiChildFlags_None,
+                    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings |
+                        ImGuiWindowFlags_NoScrollbar);
+
+  ImDrawList* draw = ImGui::GetWindowDrawList();
   const float scale = window.ui_scale_;
   const float chrome_width = 92.0f * scale;
-  const float chrome_height = 42.0f * scale;
-  const ImU32 workspace_background =
-      IM_COL32(20, 20, 22, static_cast<int>(255.0f * show));
-  // Foreground overlays always sort above the root draw list. Keep a precise transparent
-  // chrome pocket so the original traffic lights remain visible and interactive.
+  const ImU32 workspace_background = IM_COL32(20, 20, 22, static_cast<int>(255.0f * show));
+  // Keep a precise transparent chrome pocket so the original traffic lights remain visible and interactive.
   draw->AddRectFilled(ImVec2(chrome_width, 0.0f), display, workspace_background);
-  // Draw interactive top-left traffic lights (Close, Minimize, Restore) directly over the update workspace.
+  // Draw interactive top-left traffic lights (Close, Minimize, Restore) directly over the update
+  // workspace.
   const motion::MotionContext widget_motion{window.motion_system_, window.motion_tokens_};
   const theme::TrafficLightAction action =
       theme::DrawTrafficLights(widget_motion, ImVec2(0.0f, 0.0f), scale, show);
@@ -161,10 +166,9 @@ void UpdatePresenter::DrawUpdateWorkspace(SettingsWindow& window) {
       case UpdatePhase::kDownloading:
         title = snapshot.latest_version.empty() ? "Downloading update"
                                                 : "Downloading v" + snapshot.latest_version;
-        detail = snapshot.total_bytes > 0
-                     ? FormatBytes(snapshot.downloaded_bytes) + " of " +
-                           FormatBytes(snapshot.total_bytes)
-                     : "Receiving the verified package";
+        detail = snapshot.total_bytes > 0 ? FormatBytes(snapshot.downloaded_bytes) + " of " +
+                                                FormatBytes(snapshot.total_bytes)
+                                          : "Receiving the verified package";
         break;
       case UpdatePhase::kVerifying:
         title = "Verifying every byte";
@@ -230,8 +234,8 @@ void UpdatePresenter::DrawUpdateWorkspace(SettingsWindow& window) {
     const float gap = 10.0f * scale;
     const float left = center.x - (back_size.x + retry_size.x + gap) * 0.5f;
     if (MotionButton(window.motion_system_, window.motion_tokens_, scale, window.font_body_, draw,
-                     "##update_workspace_back", "Back",
-                     ImVec2(left, center.y + 142.0f * scale), back_size, false, alpha)) {
+                     "##update_workspace_back", "Back", ImVec2(left, center.y + 142.0f * scale),
+                     back_size, false, alpha)) {
       window.controller_->actions().ResumeAfterUpdateHandoverFailure();
       window.update_workspace_engaged_ = false;
       window.update_installer_started_ = false;
@@ -254,9 +258,8 @@ void UpdatePresenter::DrawUpdateWorkspace(SettingsWindow& window) {
     const bool maximized =
         GetWindowPlacement(window.hwnd_, &placement) && placement.showCmd == SW_SHOWMAXIMIZED;
     window.controller_->actions().PrepareForUpdateHandover();
-    if (window.update_service_.LaunchInstaller(
-            bounds, static_cast<int>(window.selected_page_), window.current_page_scroll_,
-            maximized)) {
+    if (window.update_service_.LaunchInstaller(bounds, static_cast<int>(window.selected_page_),
+                                               window.current_page_scroll_, maximized)) {
       window.update_installer_started_ = true;
     } else {
       window.controller_->actions().ResumeAfterUpdateHandoverFailure();
@@ -264,15 +267,15 @@ void UpdatePresenter::DrawUpdateWorkspace(SettingsWindow& window) {
   }
   if (window.update_installer_started_ && window.update_service_.InstallerHandoverReady()) {
     window.controller_->actions().RequestExit();
-  } else if (window.update_installer_started_ &&
-             window.update_service_.InstallerHandoverFailed()) {
+  } else if (window.update_installer_started_ && window.update_service_.InstallerHandoverFailed()) {
     window.update_installer_started_ = false;
     window.controller_->actions().ResumeAfterUpdateHandoverFailure();
   }
+
+  ImGui::EndChild();
+  ImGui::PopStyleColor();
 }
 
-void UpdatePresenter::Render(SettingsWindow& window) {
-  DrawUpdateWorkspace(window);
-}
+void UpdatePresenter::Render(SettingsWindow& window) { DrawUpdateWorkspace(window); }
 
 }  // namespace minimize::ui

@@ -91,8 +91,8 @@ bool ImguiRenderer::BeginFrame() {
   return true;
 }
 
-void ImguiRenderer::EndFrame() {
-  if (!ready()) return;
+bool ImguiRenderer::EndFrame() {
+  if (!ready()) return false;
   ImGui::Render();
   constexpr float clear_color[] = {0.0f, 0.0f, 0.0f, 0.0f};
   context_->OMSetRenderTargets(1, render_target_view_.GetAddressOf(), nullptr);
@@ -100,6 +100,7 @@ void ImguiRenderer::EndFrame() {
   ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
   const HRESULT result = swap_chain_->Present(1, 0);
   if (IsDeviceLostError(result)) HandleDeviceLost();
+  return SUCCEEDED(result);
 }
 
 void ImguiRenderer::Resize(UINT width, UINT height) {

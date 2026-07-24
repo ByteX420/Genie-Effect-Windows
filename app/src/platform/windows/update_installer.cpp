@@ -12,11 +12,21 @@ class UniqueHandle final {
 public:
   UniqueHandle() = default;
   explicit UniqueHandle(HANDLE value) : value_(value) {}
-  ~UniqueHandle() {
-    if (value_ != nullptr && value_ != INVALID_HANDLE_VALUE) CloseHandle(value_);
-  }
+  ~UniqueHandle() { Reset(); }
   UniqueHandle(const UniqueHandle&) = delete;
   UniqueHandle& operator=(const UniqueHandle&) = delete;
+  UniqueHandle(UniqueHandle&& other) noexcept : value_(std::exchange(other.value_, nullptr)) {}
+  UniqueHandle& operator=(UniqueHandle&& other) noexcept {
+    if (this != &other) {
+      Reset();
+      value_ = std::exchange(other.value_, nullptr);
+    }
+    return *this;
+  }
+  void Reset(HANDLE value = nullptr) {
+    if (value_ != nullptr && value_ != INVALID_HANDLE_VALUE) CloseHandle(value_);
+    value_ = value;
+  }
   [[nodiscard]] HANDLE Get() const { return value_; }
   [[nodiscard]] explicit operator bool() const {
     return value_ != nullptr && value_ != INVALID_HANDLE_VALUE;
@@ -113,9 +123,15 @@ int RunInstaller(int argument_count, wchar_t* arguments[]) {
     return ERROR_FILE_NOT_FOUND;
   }
 
-  // Compatibility path for older builds that still launch --apply-update. It is intentionally
-  // headless: the parent application owns every visible update frame.
-  UniqueHandle ready_event(OpenEventW(EVENT_MODIFY_STATE, FALSE, arguments[9]));
+  UniqueHandle ready_event;
+  for (int attempt = 0; attempt < 20; ++attempt) {
+    HANDLE handle = OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE, arguments[9]);
+    if (handle != nullptr) {
+      ready_event.Reset(handle);
+      break;
+    }
+    Sleep(10);
+  }
   if (ready_event) SetEvent(ready_event.Get());
 
   UniqueHandle parent(OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE,

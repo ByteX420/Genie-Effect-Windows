@@ -1,4 +1,4 @@
-﻿#include "pch.hpp"
+#include "pch.hpp"
 
 #include "platform/windows/single_instance_guard.hpp"
 
@@ -51,6 +51,11 @@ SingleInstanceResult SingleInstanceGuard::Acquire() {
                                          : SingleInstanceResult::kError;
   }
   if (error_ == ERROR_ALREADY_EXISTS) {
+    const DWORD wait_result = WaitForSingleObject(mutex_, 0);
+    if (wait_result == WAIT_OBJECT_0 || wait_result == WAIT_ABANDONED) {
+      owns_mutex_ = true;
+      return SingleInstanceResult::kPrimary;
+    }
     Release();
     return SingleInstanceResult::kAlreadyRunning;
   }

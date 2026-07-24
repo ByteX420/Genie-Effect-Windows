@@ -52,6 +52,7 @@ public:
 
   bool Initialize(HINSTANCE instance, const ApplicationLaunchOptions& options);
   int Run();
+  [[nodiscard]] bool PublishUpdateHandoverWindow();
   void RenderUpdateHandoverFrame();
   void CompleteUpdateHandover();
   void PrepareForUpdateHandover() override;

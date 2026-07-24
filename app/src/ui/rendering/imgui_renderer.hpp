@@ -16,7 +16,7 @@ public:
   bool Initialize(HWND window);
   void Shutdown();
   [[nodiscard]] bool BeginFrame();
-  void EndFrame();
+  [[nodiscard]] bool EndFrame();
   void Resize(UINT width, UINT height);
   [[nodiscard]] bool HandleWin32Message(HWND window, UINT message, WPARAM w_param,
                                         LPARAM l_param) const;

@@ -68,8 +68,8 @@
       <AdditionalDependencies>user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>cmd /c "taskkill /IM MinimizeEffect.exe /T /F &gt;nul 2&gt;nul &amp; exit /b 0"</Command>
-      <Message>Stopping a running MinimizeEffect instance before rebuilding the hook...</Message>
+      <Command>taskkill /IM MinimizeEffect.exe /T /F &gt;nul 2&gt;nul &amp; powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Test-Path '$(OutDir)MinimizeEffectHook.dll') { try { Remove-Item -Force '$(OutDir)MinimizeEffectHook.dll' -ErrorAction Stop } catch { Move-Item -Force '$(OutDir)MinimizeEffectHook.dll' ('$(OutDir)MinimizeEffectHook.dll.old_' + [System.IO.Path]::GetRandomFileName()) -ErrorAction SilentlyContinue } }; Get-ChildItem '$(OutDir)MinimizeEffectHook.dll.old_*' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue" &amp; exit /b 0</Command>
+      <Message>Stopping running MinimizeEffect and unlocking hook DLL before building...</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">

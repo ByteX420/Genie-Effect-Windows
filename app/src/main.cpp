@@ -99,15 +99,29 @@ int wmain(int argument_count, wchar_t* arguments[]) {
   }
 
   if (launch_options->IsUpdateHandover()) {
-    HANDLE ready_event =
-        OpenEventW(EVENT_MODIFY_STATE, FALSE, launch_options->update_ready_event_name.c_str());
-    if (ready_event != nullptr) {
-      SetEvent(ready_event);
-      CloseHandle(ready_event);
+    HANDLE ready_event = nullptr;
+    for (int attempt = 0; attempt < 20; ++attempt) {
+      ready_event = OpenEventW(EVENT_MODIFY_STATE | SYNCHRONIZE, FALSE,
+                               launch_options->update_ready_event_name.c_str());
+      if (ready_event != nullptr) break;
+      Sleep(10);
     }
-    HANDLE parent =
-        OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
-                    launch_options->update_parent_process_id);
+    if (ready_event == nullptr) {
+      return static_cast<int>(GetLastError());
+    }
+    if (!application.PublishUpdateHandoverWindow()) {
+      CloseHandle(ready_event);
+      return ERROR_GRAPHICS_PRESENT_OCCLUDED;
+    }
+    if (!SetEvent(ready_event)) {
+      const DWORD error = GetLastError();
+      CloseHandle(ready_event);
+      return static_cast<int>(error);
+    }
+    CloseHandle(ready_event);
+
+    HANDLE parent = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
+                                launch_options->update_parent_process_id);
     if (parent != nullptr) {
       const ULONGLONG handover_deadline = GetTickCount64() + 30000;
       DWORD parent_wait = WAIT_TIMEOUT;

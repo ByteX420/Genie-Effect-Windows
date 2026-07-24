@@ -32,6 +32,7 @@ public:
 
   [[nodiscard]] bool Initialize(HINSTANCE instance, const ApplicationLaunchOptions& options = {});
   [[nodiscard]] int Run();
+  [[nodiscard]] bool PublishUpdateHandoverWindow();
   void RenderUpdateHandoverFrame();
   void CompleteUpdateHandover();
   void RequestShutdown();

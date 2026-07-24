@@ -75,23 +75,26 @@ bool ApplicationRuntime::Initialize(HINSTANCE instance, const ApplicationLaunchO
     minimize::core::LogDebug(L"App", L"Running as Administrator");
   }
 
-  if (!settings_window_.Initialize(instance, *this)) {
-    return false;
-  }
   if (options.initial_window_bounds) {
     settings_window_.SetInitialBounds(*options.initial_window_bounds);
+  }
+  if (!settings_window_.Initialize(instance, *this)) {
+    return false;
   }
   if (options.IsUpdateHandover()) {
     settings_window_.PrepareUpdateResume(options.initial_page, options.initial_page_scroll,
                                          options.initial_maximized);
   }
   settings_window_.UpdateState(settings_service_.Get());
-  if (!options.IsUpdateHandover() && !StartRuntimeServices()) return false;
+  if (!options.IsUpdateHandover()) {
+    settings_window_.StartUpdateService();
+    if (!StartRuntimeServices()) return false;
+  }
 
-  // During a handover the replacement process paints this window first and starts hooks only
-  // after the old process has acknowledged the frame and exited.
-  settings_window_.Show(options.force_show_settings || !settings_service_.Get().start_minimized ||
-                        settings_service_.Get().close_behavior != "tray");
+  if (!options.IsUpdateHandover()) {
+    settings_window_.Show(options.force_show_settings || !settings_service_.Get().start_minimized ||
+                          settings_service_.Get().close_behavior != "tray");
+  }
 
   std::wcout << L"Minimize minimize monitor is running.\n";
   minimize::core::LogTrace(L"App", L"ApplicationRuntime::Initialize completed");
@@ -140,6 +143,10 @@ int ApplicationRuntime::Run() {
   });
 }
 
+bool ApplicationRuntime::PublishUpdateHandoverWindow() {
+  return settings_window_.PublishUpdateHandoverWindow();
+}
+
 void ApplicationRuntime::RenderUpdateHandoverFrame() { settings_window_.Render(); }
 
 void ApplicationRuntime::PrepareForUpdateHandover() {
@@ -161,6 +168,8 @@ void ApplicationRuntime::CompleteUpdateHandover() {
     minimize::core::LogDebug(L"Update", L"Could not start runtime services after handover");
     return;
   }
+  // Backup cleanup must start only after the former process has released its executable and hook.
+  settings_window_.StartUpdateService();
   settings_window_.CompleteUpdateHandover();
   update_handover_prepared_.store(false, std::memory_order_release);
   frame_scheduler_.Wake();
